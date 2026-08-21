@@ -1,0 +1,31 @@
+[project]
+name = "data-pipeline-diagnostics"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+authors = [
+    { name = "litharis04", email = "shda1012@h-ka.de" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "dbt-core>=1.12.0",
+    "dbt-duckdb>=1.11.0",
+    "duckdb>=1.5.5",
+    "jsonschema>=4.26.0",
+    "pydantic>=2.13.4",
+]
+
+[project.scripts]
+data-pipeline-diagnostics = "data_pipeline_diagnostics:main"
+
+[build-system]
+requires = ["uv_build>=0.12.3,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "ruff>=0.16.2",
+]
+test = [
+    "pytest>=9.1.1",
+]
