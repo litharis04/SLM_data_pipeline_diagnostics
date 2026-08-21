@@ -138,14 +138,23 @@ healthy pipeline
 - `training/` - SFT dataset preparation and cloud training scripts.
 - `tests/` - pytest tests.
 
+## 5. Task Execution
 
-## 5. Minimal quality gates
+Implementation tasks are instructions to modify the repository, not requests
+for proposed code.
 
-A task is complete only if:
-- acceptance criteria from the task file are met;
-- existing tests pass;
-- lint passes;
-- docs are updated if public behavior changed;
-- the change is reproducible by available commands.
+For tasks defined by a Markdown task file:
+
+1. Read the complete task before making changes.
+2. Inspect the referenced specifications and existing implementation.
+3. Perform the requested changes directly in the repository.
+4. Run the validation required by the task.
+5. Re-read the original task file before finishing.
+6. Verify every checklist item against the actual repository state.
+7. Update project state/documentation required by the task.
+8. Report only after the task is complete.
+
+Do not substitute code shown in chat for repository changes.
+Do not mark or report a task complete if any checklist item remains unmet.
 
 If required checks do not exist yet, explicitly state what is missing.
