@@ -35,6 +35,7 @@ from data_pipeline_diagnostics.scenario.generators import (
     TemplateStringGenerator,
     TimestampRangeGenerator,
 )
+from data_pipeline_diagnostics.scenario.raw import RawColumn, RawTable
 from data_pipeline_diagnostics.scenario.types import (
     DataType,
     Description,
@@ -82,6 +83,8 @@ __all__ = [
     "PhoneNumberGenerator",
     "Probability",
     "RandomStringGenerator",
+    "RawColumn",
+    "RawTable",
     "RelationshipEndpoint",
     "RowCount",
     "ScalarValue",
