@@ -36,6 +36,14 @@ from data_pipeline_diagnostics.scenario.generators import (
     TimestampRangeGenerator,
 )
 from data_pipeline_diagnostics.scenario.raw import RawColumn, RawTable
+from data_pipeline_diagnostics.scenario.relationships import (
+    BridgeReference,
+    ManyToManyRelationship,
+    ManyToOneRelationship,
+    OneToManyRelationship,
+    OneToOneRelationship,
+    RelationshipSpec,
+)
 from data_pipeline_diagnostics.scenario.types import (
     DataType,
     Description,
@@ -54,6 +62,7 @@ __all__ = [
     "BinaryExpression",
     "BooleanCondition",
     "BooleanGenerator",
+    "BridgeReference",
     "CategoricalGenerator",
     "CityGenerator",
     "CoalesceExpression",
@@ -77,8 +86,12 @@ __all__ = [
     "InCondition",
     "IntegerRangeGenerator",
     "LiteralExpression",
+    "ManyToManyRelationship",
+    "ManyToOneRelationship",
     "NotCondition",
     "NullCondition",
+    "OneToManyRelationship",
+    "OneToOneRelationship",
     "PersonNameGenerator",
     "PhoneNumberGenerator",
     "Probability",
@@ -86,6 +99,7 @@ __all__ = [
     "RawColumn",
     "RawTable",
     "RelationshipEndpoint",
+    "RelationshipSpec",
     "RowCount",
     "ScalarValue",
     "ScenarioId",

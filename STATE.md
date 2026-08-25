@@ -7,10 +7,11 @@
 - Shared scalar types implemented: `src/data_pipeline_diagnostics/scenario/types.py` (Identifier, ScenarioId, DomainName, Description, DataType, ScalarValue, Probability, RelationshipEndpoint, SortKey, RowCount)
 - Structured expressions/conditions implemented: `src/data_pipeline_diagnostics/scenario/expressions.py` (Expression/Condition unions discriminated by `kind`, strict validation)
 - Mini-generators implemented: `src/data_pipeline_diagnostics/scenario/generators.py` (all 16 generator kinds, discriminated by `kind`, local validators for ranges, prefix, template, categorical, etc., GeneratorSpec union)
-- Scenario package exports: `src/data_pipeline_diagnostics/scenario/__init__.py` (now exports `RawColumn`, `RawTable`)
+- Scenario package exports: `src/data_pipeline_diagnostics/scenario/__init__.py` (exports `RawColumn`, `RawTable`, `RelationshipSpec`, `BridgeReference`, concrete relationships)
 - Raw-data models implemented: `src/data_pipeline_diagnostics/scenario/raw.py` (RawColumn with `type`, `nullable`, `null_probability`, `unique`, `generator`, `description` and null_probability validator; RawTable with columns uniqueness and PK uniqueness validators, tuple arrays per §3.2)
-- Contract tests created: `tests/scenario/test_base_contract.py`, `tests/scenario/test_types.py`, `tests/scenario/test_expressions.py`, `tests/scenario/test_generators.py`, `tests/scenario/test_raw.py` and `tests/test_base.py`, `tests/test_types.py`, `tests/test_expressions.py`, `tests/test_generators.py`
-- All contract tests pass (125 passed with `--import-mode=importlib`)
+- Relationship models implemented: `src/data_pipeline_diagnostics/scenario/relationships.py` (BridgeReference with disjoint validator, OneToOne/OneToMany/ManyToOne/ManyToMany per §9, RelationshipSpec discriminated by `cardinality`)
+- Contract tests created: `tests/scenario/test_base_contract.py`, `tests/scenario/test_types.py`, `tests/scenario/test_expressions.py`, `tests/scenario/test_generators.py`, `tests/scenario/test_raw.py`, `tests/scenario/test_relationships.py` and `tests/test_base.py`, `tests/test_types.py`, `tests/test_expressions.py`, `tests/test_generators.py`
+- All contract tests pass (143 passed with `--import-mode=importlib`)
 - Lint and format checks pass (`ruff check` and `ruff format`)
-- Pytest configured with `import-mode=importlib` and ruff settings in `pyproject.toml`
-- Branch `scenario_contract` tracks raw tables implementation
+- Pytest configured with `import-mode=importlib` and ruff settings in `pyproject.toml` (`ignore = ["E501"]`)
+- Branch `scenario_contract` tracks raw tables and relationships implementation
