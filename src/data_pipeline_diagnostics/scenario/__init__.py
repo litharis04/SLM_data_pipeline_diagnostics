@@ -37,12 +37,6 @@ from data_pipeline_diagnostics.scenario.generators import (
 )
 from data_pipeline_diagnostics.scenario.intermediate import (
     AggregateIntermediateModel,
-    AverageMetric,
-    CountDistinctMetric,
-    ConditionalCountMetric,
-    ConditionalSumMetric,
-    CountMetric,
-    CountRowsMetric,
     DeduplicateIntermediateModel,
     DerivedColumn,
     IntermediateModel,
@@ -50,12 +44,21 @@ from data_pipeline_diagnostics.scenario.intermediate import (
     JoinKeyPair,
     JoinProjectionColumn,
     JoinSpec,
+    ProjectionColumn,
+    TransformIntermediateModel,
+)
+from data_pipeline_diagnostics.scenario.output import (
+    AverageMetric,
+    ConditionalCountMetric,
+    ConditionalSumMetric,
+    CountDistinctMetric,
+    CountMetric,
+    CountRowsMetric,
     MaximumMetric,
     MetricSpec,
     MinimumMetric,
-    ProjectionColumn,
+    OutputModel,
     SumMetric,
-    TransformIntermediateModel,
 )
 from data_pipeline_diagnostics.scenario.raw import RawColumn, RawTable
 from data_pipeline_diagnostics.scenario.relationships import (
@@ -131,6 +134,7 @@ __all__ = [
     "NullCondition",
     "OneToManyRelationship",
     "OneToOneRelationship",
+    "OutputModel",
     "PersonNameGenerator",
     "PhoneNumberGenerator",
     "Probability",
