@@ -1,5 +1,14 @@
 """Scenario contract package public exports."""
 
+from data_pipeline_diagnostics.scenario.assertions import (
+    AcceptedValuesAssertion,
+    ColumnRangeAssertion,
+    HealthyAssertion,
+    NotNullAssertion,
+    RelationshipsAssertion,
+    RowCountAssertion,
+    UniqueAssertion,
+)
 from data_pipeline_diagnostics.scenario.base import ContractModel
 from data_pipeline_diagnostics.scenario.expressions import (
     AnyCondition,
@@ -83,6 +92,7 @@ from data_pipeline_diagnostics.scenario.types import (
 )
 
 __all__ = [
+    "AcceptedValuesAssertion",
     "AggregateIntermediateModel",
     "AnyCondition",
     "AverageMetric",
@@ -93,6 +103,7 @@ __all__ = [
     "CategoricalGenerator",
     "CityGenerator",
     "CoalesceExpression",
+    "ColumnRangeAssertion",
     "ColumnExpression",
     "CompanyNameGenerator",
     "ComparisonCondition",
@@ -116,6 +127,7 @@ __all__ = [
     "ForeignKeyGenerator",
     "FormattedIdGenerator",
     "GeneratorSpec",
+    "HealthyAssertion",
     "Identifier",
     "InCondition",
     "IntermediateModel",
@@ -131,10 +143,14 @@ __all__ = [
     "MetricSpec",
     "MinimumMetric",
     "NotCondition",
+    "NotNullAssertion",
     "NullCondition",
     "OneToManyRelationship",
     "OneToOneRelationship",
     "OutputModel",
+    "RelationshipsAssertion",
+    "RowCountAssertion",
+    "UniqueAssertion",
     "PersonNameGenerator",
     "PhoneNumberGenerator",
     "Probability",
