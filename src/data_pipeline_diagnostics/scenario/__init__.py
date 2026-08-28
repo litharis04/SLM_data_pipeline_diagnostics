@@ -10,6 +10,11 @@ from data_pipeline_diagnostics.scenario.assertions import (
     UniqueAssertion,
 )
 from data_pipeline_diagnostics.scenario.base import ContractModel
+from data_pipeline_diagnostics.scenario.errors import (
+    ErrorCode,
+    SemanticIssue,
+    SemanticValidationError,
+)
 from data_pipeline_diagnostics.scenario.expressions import (
     AnyCondition,
     BinaryExpression,
@@ -79,12 +84,13 @@ from data_pipeline_diagnostics.scenario.relationships import (
     OneToOneRelationship,
     RelationshipSpec,
 )
+from data_pipeline_diagnostics.scenario.semantic import ValidatedScenario, validate_semantics
 from data_pipeline_diagnostics.scenario.staging import (
     CastOperation,
     CoalesceOperation,
     DeduplicateRowsOperation,
     FilterRowsOperation,
-    LowerOperation,
+    LowerOperation,  # noqa: F401
     MapValuesOperation,
     NullIfOperation,
     ReplaceOperation,
@@ -142,6 +148,7 @@ __all__ = [
     "Description",
     "DomainName",
     "EmailGenerator",
+    "ErrorCode",
     "Expression",
     "FilterRowsOperation",
     "FloatRangeGenerator",
@@ -158,7 +165,6 @@ __all__ = [
     "JoinProjectionColumn",
     "JoinSpec",
     "LiteralExpression",
-    "LowerOperation",
     "ManyToManyRelationship",
     "ManyToOneRelationship",
     "MapValuesOperation",
@@ -172,6 +178,8 @@ __all__ = [
     "OneToManyRelationship",
     "OneToOneRelationship",
     "OutputModel",
+    "SemanticIssue",
+    "SemanticValidationError",
     "ReplaceOperation",
     "RelationshipsAssertion",
     "RowCountAssertion",
@@ -201,4 +209,6 @@ __all__ = [
     "TransformIntermediateModel",
     "TrimOperation",
     "UpperOperation",
+    "ValidatedScenario",
+    "validate_semantics",
 ]
