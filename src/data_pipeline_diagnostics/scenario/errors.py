@@ -63,3 +63,21 @@ class ErrorCode:
     CONTRADICTORY_ASSERTION = "E128"
     # generic
     UNKNOWN = "E999"
+
+
+class ScenarioParseError(Exception):
+    """Project-level parse error wrapping Pydantic ValidationError (§18.1)."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: str = "P001",
+        path: str = "",
+        original: Exception | None = None,
+    ) -> None:
+        self.code = code
+        self.path = path
+        self.message = message
+        self.original = original
+        super().__init__(f"{code} at {path}: {message}" if path else f"{code}: {message}")

@@ -12,6 +12,7 @@ from data_pipeline_diagnostics.scenario.assertions import (
 from data_pipeline_diagnostics.scenario.base import ContractModel
 from data_pipeline_diagnostics.scenario.errors import (
     ErrorCode,
+    ScenarioParseError,
     SemanticIssue,
     SemanticValidationError,
 )
@@ -61,6 +62,10 @@ from data_pipeline_diagnostics.scenario.intermediate import (
     ProjectionColumn,
     TransformIntermediateModel,
 )
+from data_pipeline_diagnostics.scenario.json_schema import (
+    export_json_schema,
+    get_scenario_json_schema,
+)
 from data_pipeline_diagnostics.scenario.models import Scenario
 from data_pipeline_diagnostics.scenario.output import (
     AverageMetric,
@@ -74,6 +79,12 @@ from data_pipeline_diagnostics.scenario.output import (
     MinimumMetric,
     OutputModel,
     SumMetric,
+)
+from data_pipeline_diagnostics.scenario.parsing import (
+    canonical_json,
+    parse_scenario_file,
+    parse_scenario_json,
+    scenario_content_hash,
 )
 from data_pipeline_diagnostics.scenario.raw import RawColumn, RawTable
 from data_pipeline_diagnostics.scenario.relationships import (
@@ -178,8 +189,15 @@ __all__ = [
     "OneToManyRelationship",
     "OneToOneRelationship",
     "OutputModel",
+    "ScenarioParseError",
     "SemanticIssue",
     "SemanticValidationError",
+    "canonical_json",
+    "export_json_schema",
+    "get_scenario_json_schema",
+    "parse_scenario_file",
+    "parse_scenario_json",
+    "scenario_content_hash",
     "ReplaceOperation",
     "RelationshipsAssertion",
     "RowCountAssertion",
