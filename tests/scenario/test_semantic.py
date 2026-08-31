@@ -169,20 +169,31 @@ def test_positive_full_scenario_passes():
     assert validated.scenario == s
     assert "trans_a" in validated.topological_order
     assert "join_a" in validated.topological_order
-    assert len(validated.derived_assertions) >= 0
-    # check lineage exists
+    # §17.1: resolved schemas and grains must be present
+    assert "stg_a" in validated.staging_schemas
+    assert "trans_a" in validated.intermediate_schemas
+    assert "out_a" in validated.output_schemas
+    assert "stg_a" in validated.resolved_grains
+    assert "raw_a" in validated.resolved_keys
+    assert validated.resolved_keys["raw_a"] == ("id",)
+    # lineage must be raw lineage, not just current_model.column
     assert "stg_a" in validated.lineage
-    # check symbol tables
-    assert "raw_a" in validated.raw_by_name
-    assert "stg_a" in validated.staging_by_name
+    assert validated.lineage["stg_a"]["id"] == ["raw_a.id"]
+    assert validated.lineage["trans_a"]["id"] == ["raw_a.id"]
+    # derived assertions must be comprehensive
+    derived_types = {d["type"] for d in validated.derived_assertions}
+    assert "not_null" in derived_types
+    assert "unique" in derived_types
+    assert "relationships" in derived_types
+    assert "row_count" in derived_types
+    # At least 5 derived assertions for this scenario
+    assert len(validated.derived_assertions) >= 5
     # deterministic ordering – re-run gives same
     validated2 = validate_semantics(s)
-    assert (
-        [i.code for i in validated2.derived_assertions]
-        == [i.code for i in validated.derived_assertions]
-        if False
-        else True
-    )
+    assert [d["name"] for d in validated.derived_assertions] == [
+        d["name"] for d in validated2.derived_assertions
+    ]
+    assert list(validated.staging_schemas.keys()) == list(validated2.staging_schemas.keys())
 
     # compiler boundary – bare Scenario should not be accepted where ValidatedScenario required
     def _compiler_accepts(vs: ValidatedScenario) -> None:
@@ -482,14 +493,14 @@ def test_wrong_fk_side():
 
 
 def test_invalid_staging_chain():
-    # staging grain references non-existent column after transformations
+    # staging operation chain: trim on integer column must fail (only valid on string)
     base = _base_scenario()
     base["staging_models"] = (
         {
             "name": "stg_a",
             "source": "raw_a",
-            "columns": ({"source": "id", "target": "id"},),
-            "grain": ("nonexistent",),
+            "columns": ({"source": "id", "target": "id", "operations": ({"op": "trim"},)},),
+            "grain": ("id",),
         },
         base["staging_models"][1],
         base["staging_models"][2],
@@ -497,7 +508,25 @@ def test_invalid_staging_chain():
     s = Scenario.model_validate(base)
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
-    assert any("grain" in i.message.lower() for i in exc.value.issues)
+    assert any(
+        "trim" in i.message.lower() or "string" in i.message.lower() for i in exc.value.issues
+    )
+    # also test grain still fails if needed, but chain is primary
+    base2 = _base_scenario()
+    base2["staging_models"] = (
+        {
+            "name": "stg_a",
+            "source": "raw_a",
+            "columns": ({"source": "id", "target": "id"},),
+            "grain": ("nonexistent",),
+        },
+        base2["staging_models"][1],
+        base2["staging_models"][2],
+    )
+    s2 = Scenario.model_validate(base2)
+    with pytest.raises(SemanticValidationError) as exc2:
+        validate_semantics(s2)
+    assert any("grain" in i.message.lower() for i in exc2.value.issues)
 
 
 def test_cyclic_dag():
@@ -707,26 +736,64 @@ def test_disconnected_model():
 
 
 def test_contradictory_assertion():
+    # Duplicate explicit assertions with same effective meaning
     base = _base_scenario()
-    # Create assertion that references non-existent model – this is semantic missing ref, also contradictory could be duplicate
     base["tests"] = (
-        {"name": "assert1", "model": "nonexistent_model", "type": "not_null", "columns": ("id",)},
+        {"name": "assert1", "model": "out_a", "type": "not_null", "columns": ("id",)},
+        {"name": "assert2", "model": "out_a", "type": "not_null", "columns": ("id",)},
     )
     s = Scenario.model_validate(base)
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
-    assert any("does not exist" in i.message.lower() for i in exc.value.issues)
+    assert any("duplicate" in i.message.lower() for i in exc.value.issues)
+    # Explicit that duplicates derived (PK not_null is derived)
+    base2 = _base_scenario()
+    # raw_a has PK id, derived will be not_null on raw_a.id, so explicit duplicate should fail
+    base2["tests"] = (
+        {"name": "dup_derived", "model": "raw_a", "type": "not_null", "columns": ("id",)},
+    )
+    s2 = Scenario.model_validate(base2)
+    with pytest.raises(SemanticValidationError) as exc2:
+        validate_semantics(s2)
+    assert any(
+        "derived" in i.message.lower() or "duplicate" in i.message.lower()
+        for i in exc2.value.issues
+    )
+    # Also test missing ref still is semantic, but contradictory is primary
+    base3 = _base_scenario()
+    base3["tests"] = (
+        {"name": "assert1", "model": "nonexistent_model", "type": "not_null", "columns": ("id",)},
+    )
+    s3 = Scenario.model_validate(base3)
+    with pytest.raises(SemanticValidationError) as exc3:
+        validate_semantics(s3)
+    assert any("does not exist" in i.message.lower() for i in exc3.value.issues)
 
 
 def test_compiler_accepts_only_validated():
-    # This is checked in positive test, but explicit
     data = _base_scenario()
     s = Scenario.model_validate(data)
     validated = validate_semantics(s)
+    # ValidatedScenario must be distinct type, not alias
+    assert type(validated) is not Scenario
+    assert isinstance(validated, ValidatedScenario)
+    assert not isinstance(s, ValidatedScenario)
+    assert validated.scenario is s
+    assert hasattr(validated, "topological_order")
+    assert hasattr(validated, "staging_schemas")
+    assert hasattr(validated, "derived_assertions")
 
+    # Simulate compiler that only accepts ValidatedScenario
     def requires_validated(vs: ValidatedScenario) -> int:
+        if not isinstance(vs, ValidatedScenario):
+            raise TypeError("compiler requires ValidatedScenario, got bare Scenario")
         return len(vs.topological_order)
 
     assert requires_validated(validated) >= 1
-    with pytest.raises(Exception):
+    with pytest.raises(TypeError, match="ValidatedScenario"):
         requires_validated(s)  # type: ignore[arg-type]
+    # Also check that raw lineage and resolved schemas are present
+    assert validated.lineage["stg_a"]["id"] == ["raw_a.id"]
+    assert (
+        validated.staging_schemas["stg_a"]["id"] == validated.intermediate_schemas["trans_a"]["id"]
+    )
