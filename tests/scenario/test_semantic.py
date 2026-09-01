@@ -150,8 +150,20 @@ def _base_scenario() -> dict:
         "relationships": (
             _rel("rel_a", "raw_a", ("id",), "raw_b", ("a_id",), cardinality="one_to_many"),
         ),
-        "staging_models": (_stg("stg_a", "raw_a"), _stg("stg_b", "raw_b"), _stg("stg_c", "raw_c")),
-        "intermediate_models": (_trans("trans_a", "stg_a"), _join("join_a", "stg_b", "stg_c")),
+        "staging_models": (
+            _stg("stg_a", "raw_a"),
+            {
+                "name": "stg_b",
+                "source": "raw_b",
+                "columns": ({"source": "id", "target": "id"}, {"source": "a_id", "target": "a_id"}),
+                "grain": ("id",),
+            },
+            _stg("stg_c", "raw_c"),
+        ),
+        "intermediate_models": (
+            _trans("trans_a", "stg_c"),
+            _join("join_a", "stg_a", "stg_b", left_key="id", right_key="a_id"),
+        ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
 
@@ -179,7 +191,7 @@ def test_positive_full_scenario_passes():
     # lineage must be raw lineage, not just current_model.column
     assert "stg_a" in validated.lineage
     assert validated.lineage["stg_a"]["id"] == ["raw_a.id"]
-    assert validated.lineage["trans_a"]["id"] == ["raw_a.id"]
+    assert validated.lineage["trans_a"]["id"] == ["raw_c.id"]
     # derived assertions must be comprehensive
     derived_types = {d["type"] for d in validated.derived_assertions}
     assert "not_null" in derived_types
@@ -669,18 +681,18 @@ def test_impossible_grain():
 def test_invalid_metric_type():
     base = _base_scenario()
     # Use sum on string column – should fail
-    # Make stg_a's id be string type
+    # Make raw_c's id be string type (trans_a is from stg_c)
     base["raw_tables"] = (
+        base["raw_tables"][0],
+        base["raw_tables"][1],
         {
-            "name": "raw_a",
+            "name": "raw_c",
             "rows": {"min": 1, "max": 10},
             "columns": ({"name": "id", "type": "string", "generator": _STR_GEN},),
             "primary_key": ("id",),
         },
-        base["raw_tables"][1],
-        base["raw_tables"][2],
     )
-    # intermediate trans_a will have id string type
+    # intermediate trans_a will have id string type (from stg_c)
     # output sum on id string should fail
     base["output_models"] = (
         {

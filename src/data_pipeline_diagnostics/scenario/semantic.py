@@ -204,6 +204,73 @@ def _check_condition(
         _check_condition(cond.get("condition"), schema, issues, path)
 
 
+def _collect_expression_columns(expr: object) -> list[str]:
+    """Collect all column names referenced in an Expression."""
+    if expr is None:
+        return []
+    if hasattr(expr, "model_dump"):
+        expr = expr.model_dump()  # type: ignore[union-attr]
+    if not isinstance(expr, dict):
+        return []
+    kind = expr.get("kind")
+    if kind == "column":
+        col = expr.get("column")
+        return [col] if isinstance(col, str) else []
+    if kind == "binary":
+        return _collect_expression_columns(expr.get("left")) + _collect_expression_columns(
+            expr.get("right")
+        )
+    if kind == "date_part":
+        return _collect_expression_columns(expr.get("value"))
+    if kind == "coalesce":
+        cols: list[str] = []
+        for v in expr.get("values", []):
+            cols.extend(_collect_expression_columns(v))
+        return cols
+    return []
+
+
+def _collect_condition_columns(cond: object) -> list[str]:
+    """Collect all column names referenced in a Condition."""
+    if cond is None:
+        return []
+    if hasattr(cond, "model_dump"):
+        cond = cond.model_dump()  # type: ignore[union-attr]
+    if not isinstance(cond, dict):
+        return []
+    kind = cond.get("kind")
+    if kind == "comparison":
+        return _collect_expression_columns(cond.get("left")) + _collect_expression_columns(
+            cond.get("right")
+        )
+    if kind == "in":
+        return _collect_expression_columns(cond.get("value"))
+    if kind == "is_null":
+        return _collect_expression_columns(cond.get("value"))
+    if kind in ("all", "any"):
+        cols: list[str] = []
+        for c in cond.get("conditions", []):
+            cols.extend(_collect_condition_columns(c))
+        return cols
+    if kind == "not":
+        return _collect_condition_columns(cond.get("condition"))
+    return []
+
+
+def _raw_lineage_for_column(
+    model_name: str,
+    col_name: str,
+    staging_lineage: dict[str, dict[str, list[str]]],
+    intermediate_lineage: dict[str, dict[str, list[str]]],
+) -> list[str]:
+    """Return raw lineage for a column in a staging or intermediate model."""
+    if model_name in staging_lineage:
+        return staging_lineage[model_name].get(col_name, [f"{model_name}.{col_name}"])
+    if model_name in intermediate_lineage:
+        return intermediate_lineage[model_name].get(col_name, [f"{model_name}.{col_name}"])
+    return [f"{model_name}.{col_name}"]
+
+
 # ---------------------------------------------------------------------------
 # Main validator
 # ---------------------------------------------------------------------------
@@ -1237,10 +1304,17 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=dc.name,
                     )
                 out_schema[dc.name] = declared if declared else DataType.string
-                # Lineage for derived column is expression's columns + derived
-                # Simplified: collect column refs
-                # For now, lineage is derived itself
-                out_lineage[dc.name] = [f"{m.name}.{dc.name}"]
+                # Proper raw lineage: combine raw lineage of all columns in expression
+                expr_cols = _collect_expression_columns(dc.expression)
+                raw_lin: list[str] = []
+                for ec in expr_cols:
+                    if ec in src_lineage:
+                        raw_lin.extend(src_lineage[ec])
+                    elif ec in out_lineage:
+                        raw_lin.extend(out_lineage[ec])
+                    else:
+                        raw_lin.append(f"{m.source}.{ec}")
+                out_lineage[dc.name] = sorted(set(raw_lin)) if raw_lin else [f"{m.name}.{dc.name}"]
                 # Also check condition filters
             for f in getattr(m, "filters", []):
                 _check_condition(f, out_schema, issues, f"intermediate_models[{name}].filters")
@@ -1297,9 +1371,106 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"join key type mismatch '{lt.value}' vs '{rt.value}'",
                         related=pair.left,
                     )
-                # Check lineage: join keys should be supported by traceable raw relationship
-                # Per spec, join keys must be traceable via raw lineage – simplified check omitted for base scenario compatibility
-                pass
+                # Check lineage: join keys must be supported by raw relationship
+                # Get raw lineage for each side
+                left_raw_lin = left_lineage.get(pair.left, [])
+                right_raw_lin = right_lineage.get(pair.right, [])
+
+                # Each lineage is like ["raw_a.id"] – extract table and column
+                def _parse_raw(lin: str) -> tuple[str, str] | None:
+                    if "." in lin:
+                        t, c = lin.split(".", 1)
+                        return (t, c)
+                    return None
+
+                left_raw = _parse_raw(left_raw_lin[0]) if left_raw_lin else None
+                right_raw = _parse_raw(right_raw_lin[0]) if right_raw_lin else None
+                if left_raw and right_raw:
+                    found = False
+                    for rel in scenario.relationships:
+                        # Check if relationship connects these raw tables/columns (in either direction)
+                        if (
+                            rel.left.table == left_raw[0]
+                            and rel.right.table == right_raw[0]
+                            and left_raw[1] in rel.left.columns
+                            and right_raw[1] in rel.right.columns
+                        ) or (
+                            rel.left.table == right_raw[0]
+                            and rel.right.table == left_raw[0]
+                            and right_raw[1] in rel.left.columns
+                            and left_raw[1] in rel.right.columns
+                        ):
+                            # Also check arity matches – for direct relationships, single column check is enough
+                            found = True
+                            break
+                        # For composite keys, check if pair is part of relationship
+                        # Simplified: check if left_raw and right_raw are in any relationship together
+                        if (rel.left.table, rel.right.table) == (left_raw[0], right_raw[0]) or (
+                            rel.left.table,
+                            rel.right.table,
+                        ) == (right_raw[0], left_raw[0]):
+                            # Check if columns are part of relationship
+                            if (
+                                left_raw[1] in rel.left.columns
+                                and right_raw[1] in rel.right.columns
+                            ):
+                                found = True
+                            elif (
+                                left_raw[1] in rel.right.columns
+                                and right_raw[1] in rel.left.columns
+                            ):
+                                found = True
+                    if not found:
+                        _add_issue(
+                            issues,
+                            ErrorCode.JOIN_KEY_MISMATCH,
+                            f"intermediate_models[{name}].join.on",
+                            f"join keys '{pair.left}'/'{pair.right}' not supported by traceable raw relationship lineage",
+                            related=pair.left,
+                        )
+                # Grain vs cardinality: validate grain against join cardinality
+                # For inner join, grain should be combination or from one side; for left join, grain must be from left
+                # Simplified: for left join, grain must be subset of left side's grain or output; for inner, grain must be unique
+                # We check that grain is subset of output (already) and that for left join, grain columns are from left
+                if m.join.type == "left":
+                    for g in m.grain:
+                        # Find which side g comes from
+                        g_side = None
+                        for jc in m.columns:
+                            if jc.target == g:
+                                g_side = jc.side
+                                break
+                        if g_side is None:
+                            for dc in m.derived_columns:
+                                if dc.name == g:
+                                    # For derived, check its expression lineage
+                                    expr_cols = _collect_expression_columns(dc.expression)
+                                    # If any expression column is from right, then derived is from right
+                                    for ec in expr_cols:
+                                        if ec in right_schema:
+                                            g_side = "right"
+                                        elif ec in left_schema:
+                                            if g_side is None:
+                                                g_side = "left"
+                                            elif g_side == "right":
+                                                g_side = "both"
+                        # For left join, grain must be from left (preserves left grain)
+                        if g_side == "right":
+                            _add_issue(
+                                issues,
+                                ErrorCode.GRAIN_IMPOSSIBLE,
+                                f"intermediate_models[{name}].grain",
+                                f"grain '{g}' for left join must be from left side, got right",
+                                related=g,
+                            )
+                        elif g_side == "both":
+                            _add_issue(
+                                issues,
+                                ErrorCode.GRAIN_IMPOSSIBLE,
+                                f"intermediate_models[{name}].grain",
+                                f"grain '{g}' for left join must be from left side only",
+                                related=g,
+                            )
             out_schema = {}
             out_lineage = {}
             for jc in m.columns:
@@ -1358,7 +1529,21 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=dc.name,
                     )
                 out_schema[dc.name] = declared if declared else DataType.string
-                out_lineage[dc.name] = [f"{m.name}.{dc.name}"]
+                # Proper raw lineage for derived
+                expr_cols = _collect_expression_columns(dc.expression)
+                raw_lin: list[str] = []
+                for ec in expr_cols:
+                    # Expression is evaluated against out_schema (projected)
+                    # Find which side it comes from
+                    if ec in left_schema:
+                        raw_lin.extend(left_lineage.get(ec, [f"{m.left}.{ec}"]))
+                    elif ec in right_schema:
+                        raw_lin.extend(right_lineage.get(ec, [f"{m.right}.{ec}"]))
+                    elif ec in out_schema:
+                        raw_lin.extend(out_lineage.get(ec, [f"{m.name}.{ec}"]))
+                    else:
+                        raw_lin.append(f"{m.name}.{ec}")
+                out_lineage[dc.name] = sorted(set(raw_lin)) if raw_lin else [f"{m.name}.{dc.name}"]
             for f in getattr(m, "filters", []):
                 _check_condition(f, out_schema, issues, f"intermediate_models[{name}].filters")
             for g in m.grain:
@@ -1370,8 +1555,6 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"grain '{g}' not in output",
                         related=g,
                     )
-            # Grain vs cardinality: for inner join, grain should be from both sides? For left join, grain from left
-            # Simplified: check grain is subset of output
             intermediate_schema[name] = out_schema
             intermediate_lineage[name] = out_lineage
 
@@ -1449,7 +1632,22 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     out_schema[met.name] = ctype if ctype else DataType.string
                 else:
                     out_schema[met.name] = DataType.string
-                out_lineage[met.name] = [f"{m.name}.{met.name}"]
+                # Proper raw lineage for metric: column + condition columns
+                raw_lin: list[str] = []
+                if hasattr(met, "column"):
+                    col = getattr(met, "column", None)
+                    if col and col in src_lineage:
+                        raw_lin.extend(src_lineage[col])
+                if hasattr(met, "condition"):
+                    cond = getattr(met, "condition", None)
+                    for cc in _collect_condition_columns(cond):
+                        if cc in src_lineage:
+                            raw_lin.extend(src_lineage[cc])
+                        elif cc in src_schema:
+                            raw_lin.append(f"{m.source}.{cc}")
+                out_lineage[met.name] = (
+                    sorted(set(raw_lin)) if raw_lin else [f"{m.name}.{met.name}"]
+                )
             group_targets = {c.target for c in m.group_by}
             for g in m.grain:
                 if g not in group_targets:
@@ -1594,16 +1792,35 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 out_schema[met.name] = ctype if ctype else DataType.string
             else:
                 out_schema[met.name] = DataType.string
-            out_lin = []
+            # Proper raw lineage for output metrics
+            raw_lin: list[str] = []
             if hasattr(met, "column"):
                 col = getattr(met, "column", None)
                 if col and col in src_lineage:
-                    out_lin.extend(src_lineage[col])
-                else:
-                    out_lin.append(f"{out.source}.{met.name}")
+                    raw_lin.extend(src_lineage[col])
+            if hasattr(met, "condition"):
+                cond = getattr(met, "condition", None)
+                for cc in _collect_condition_columns(cond):
+                    if cc in src_lineage:
+                        raw_lin.extend(src_lineage[cc])
+                    elif cc in src_schema:
+                        raw_lin.append(f"{out.source}.{cc}")
+            if raw_lin:
+                out_line[met.name] = sorted(set(raw_lin))
             else:
-                out_lin.append(f"{out.source}.{met.name}")
-            out_line[met.name] = out_lin
+                # For count_rows without column, lineage is via group_by
+                # Use group_by lineage as fallback
+                if met.function == "count_rows":
+                    # count_rows has no column, but still should have raw lineage via group_by
+                    gb_lin: list[str] = []
+                    for pc in out.group_by:
+                        if pc.source in src_lineage:
+                            gb_lin.extend(src_lineage[pc.source])
+                    out_line[met.name] = (
+                        sorted(set(gb_lin)) if gb_lin else [f"{out.source}.{met.name}"]
+                    )
+                else:
+                    out_line[met.name] = [f"{out.source}.{met.name}"]
         output_schemas[out.name] = out_schema
         output_lineage[out.name] = out_line
 
