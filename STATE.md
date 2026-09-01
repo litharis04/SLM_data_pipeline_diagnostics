@@ -24,4 +24,4 @@
 - Build artifact: `artifacts/scenario.schema.json` generated via `export_json_schema` (deterministic, version 1.0, discriminators, additionalProperties false)
 - Fixtures: `tests/scenario/fixtures/valid/minimal.json`, `maximal.json` and `invalid/duplicate_column.json` per §4.3, §19
 - End-to-end verified: `parse_scenario_json → validate_semantics → canonical_json` round-trip and content hash deterministic (see STATE.md §21 closure)
-- Branch `scenario_contract` tracks T10 fix per review (full §17 coverage) + T11 closure – §21 acceptance criteria met
+- Branch `scenario_contract` tracks T10 fix per review (full §17 coverage, join lineage via raw relationship, grain cardinality, derived lineage to raw) + T11 closure – §21 acceptance criteria met (second review: join lineage and derived lineage fixed, positive test now uses supported join)
