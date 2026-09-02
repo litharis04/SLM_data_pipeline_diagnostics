@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 from collections import deque
 from dataclasses import dataclass
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 from data_pipeline_diagnostics.scenario.errors import (
@@ -474,17 +475,53 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     f"PK column '{pk_col}' must be non-nullable",
                     related=pk_col,
                 )
-        # feasibility for PK/unique vs row_count
+        # feasibility for PK/unique vs row_count – composite PK capacity is product
         max_rows = tbl.rows.max
+        if tbl.primary_key:
+            # Check composite PK capacity as product
+            if len(tbl.primary_key) == 1:
+                col = raw_col_map[tbl.name].get(tbl.primary_key[0])
+                if col is not None and (getattr(col, "unique", False) or True):
+                    cap = _generator_capacity(col)
+                    if cap is not None and cap < max_rows:
+                        _add_issue(
+                            issues,
+                            ErrorCode.INVALID_PK,
+                            f"{base}.primary_key",
+                            f"PK capacity {cap} < max rows {max_rows}",
+                            related=tbl.primary_key[0],
+                        )
+            else:
+                # Composite PK: product of capacities
+                caps: list[int] = []
+                for pk_col in tbl.primary_key:
+                    col = raw_col_map[tbl.name].get(pk_col)
+                    if col is not None:
+                        cap = _generator_capacity(col)
+                        if cap is not None:
+                            caps.append(cap)
+                if caps:
+                    # product, but cap at large number to avoid overflow
+                    prod = 1
+                    for c in caps:
+                        prod = min(prod * c, 10**12)
+                    if prod < max_rows:
+                        _add_issue(
+                            issues,
+                            ErrorCode.INVALID_PK,
+                            f"{base}.primary_key",
+                            f"composite PK capacity {prod} < max rows {max_rows}",
+                            related=",".join(tbl.primary_key),
+                        )
         for col in tbl.columns:
-            if getattr(col, "unique", False) or col.name in tbl.primary_key:
+            if getattr(col, "unique", False) and col.name not in tbl.primary_key:
                 cap = _generator_capacity(col)
                 if cap is not None and cap < max_rows:
                     _add_issue(
                         issues,
                         ErrorCode.INVALID_PK,
                         f"{base}.columns[{col.name}]",
-                        f"unique/PK column '{col.name}' capacity {cap} < max rows {max_rows}",
+                        f"unique column '{col.name}' capacity {cap} < max rows {max_rows}",
                         related=col.name,
                     )
         # generator/type compatibility etc.
@@ -1147,6 +1184,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             f"order_by '{col}' not in staging output",
                             related=str(col),
                         )
+                # Deterministic tie-breaking: order_by should not be subset of keys alone
+                order_cols = [getattr(sk, "column", None) for sk in getattr(op, "order_by", [])]
+                if set(order_cols) <= set(getattr(op, "keys", [])):
+                    _add_issue(
+                        issues,
+                        ErrorCode.UNKNOWN,
+                        f"staging_models[{s.name}].row_operations[{op_idx}].order_by",
+                        "deduplication order_by must provide deterministic tie-breaking beyond keys",
+                        related=",".join(order_cols),
+                    )
 
     # §17.6 DAG & Intermediate
     all_model_names = set(staging_by_name.keys()) | set(intermediate_by_name.keys())
@@ -1601,6 +1648,8 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"source '{pc.source}' not in '{m.source}'",
                         related=pc.source,
                     )
+            for f in getattr(m, "filters", []):
+                _check_condition(f, src_schema, issues, f"intermediate_models[{name}].filters")
             for met in m.metrics:
                 if hasattr(met, "column"):
                     col_name = getattr(met, "column", None)
@@ -1713,6 +1762,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"order_by '{sk.column}' not in source",
                         related=sk.column,
                     )
+            # Deterministic tie-breaking: order_by should extend beyond keys
+            order_cols = [sk.column for sk in m.order_by]
+            if set(order_cols) <= set(m.keys):
+                _add_issue(
+                    issues,
+                    ErrorCode.UNKNOWN,
+                    f"intermediate_models[{name}].order_by",
+                    "deduplication order_by must provide deterministic tie-breaking beyond keys",
+                    related=",".join(order_cols),
+                )
             for g in m.grain:
                 if g not in src_schema:
                     _add_issue(
@@ -2248,47 +2307,68 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 }
             )
         elif rel.cardinality == "one_to_one":
-            # Choose the FK side as dependent – find which side has FK
-            # For simplicity, add both directions? But spec says relationship tests for non-null dependent keys
-            # We'll add for the FK side
-            # Find FK side
+            # Find FK side and collect all FK columns for composite keys
             fk_side = None
-            fk_cols = None
             to_table = None
             to_cols = None
+            fk_cols_list: list[str] = []
             for tbl in scenario.raw_tables:
-                for col in tbl.columns:
-                    if (
-                        getattr(col.generator, "kind", None) == "foreign_key"
-                        and getattr(col.generator, "relationship", None) == rel.name
-                    ):
-                        # This column is FK
-                        if tbl.name == rel.left.table:
-                            fk_side = tbl.name
-                            fk_cols = (col.name,)
-                            to_table = rel.right.table
-                            to_cols = rel.right.columns
-                        elif tbl.name == rel.right.table:
-                            fk_side = tbl.name
-                            fk_cols = (col.name,)
-                            to_table = rel.left.table
-                            to_cols = rel.left.columns
-                        break
-                if fk_side:
+                # Determine which side this table is on
+                side_cols = None
+                target_table = None
+                target_cols = None
+                if tbl.name == rel.left.table:
+                    side_cols = rel.left.columns
+                    target_table = rel.right.table
+                    target_cols = rel.right.columns
+                elif tbl.name == rel.right.table:
+                    side_cols = rel.right.columns
+                    target_table = rel.left.table
+                    target_cols = rel.left.columns
+                else:
+                    continue
+                # Collect all FK cols for this relationship on this table
+                cols_for_rel = [
+                    c.name
+                    for c in tbl.columns
+                    if getattr(getattr(c, "generator", None), "kind", None) == "foreign_key"
+                    and getattr(c.generator, "relationship", None) == rel.name
+                ]
+                # Check if this table's FK cols match the side's columns (for composite, all must match)
+                if set(cols_for_rel) == set(side_cols) and cols_for_rel:
+                    fk_side = tbl.name
+                    fk_cols_list = cols_for_rel
+                    to_table = target_table
+                    to_cols = target_cols
                     break
-            if fk_side:
+                # Also handle case where FK cols are subset but we still want to capture all
+                if cols_for_rel:
+                    # If any FK found on this side, consider it the FK side
+                    if fk_side is None:
+                        fk_side = tbl.name
+                        fk_cols_list = cols_for_rel
+                        to_table = target_table
+                        to_cols = target_cols
+            if fk_side and fk_cols_list:
+                # Ensure order follows side_cols order
+                # Sort fk_cols_list to match side_cols order if composite
+                side_order = rel.left.columns if fk_side == rel.left.table else rel.right.columns
+                # Reorder fk_cols_list to match side_order where possible
+                ordered = [c for c in side_order if c in fk_cols_list]
+                if set(ordered) != set(fk_cols_list):
+                    ordered = fk_cols_list
                 derived.append(
                     {
                         "name": f"derived_rel_{rel.name}",
                         "model": fk_side,
                         "type": "relationships",
-                        "columns": fk_cols,
+                        "columns": tuple(ordered),
                         "to_model": to_table,
                         "to_columns": to_cols,
                     }
                 )
             else:
-                # Fallback: use right as dependent for one_to_one
+                # Fallback: use right as dependent
                 derived.append(
                     {
                         "name": f"derived_rel_{rel.name}",
@@ -2442,19 +2522,26 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
     for tbl in scenario.raw_tables:
         resolved_keys[tbl.name] = tbl.primary_key
 
+    # Wrap dicts to make ValidatedScenario deeply immutable (frozen only superficially)
+    def _freeze_dict(d: dict) -> MappingProxyType:
+        return MappingProxyType(dict(d))
+
+    def _freeze_nested(d: dict) -> MappingProxyType:
+        return MappingProxyType({k: MappingProxyType(dict(v)) if isinstance(v, dict) else v for k, v in d.items()})
+
     return ValidatedScenario(
         scenario=scenario,
-        raw_by_name=raw_by_name,
-        staging_by_name=staging_by_name,
-        intermediate_by_name=intermediate_by_name,
-        output_by_name=output_by_name,
-        relationships_by_name=rel_by_name,
+        raw_by_name=_freeze_dict(raw_by_name),
+        staging_by_name=_freeze_dict(staging_by_name),
+        intermediate_by_name=_freeze_dict(intermediate_by_name),
+        output_by_name=_freeze_dict(output_by_name),
+        relationships_by_name=_freeze_dict(rel_by_name),
         topological_order=tuple(topo),
-        lineage=full_lineage,
+        lineage=_freeze_nested(full_lineage),
         derived_assertions=tuple(derived),
-        staging_schemas=staging_schema,
-        intermediate_schemas=intermediate_schema,
-        output_schemas=output_schemas,
-        resolved_grains=resolved_grains,
-        resolved_keys=resolved_keys,
+        staging_schemas=_freeze_nested(staging_schema),
+        intermediate_schemas=_freeze_nested(intermediate_schema),
+        output_schemas=_freeze_nested(output_schemas),
+        resolved_grains=_freeze_dict(resolved_grains),
+        resolved_keys=_freeze_dict(resolved_keys),
     )

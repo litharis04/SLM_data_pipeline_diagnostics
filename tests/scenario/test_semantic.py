@@ -782,6 +782,449 @@ def test_contradictory_assertion():
     assert any("does not exist" in i.message.lower() for i in exc3.value.issues)
 
 
+def test_fk_missing_relationship():
+    base = _base_scenario()
+    base["raw_tables"] = (
+        base["raw_tables"][0],
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {"name": "id", "type": "integer", "generator": _INT_GEN},
+                {
+                    "name": "a_id",
+                    "type": "integer",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+                {
+                    "name": "ghost_fk",
+                    "type": "integer",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "ghost_rel",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
+        base["raw_tables"][2],
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any(
+        "ghost_rel" in i.message and "does not exist" in i.message.lower() for i in exc.value.issues
+    )
+
+
+def test_join_without_supporting_lineage():
+    base = _base_scenario()
+    # Change join to use keys that have no supporting relationship (stg_b.id + stg_c.id has no rel)
+    base["intermediate_models"] = (
+        {
+            "operation": "transform",
+            "name": "trans_a",
+            "source": "stg_c",
+            "columns": ({"source": "id", "target": "id"},),
+            "grain": ("id",),
+        },
+        {
+            "operation": "join",
+            "name": "join_a",
+            "left": "stg_b",
+            "right": "stg_c",
+            "join": {"type": "inner", "on": ({"left": "id", "right": "id"},)},
+            "columns": ({"side": "left", "source": "id", "target": "id"},),
+            "grain": ("id",),
+        },
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any(
+        "not supported" in i.message.lower() and "relationship" in i.message.lower()
+        for i in exc.value.issues
+    )
+
+
+def test_staging_filter_type_mismatch():
+    base = _base_scenario()
+    base["staging_models"] = (
+        {
+            "name": "stg_a",
+            "source": "raw_a",
+            "columns": ({"source": "id", "target": "id"},),
+            "grain": ("id",),
+            "row_operations": (
+                {
+                    "op": "filter",
+                    "condition": {
+                        "kind": "comparison",
+                        "operator": "eq",
+                        "left": {"kind": "column", "column": "id"},
+                        "right": {"kind": "literal", "value": "wrong_type"},
+                    },
+                },
+            ),
+        },
+        base["staging_models"][1],
+        base["staging_models"][2],
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any("type mismatch" in i.message.lower() for i in exc.value.issues)
+
+
+def test_assertion_missing_to_model_and_wrong_type():
+    base = _base_scenario()
+    base["tests"] = (
+        {
+            "name": "assert1",
+            "model": "out_a",
+            "type": "relationships",
+            "columns": ("id",),
+            "to_model": "ghost_model",
+            "to_columns": ("id",),
+        },
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any(
+        "ghost_model" in i.message and "does not exist" in i.message.lower()
+        for i in exc.value.issues
+    )
+    base2 = _base_scenario()
+    base2["tests"] = (
+        {
+            "name": "assert1",
+            "model": "out_a",
+            "type": "column_range",
+            "column": "id",
+            "min": "wrong_type",
+        },
+    )
+    s2 = Scenario.model_validate(base2)
+    with pytest.raises(SemanticValidationError) as exc2:
+        validate_semantics(s2)
+    assert any("column_range" in i.path or "type" in i.message.lower() for i in exc2.value.issues)
+
+
+def test_aggregate_filter_type_mismatch():
+    base = _base_scenario()
+    base["intermediate_models"] = (
+        {
+            "operation": "aggregate",
+            "name": "agg_a",
+            "source": "stg_a",
+            "group_by": ({"source": "id", "target": "id"},),
+            "metrics": ({"name": "cnt", "function": "count_rows"},),
+            "filters": (
+                {
+                    "kind": "comparison",
+                    "operator": "eq",
+                    "left": {"kind": "column", "column": "id"},
+                    "right": {"kind": "literal", "value": "wrong_type"},
+                },
+            ),
+            "grain": ("id",),
+        },
+        base["intermediate_models"][1],
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any("type mismatch" in i.message.lower() for i in exc.value.issues)
+
+
+def test_deterministic_tie_breaking():
+    base = _base_scenario()
+    base["intermediate_models"] = (
+        base["intermediate_models"][0],
+        {
+            "operation": "deduplicate",
+            "name": "dedup_a",
+            "source": "stg_a",
+            "keys": ("id",),
+            "order_by": ({"column": "id"},),  # order_by same as keys – not deterministic
+            "grain": ("id",),
+        },
+    )
+    base["output_models"] = (
+        {
+            "name": "out_a",
+            "source": "dedup_a",
+            "group_by": ({"source": "id", "target": "id"},),
+            "grain": ("id",),
+            "metrics": ({"name": "cnt", "function": "count_rows"},),
+        },
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any("deterministic" in i.message.lower() for i in exc.value.issues)
+
+
+def test_composite_pk_feasibility():
+    base = _base_scenario()
+    # Composite PK with two columns each capacity 2 (integer_range 1-2) but max rows 10 -> composite capacity 4 <10, should fail
+    base["raw_tables"] = (
+        {
+            "name": "raw_a",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 2},
+                },
+                {
+                    "name": "seq",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 2},
+                },
+            ),
+            "primary_key": ("id", "seq"),
+        },
+        base["raw_tables"][1],
+        base["raw_tables"][2],
+    )
+    # Fix staging to match new columns
+    base["staging_models"] = (
+        {
+            "name": "stg_a",
+            "source": "raw_a",
+            "columns": ({"source": "id", "target": "id"}, {"source": "seq", "target": "seq"}),
+            "grain": ("id", "seq"),
+        },
+        base["staging_models"][1],
+        base["staging_models"][2],
+    )
+    base["relationships"] = (
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id", "seq")},
+            "right": {"table": "raw_b", "columns": ("a_id", "extra")},
+        },
+    )
+    # Need to update raw_b to have matching FK columns for composite
+    base["raw_tables"] = (
+        base["raw_tables"][0],
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "integer",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+                {
+                    "name": "extra",
+                    "type": "integer",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
+        base["raw_tables"][2],
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any("composite pk capacity" in i.message.lower() for i in exc.value.issues)
+
+
+def test_one_to_one_composite_derived():
+    # One-to-one with composite keys should derive correctly with all columns, not just first
+    base = {
+        "schema_version": "1.0",
+        "scenario_id": "test_one_to_one_comp",
+        "domain": "testdomain",
+        "raw_tables": (
+            {
+                "name": "raw_a",
+                "rows": {"min": 1, "max": 10},
+                "columns": (
+                    {
+                        "name": "id",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                    {
+                        "name": "seq",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                ),
+                "primary_key": ("id", "seq"),
+            },
+            {
+                "name": "raw_b",
+                "rows": {"min": 1, "max": 10},
+                "columns": (
+                    {
+                        "name": "id",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                    {
+                        "name": "a_id",
+                        "type": "integer",
+                        "unique": True,
+                        "generator": {
+                            "kind": "foreign_key",
+                            "relationship": "rel_a",
+                            "target_side": "left",
+                        },
+                    },
+                    {
+                        "name": "a_seq",
+                        "type": "integer",
+                        "unique": True,
+                        "generator": {
+                            "kind": "foreign_key",
+                            "relationship": "rel_a",
+                            "target_side": "left",
+                        },
+                    },
+                ),
+                "primary_key": (),
+            },
+            {
+                "name": "raw_c",
+                "rows": {"min": 1, "max": 10},
+                "columns": (
+                    {
+                        "name": "id",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                ),
+                "primary_key": ("id",),
+            },
+        ),
+        "relationships": (
+            {
+                "name": "rel_a",
+                "cardinality": "one_to_one",
+                "left": {"table": "raw_a", "columns": ("id", "seq")},
+                "right": {"table": "raw_b", "columns": ("a_id", "a_seq")},
+            },
+        ),
+        "staging_models": (
+            {
+                "name": "stg_a",
+                "source": "raw_a",
+                "columns": ({"source": "id", "target": "id"}, {"source": "seq", "target": "seq"}),
+                "grain": ("id", "seq"),
+            },
+            {
+                "name": "stg_b",
+                "source": "raw_b",
+                "columns": (
+                    {"source": "id", "target": "id"},
+                    {"source": "a_id", "target": "a_id"},
+                    {"source": "a_seq", "target": "a_seq"},
+                ),
+                "grain": ("id",),
+            },
+            {
+                "name": "stg_c",
+                "source": "raw_c",
+                "columns": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
+        ),
+        "intermediate_models": (
+            {
+                "operation": "transform",
+                "name": "trans_a",
+                "source": "stg_c",
+                "columns": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
+            {
+                "operation": "join",
+                "name": "join_a",
+                "left": "stg_a",
+                "right": "stg_b",
+                "join": {
+                    "type": "inner",
+                    "on": ({"left": "id", "right": "a_id"}, {"left": "seq", "right": "a_seq"}),
+                },
+                "columns": ({"side": "left", "source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
+        ),
+        "output_models": (
+            {
+                "name": "out_a",
+                "source": "trans_a",
+                "group_by": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+                "metrics": ({"name": "cnt", "function": "count_rows"},),
+            },
+            {
+                "name": "out_b",
+                "source": "join_a",
+                "group_by": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+                "metrics": ({"name": "cnt2", "function": "count_rows"},),
+            },
+        ),
+    }
+    s = Scenario.model_validate(base)
+    validated = validate_semantics(s)
+    # Check that derived assertion for one_to_one includes both columns, not just first
+    derived_rels = [
+        d
+        for d in validated.derived_assertions
+        if d["type"] == "relationships" and d["model"] == "raw_b"
+    ]
+    assert len(derived_rels) == 1
+    assert set(derived_rels[0]["columns"]) == {"a_id", "a_seq"}
+
+
+def test_validated_scenario_frozen_deep():
+    data = _base_scenario()
+    s = Scenario.model_validate(data)
+    validated = validate_semantics(s)
+    # Top-level frozen
+    with pytest.raises(Exception):
+        validated.scenario = None  # type: ignore[misc]
+    # Dicts should be immutable via MappingProxyType
+    with pytest.raises(Exception):
+        validated.raw_by_name["new"] = None  # type: ignore[index]
+    with pytest.raises(Exception):
+        validated.lineage["new"] = {}  # type: ignore[index]
+    # Inner dicts also immutable
+    with pytest.raises(Exception):
+        validated.lineage["stg_a"]["new_col"] = ["raw_a.new"]  # type: ignore[index]
+    with pytest.raises(Exception):
+        validated.staging_schemas["stg_a"]["new_col"] = "test"  # type: ignore[index]
+
+
 def test_compiler_accepts_only_validated():
     data = _base_scenario()
     s = Scenario.model_validate(data)
