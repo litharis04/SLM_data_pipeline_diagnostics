@@ -78,11 +78,27 @@ def _add_issue(
     issues.append(SemanticIssue(code=code, path=path, message=message, related=related))
 
 
+def _scalar_to_datatype(value: object) -> DataType | None:
+    """Internal scalar-to-DataType helper used everywhere semantic typing is required."""
+    if isinstance(value, bool):
+        return DataType.boolean
+    if isinstance(value, int):
+        return DataType.integer
+    if isinstance(value, float):
+        return DataType.float
+    if isinstance(value, str):
+        return DataType.string
+    return None
+
+
 def _infer_expression_type(expr: object, schema: dict[str, DataType]) -> DataType | None:
-    """Infer DataType for Expression against schema."""
+    """Infer DataType for Expression against schema.
+
+    Returns DataType on success, None on unresolved column or statically invalid.
+    Caller must distinguish via _check_expression_type.
+    """
     if expr is None:
         return None
-    # Handle Pydantic model or dict
     if hasattr(expr, "model_dump"):
         expr = expr.model_dump()  # type: ignore[union-attr]
     if not isinstance(expr, dict):
@@ -92,47 +108,78 @@ def _infer_expression_type(expr: object, schema: dict[str, DataType]) -> DataTyp
         col = expr.get("column")
         return schema.get(col) if isinstance(col, str) else None
     if kind == "literal":
-        v = expr.get("value")
-        if isinstance(v, bool):
-            return DataType.boolean
-        if isinstance(v, int):
-            return DataType.integer
-        if isinstance(v, float):
-            return DataType.float
-        if isinstance(v, str):
-            return DataType.string
-        return None
+        return _scalar_to_datatype(expr.get("value"))
     if kind == "binary":
         left = _infer_expression_type(expr.get("left"), schema)
         right = _infer_expression_type(expr.get("right"), schema)
         op = expr.get("operator")
         if op in ("add", "subtract", "multiply", "divide"):
+            # Require both operands numeric; unresolved (None) is handled by caller via missing-ref suppression
+            if left is None or right is None:
+                # If either is unresolved (column missing), return None to suppress cascade
+                # But if one is present and the other is invalid, we need to report invalid
+                # Check if the missing is due to unresolved column vs invalid type
+                # For now, return None and let caller decide based on whether column exists
+                return None
             if left in (DataType.integer, DataType.float) and right in (
                 DataType.integer,
                 DataType.float,
             ):
-                # divide always returns float per spec? But we treat as float if either is float else integer/float
                 if left == DataType.float or right == DataType.float or op == "divide":
                     return DataType.float
                 return DataType.integer
+            # Statically invalid: non-numeric operand
             return None
         return None
     if kind == "date_part":
-        # returns integer
         inner = expr.get("value")
         t = _infer_expression_type(inner, schema)
-        if t in (DataType.date, DataType.timestamp, DataType.string):
+        # Require date or timestamp, not string
+        if t in (DataType.date, DataType.timestamp):
             return DataType.integer
         return None
     if kind == "coalesce":
         vals = expr.get("values", [])
         types = [_infer_expression_type(v, schema) for v in vals]
-        # coalesce returns first non-null type – assume all same
-        for t in types:
-            if t is not None:
-                return t
-        return None
+        # Require all operands to have a common compatible type
+        # Filter out unresolved (None due to missing column) – suppress
+        present_types = [t for t in types if t is not None]
+        if not present_types:
+            return None
+        # Check that all present types are compatible: either all same, or integer/float promotion
+        # Numeric promotion: integer and float are compatible -> float
+        # Otherwise, all must be equal
+        first = present_types[0]
+        for t in present_types[1:]:
+            if t != first:
+                # Allow integer/float promotion
+                if {t, first} <= {DataType.integer, DataType.float}:
+                    first = DataType.float
+                else:
+                    return None
+        return first
     return None
+
+
+def _is_column_unresolved(expr: object, schema: dict[str, DataType]) -> bool:
+    """Check if expression contains an unresolved column (already reported as missing)."""
+    if expr is None:
+        return False
+    if hasattr(expr, "model_dump"):
+        expr = expr.model_dump()  # type: ignore[union-attr]
+    if not isinstance(expr, dict):
+        return False
+    kind = expr.get("kind")
+    if kind == "column":
+        col = expr.get("column")
+        return isinstance(col, str) and col not in schema
+    if kind == "binary":
+        return _is_column_unresolved(expr.get("left"), schema) or _is_column_unresolved(expr.get("right"), schema)
+    if kind == "date_part":
+        return _is_column_unresolved(expr.get("value"), schema)
+    if kind == "coalesce":
+        return any(_is_column_unresolved(v, schema) for v in expr.get("values", []))
+    return False
 
 
 def _check_expression_columns(
@@ -196,6 +243,21 @@ def _check_condition(
                 )
     elif kind == "in":
         _check_expression_columns(cond.get("value"), schema, issues, path)
+        # Check that options are compatible with value's inferred type
+        val_type = _infer_expression_type(cond.get("value"), schema)
+        if val_type is not None:
+            for opt in cond.get("options", []):
+                opt_type = _scalar_to_datatype(opt)
+                if opt_type is not None and opt_type != val_type:
+                    # Allow numeric promotion
+                    if not ({opt_type, val_type} <= {DataType.integer, DataType.float}):
+                        _add_issue(
+                            issues,
+                            ErrorCode.INVALID_CONDITION_TYPE,
+                            path,
+                            f"InCondition option type '{opt_type.value}' != value type '{val_type.value}'",
+                            related=str(opt),
+                        )
     elif kind == "is_null":
         _check_expression_columns(cond.get("value"), schema, issues, path)
     elif kind in ("all", "any"):
@@ -1348,8 +1410,9 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     out_schema[pc.target] = src_schema[pc.source]
                     out_lineage[pc.target] = src_lineage.get(pc.source, [f"{m.source}.{pc.source}"])
             for dc in m.derived_columns:
-                # Type check derived column
-                inferred = _infer_expression_type(dc.expression, {**src_schema, **out_schema})
+                # Per §12.3: derived columns evaluated only against projected target names
+                projected_schema = dict(out_schema)  # snapshot of projected only
+                inferred = _infer_expression_type(dc.expression, projected_schema)
                 declared = (
                     dc.type
                     if isinstance(dc.type, DataType)
@@ -1357,17 +1420,25 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     if isinstance(dc.type, str)
                     else None
                 )
-                if inferred is not None and declared is not None and inferred != declared:
+                if inferred is None and not _is_column_unresolved(dc.expression, projected_schema):
                     _add_issue(
                         issues,
-                        ErrorCode.UNKNOWN,
+                        ErrorCode.INVALID_EXPRESSION_TYPE,
+                        f"intermediate_models[{name}].derived_columns[{dc.name}]",
+                        "invalid expression: statically incompatible types",
+                        related=dc.name,
+                    )
+                elif inferred is not None and declared is not None and inferred != declared:
+                    _add_issue(
+                        issues,
+                        ErrorCode.INVALID_EXPRESSION_TYPE,
                         f"intermediate_models[{name}].derived_columns[{dc.name}]",
                         f"declared type '{declared.value}' != inferred '{inferred.value}'",
                         related=dc.name,
                     )
                 _check_expression_columns(
                     dc.expression,
-                    {**src_schema, **out_schema},
+                    projected_schema,
                     issues,
                     f"intermediate_models[{name}].derived_columns[{dc.name}]",
                 )
@@ -1582,10 +1653,18 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     if isinstance(dc.type, str)
                     else None
                 )
-                if inferred is not None and declared is not None and inferred != declared:
+                if inferred is None and not _is_column_unresolved(dc.expression, out_schema):
                     _add_issue(
                         issues,
-                        ErrorCode.UNKNOWN,
+                        ErrorCode.INVALID_EXPRESSION_TYPE,
+                        f"intermediate_models[{name}].derived_columns[{dc.name}]",
+                        "invalid expression: statically incompatible types",
+                        related=dc.name,
+                    )
+                elif inferred is not None and declared is not None and inferred != declared:
+                    _add_issue(
+                        issues,
+                        ErrorCode.INVALID_EXPRESSION_TYPE,
                         f"intermediate_models[{name}].derived_columns[{dc.name}]",
                         f"declared type '{declared.value}' != inferred '{inferred.value}'",
                         related=dc.name,
