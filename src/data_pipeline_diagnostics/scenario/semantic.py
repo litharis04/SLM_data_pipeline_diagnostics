@@ -578,6 +578,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             f"template column '{col.name}' must not reference itself",
                             related=ph,
                         )
+            if gen_kind == "foreign_key":
+                rel_name = getattr(col.generator, "relationship", None)
+                if rel_name not in rel_by_name:
+                    _add_issue(
+                        issues,
+                        ErrorCode.MISSING_REF,
+                        f"{cpath}.generator.relationship",
+                        f"relationship '{rel_name}' does not exist",
+                        related=rel_name,
+                    )
         # template cycle detection per table
         template_deps: dict[str, list[str]] = {}
         for col in tbl.columns:
@@ -1087,14 +1097,33 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     f"grain column '{g}' does not exist after transformations",
                     related=g,
                 )
+        # Build actual schema after column operations for row_operations checks
+        actual_schema: dict[str, DataType] = {}
+        for col in s.columns:
+            cur_type = raw_type_map.get(col.source)
+            for op in col.operations:
+                op_kind = getattr(op, "op", None)
+                if op_kind == "cast":
+                    target_type = getattr(op, "type", None)
+                    if isinstance(target_type, str):
+                        try:
+                            target_type = DataType(target_type)
+                        except Exception:
+                            pass
+                    if isinstance(target_type, DataType):
+                        cur_type = target_type
+                elif op_kind in ("map_values", "replace"):
+                    cur_type = DataType.string
+                # trim/lower/upper keep string, null_if/coalesce keep same type
+            if cur_type is not None:
+                actual_schema[col.target] = cur_type
         # row_operations
         for op_idx, op in enumerate(s.row_operations):
             if getattr(op, "op", None) == "filter":
                 cond = getattr(op, "condition", None)
-                # Use _check_condition helper with dummy schema (string types)
                 _check_condition(
                     cond,
-                    {k: DataType.string for k in target_names},
+                    actual_schema,
                     issues,
                     f"staging_models[{s.name}].row_operations[{op_idx}]",
                 )
