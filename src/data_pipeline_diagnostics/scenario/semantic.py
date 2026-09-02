@@ -45,6 +45,122 @@ class ValidatedScenario:
 
 
 # ---------------------------------------------------------------------------
+# Resolved relationship – internal immutable record (§13)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class ResolvedRelationship:
+    """Internal resolved relationship – not exposed in JSON."""
+
+    name: str
+    cardinality: str
+    left_table: str
+    left_columns: tuple[str, ...]
+    right_table: str
+    right_columns: tuple[str, ...]
+    # For direct relationships, dependent side is the FK side
+    dependent_table: str | None
+    dependent_columns: tuple[str, ...] | None
+    target_table: str | None
+    target_columns: tuple[str, ...] | None
+    # For many-to-many
+    bridge_table: str | None
+    bridge_left_columns: tuple[str, ...] | None
+    bridge_right_columns: tuple[str, ...] | None
+
+
+def _resolve_relationships(
+    relationships: list[object], raw_by_name: dict[str, object]
+) -> dict[str, ResolvedRelationship]:
+    """Resolve each relationship into an immutable record with exact tuples."""
+    resolved: dict[str, ResolvedRelationship] = {}
+    for rel in relationships:
+        name = getattr(rel, "name")
+        card = getattr(rel, "cardinality")
+        left = getattr(rel, "left")
+        right = getattr(rel, "right")
+        left_table = getattr(left, "table")
+        left_cols = tuple(getattr(left, "columns"))
+        right_table = getattr(right, "table")
+        right_cols = tuple(getattr(right, "columns"))
+        bridge_table = None
+        bridge_left = None
+        bridge_right = None
+        dependent_table = None
+        dependent_cols = None
+        target_table = None
+        target_cols = None
+        if card == "one_to_many":
+            dependent_table = right_table
+            dependent_cols = right_cols
+            target_table = left_table
+            target_cols = left_cols
+        elif card == "many_to_one":
+            dependent_table = left_table
+            dependent_cols = left_cols
+            target_table = right_table
+            target_cols = right_cols
+        elif card == "one_to_one":
+            # Determine FK side by checking which side's columns have FK generators for this relationship
+            # Look for FK columns in raw tables
+            fk_left = []
+            fk_right = []
+            for tbl_name in (left_table, right_table):
+                tbl = raw_by_name.get(tbl_name)
+                if tbl is not None:
+                    for col in getattr(tbl, "columns", []):
+                        gen = getattr(col, "generator", None)
+                        if (
+                            getattr(gen, "kind", None) == "foreign_key"
+                            and getattr(gen, "relationship", None) == name
+                        ):
+                            if tbl_name == left_table:
+                                fk_left.append(col.name)
+                            else:
+                                fk_right.append(col.name)
+            # Exactly one side should be FK side
+            if fk_left and not fk_right:
+                dependent_table = left_table
+                dependent_cols = tuple(fk_left)
+                target_table = right_table
+                target_cols = tuple(right_cols)
+            elif fk_right and not fk_left:
+                dependent_table = right_table
+                dependent_cols = tuple(fk_right)
+                target_table = left_table
+                target_cols = tuple(left_cols)
+            elif fk_left and fk_right:
+                # Both sides have FK – invalid, but we will report later; for resolved, pick None
+                pass
+            else:
+                # No FK found yet – will be reported later, keep as None for now
+                pass
+        elif card == "many_to_many":
+            bridge = getattr(rel, "bridge", None)
+            if bridge is not None:
+                bridge_table = getattr(bridge, "table")
+                bridge_left = tuple(getattr(bridge, "left_columns"))
+                bridge_right = tuple(getattr(bridge, "right_columns"))
+        resolved[name] = ResolvedRelationship(
+            name=name,
+            cardinality=card,
+            left_table=left_table,
+            left_columns=left_cols,
+            right_table=right_table,
+            right_columns=right_cols,
+            dependent_table=dependent_table,
+            dependent_columns=dependent_cols,
+            target_table=target_table,
+            target_columns=target_cols,
+            bridge_table=bridge_table,
+            bridge_left_columns=bridge_left,
+            bridge_right_columns=bridge_right,
+        )
+    return resolved
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -466,6 +582,9 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             seen_assert.add(a.name)
             assertion_by_name[a.name] = a
 
+    # Resolve relationships into internal immutable records (§13) – reused for validation and derived
+    resolved_rels = _resolve_relationships(list(scenario.relationships), raw_by_name)  # noqa: F841 – reserved for T15 join validation
+
     # Build raw column maps
     raw_col_map: dict[str, dict[str, object]] = {}
     raw_col_type: dict[str, dict[str, DataType]] = {}
@@ -838,19 +957,57 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
 
-            def _has_fk(table: str, cols: tuple, target_side: str) -> bool:
+            def _has_exact_fk(table: str, cols: tuple[str, ...], target_side: str) -> bool:
+                """Require every dependent endpoint component to have correct FK, and only those."""
                 cmap = raw_col_map.get(table, {})
+                # Check that every dependent column has FK with correct relationship and target_side
                 for cname in cols:
                     col = cmap.get(cname)
-                    if col is not None and getattr(col.generator, "kind", None) == "foreign_key":
-                        if (
-                            getattr(col.generator, "relationship", None) == rel.name
-                            and getattr(col.generator, "target_side", None) == target_side
-                        ):
-                            return True
-                return False
+                    if col is None:
+                        return False
+                    gen = getattr(col, "generator", None)
+                    if getattr(gen, "kind", None) != "foreign_key":
+                        return False
+                    if getattr(gen, "relationship", None) != rel.name:
+                        return False
+                    if getattr(gen, "target_side", None) != target_side:
+                        return False
+                # Check that no non-dependent column in the same table claims this relationship
+                for cname, col in cmap.items():
+                    if cname in cols:
+                        continue
+                    gen = getattr(col, "generator", None)
+                    if getattr(gen, "kind", None) == "foreign_key" and getattr(gen, "relationship", None) == rel.name:
+                        # Non-endpoint column incorrectly claims this relationship
+                        _add_issue(
+                            issues,
+                            ErrorCode.FOREIGN_KEY_SIDE,
+                            f"{base}",
+                            f"column '{cname}' in table '{table}' incorrectly claims relationship '{rel.name}' but is not dependent endpoint",
+                            related=cname,
+                        )
+                        return False
+                return True
 
-            # Check FK and also detect conflicting ownership
+            def _check_composite_nullability(table: str, cols: tuple[str, ...]) -> None:
+                """Atomic composite FK must not have mixed nullability."""
+                cmap = raw_col_map.get(table, {})
+                nullables = []
+                for cname in cols:
+                    col = cmap.get(cname)
+                    if col is not None:
+                        nullables.append(getattr(col, "nullable", False))
+                # If any is nullable and any is not, it's partial-null risk
+                if len(set(nullables)) > 1:
+                    _add_issue(
+                        issues,
+                        ErrorCode.FOREIGN_KEY_SIDE,
+                        f"{base}",
+                        f"composite FK '{rel.name}' has incompatible partial-null nullability {nullables}",
+                        related=rel.name,
+                    )
+
+            # Check FK and also detect conflicting ownership – exact tuples
             if rel.cardinality == "one_to_many":
                 for cname in rel.right.columns:
                     key = (rel.right.table, cname)
@@ -864,29 +1021,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         )
                     else:
                         fk_owner[key] = rel.name
-                if not _has_fk(rel.right.table, rel.right.columns, "left"):
+                if not _has_exact_fk(rel.right.table, rel.right.columns, "left"):
                     _add_issue(
                         issues,
                         ErrorCode.FOREIGN_KEY_SIDE,
                         f"{base}.right",
-                        "dependent columns must have foreign_key generator targeting left",
+                        "every dependent endpoint component must have foreign_key generator targeting left",
                         related=rel.name,
                     )
-                # Check that all components of composite FK are present and atomic
-                if len(rel.right.columns) > 1:
-                    fk_cols = [
-                        c
-                        for c in raw_col_map.get(rel.right.table, {}).values()
-                        if getattr(getattr(c, "generator", None), "relationship", None) == rel.name
-                    ]
-                    if len(fk_cols) != len(rel.right.columns):
-                        _add_issue(
-                            issues,
-                            ErrorCode.FOREIGN_KEY_SIDE,
-                            f"{base}.right",
-                            f"composite FK must have all components for relationship '{rel.name}'",
-                            related=rel.name,
-                        )
+                else:
+                    _check_composite_nullability(rel.right.table, rel.right.columns)
             elif rel.cardinality == "many_to_one":
                 for cname in rel.left.columns:
                     key = (rel.left.table, cname)
@@ -900,31 +1044,19 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         )
                     else:
                         fk_owner[key] = rel.name
-                if not _has_fk(rel.left.table, rel.left.columns, "right"):
+                if not _has_exact_fk(rel.left.table, rel.left.columns, "right"):
                     _add_issue(
                         issues,
                         ErrorCode.FOREIGN_KEY_SIDE,
                         f"{base}.left",
-                        "dependent columns must have foreign_key generator targeting right",
+                        "every dependent endpoint component must have foreign_key generator targeting right",
                         related=rel.name,
                     )
-                if len(rel.left.columns) > 1:
-                    fk_cols = [
-                        c
-                        for c in raw_col_map.get(rel.left.table, {}).values()
-                        if getattr(getattr(c, "generator", None), "relationship", None) == rel.name
-                    ]
-                    if len(fk_cols) != len(rel.left.columns):
-                        _add_issue(
-                            issues,
-                            ErrorCode.FOREIGN_KEY_SIDE,
-                            f"{base}.left",
-                            "composite FK must have all components",
-                            related=rel.name,
-                        )
+                else:
+                    _check_composite_nullability(rel.left.table, rel.left.columns)
             elif rel.cardinality == "one_to_one":
-                has_left = _has_fk(rel.left.table, rel.left.columns, "right")
-                has_right = _has_fk(rel.right.table, rel.right.columns, "left")
+                has_left = _has_exact_fk(rel.left.table, rel.left.columns, "right")
+                has_right = _has_exact_fk(rel.right.table, rel.right.columns, "left")
                 if not (has_left ^ has_right):
                     _add_issue(
                         issues,
@@ -974,9 +1106,30 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=btbl,
                     )
                 else:
+                    # Require every bridge column to exist before checking type/generator
+                    for lc in bridge_table.left_columns:
+                        if lc not in raw_col_map.get(btbl, {}):
+                            _add_issue(
+                                issues,
+                                ErrorCode.MISSING_REF,
+                                f"{base}.bridge.left_columns",
+                                f"bridge left column '{lc}' does not exist in table '{btbl}'",
+                                related=lc,
+                            )
+                    for rc in bridge_table.right_columns:
+                        if rc not in raw_col_map.get(btbl, {}):
+                            _add_issue(
+                                issues,
+                                ErrorCode.MISSING_REF,
+                                f"{base}.bridge.right_columns",
+                                f"bridge right column '{rc}' does not exist in table '{btbl}'",
+                                related=rc,
+                            )
                     # Check bridge column types match endpoint types
                     for lc, lcol in zip(bridge_table.left_columns, rel.left.columns):
                         bcol = raw_col_map.get(btbl, {}).get(lc)
+                        if bcol is None:
+                            continue
                         ltype = raw_col_type.get(rel.left.table, {}).get(lcol)
                         btype = raw_col_type.get(btbl, {}).get(lc)
                         if ltype is not None and btype is not None and ltype != btype:
@@ -988,21 +1141,22 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                                 related=lc,
                             )
                         # Check generator
-                        if bcol is not None:
-                            if (
-                                getattr(bcol.generator, "kind", None) != "foreign_key"
-                                or getattr(bcol.generator, "relationship", None) != rel.name
-                                or getattr(bcol.generator, "target_side", None) != "left"
-                            ):
-                                _add_issue(
-                                    issues,
-                                    ErrorCode.FOREIGN_KEY_SIDE,
-                                    f"{base}.bridge.left_columns",
-                                    f"bridge left column '{lc}' must be foreign_key targeting left",
-                                    related=lc,
-                                )
+                        if (
+                            getattr(bcol.generator, "kind", None) != "foreign_key"
+                            or getattr(bcol.generator, "relationship", None) != rel.name
+                            or getattr(bcol.generator, "target_side", None) != "left"
+                        ):
+                            _add_issue(
+                                issues,
+                                ErrorCode.FOREIGN_KEY_SIDE,
+                                f"{base}.bridge.left_columns",
+                                f"bridge left column '{lc}' must be foreign_key targeting left",
+                                related=lc,
+                            )
                     for rc, rcol in zip(bridge_table.right_columns, rel.right.columns):
                         bcol = raw_col_map.get(btbl, {}).get(rc)
+                        if bcol is None:
+                            continue
                         rtype = raw_col_type.get(rel.right.table, {}).get(rcol)
                         btype = raw_col_type.get(btbl, {}).get(rc)
                         if rtype is not None and btype is not None and rtype != btype:
@@ -1013,18 +1167,34 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                                 f"bridge column '{rc}' type mismatch",
                                 related=rc,
                             )
-                        if bcol is not None:
-                            if (
-                                getattr(bcol.generator, "kind", None) != "foreign_key"
-                                or getattr(bcol.generator, "relationship", None) != rel.name
-                                or getattr(bcol.generator, "target_side", None) != "right"
-                            ):
+                        if (
+                            getattr(bcol.generator, "kind", None) != "foreign_key"
+                            or getattr(bcol.generator, "relationship", None) != rel.name
+                            or getattr(bcol.generator, "target_side", None) != "right"
+                        ):
+                            _add_issue(
+                                issues,
+                                ErrorCode.FOREIGN_KEY_SIDE,
+                                f"{base}.bridge.right_columns",
+                                f"bridge right column '{rc}' must be foreign_key targeting right",
+                                related=rc,
+                            )
+                    # Reject non-bridge columns that claim many-to-many relationship
+                    for tbl_name, cmap in raw_col_map.items():
+                        for cname, col in cmap.items():
+                            gen = getattr(col, "generator", None)
+                            if getattr(gen, "kind", None) == "foreign_key" and getattr(gen, "relationship", None) == rel.name:
+                                # Check if this column is part of bridge
+                                if tbl_name == btbl and cname in (bridge_table.left_columns + bridge_table.right_columns):
+                                    continue
+                                # Also check if it's part of left/right endpoint? For many-to-many, endpoints should not have FK, only bridge should
+                                # So any FK with this relationship that is not in bridge is incorrect
                                 _add_issue(
                                     issues,
                                     ErrorCode.FOREIGN_KEY_SIDE,
-                                    f"{base}.bridge.right_columns",
-                                    f"bridge right column '{rc}' must be foreign_key targeting right",
-                                    related=rc,
+                                    f"raw_tables[{tbl_name}].columns[{cname}]",
+                                    f"column '{cname}' incorrectly claims many-to-many relationship '{rel.name}' but is not a bridge column",
+                                    related=cname,
                                 )
                     # Track ownership for bridge columns
                     for cname in bridge_table.left_columns + bridge_table.right_columns:
