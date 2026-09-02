@@ -1896,31 +1896,128 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"assertion column '{c}' not in model '{a.model}'",
                         related=c,
                     )
-            # For relationships to_columns
+            # For relationships to_columns and to_model
             if hasattr(a, "to_columns"):
-                to_schema = None
                 to_model = getattr(a, "to_model", None)
-                if to_model in staging_schema:
-                    to_schema = staging_schema[to_model]
-                elif to_model in intermediate_schema:
-                    to_schema = intermediate_schema[to_model]
-                elif to_model in output_schemas:
-                    to_schema = output_schemas[to_model]
-                if to_schema is not None:
-                    for c in getattr(a, "to_columns", []):
-                        if c not in to_schema:
-                            _add_issue(
-                                issues,
-                                ErrorCode.MISSING_REF,
-                                f"{base}.to_columns",
-                                f"to_column '{c}' not in model '{to_model}'",
-                                related=c,
+                # Check to_model exists (including raw)
+                if (
+                    to_model not in raw_by_name
+                    and to_model not in staging_by_name
+                    and to_model not in intermediate_by_name
+                    and to_model not in output_by_name
+                    and to_model not in raw_col_type
+                    and to_model not in staging_schema
+                    and to_model not in intermediate_schema
+                    and to_model not in output_schemas
+                ):
+                    # Check raw, staging, intermediate, output – if not found, report
+                    if (
+                        to_model not in raw_by_name
+                        and to_model not in staging_schema
+                        and to_model not in intermediate_schema
+                        and to_model not in output_schemas
+                    ):
+                        _add_issue(
+                            issues,
+                            ErrorCode.MISSING_REF,
+                            f"{base}.to_model",
+                            f"to_model '{to_model}' does not exist",
+                            related=to_model,
+                        )
+                    to_schema = None
+                else:
+                    to_schema = None
+                    if to_model in raw_col_type:
+                        to_schema = raw_col_type[to_model]
+                    elif to_model in staging_schema:
+                        to_schema = staging_schema[to_model]
+                    elif to_model in intermediate_schema:
+                        to_schema = intermediate_schema[to_model]
+                    elif to_model in output_schemas:
+                        to_schema = output_schemas[to_model]
+                    if to_schema is not None:
+                        for c in getattr(a, "to_columns", []):
+                            if c not in to_schema:
+                                _add_issue(
+                                    issues,
+                                    ErrorCode.MISSING_REF,
+                                    f"{base}.to_columns",
+                                    f"to_column '{c}' not in model '{to_model}'",
+                                    related=c,
+                                )
+                        # Check source/target types are exactly equal for relationships assertion
+                        if model_schema is not None and to_schema is not None:
+                            cols = getattr(a, "columns", [])
+                            to_cols = getattr(a, "to_columns", [])
+                            if len(cols) == len(to_cols):
+                                for sc, tc in zip(cols, to_cols):
+                                    stype = model_schema.get(sc)
+                                    ttype = to_schema.get(tc)
+                                    if stype is not None and ttype is not None and stype != ttype:
+                                        _add_issue(
+                                            issues,
+                                            ErrorCode.RELATIONSHIP_TYPE,
+                                            f"{base}",
+                                            f"relationships assertion type mismatch '{sc}' ({stype.value}) vs '{tc}' ({ttype.value})",
+                                            related=a.name,
+                                        )
+            # Check accepted_values values type matches column type
+            if getattr(a, "type", None) == "accepted_values":
+                col = getattr(a, "column", None)
+                if col is not None and model_schema is not None:
+                    col_type = model_schema.get(col)
+                    if col_type is not None:
+                        for v in getattr(a, "values", []):
+                            actual = (
+                                "string"
+                                if isinstance(v, str)
+                                else "integer"
+                                if isinstance(v, int) and not isinstance(v, bool)
+                                else "float"
+                                if isinstance(v, float)
+                                else "boolean"
+                                if isinstance(v, bool)
+                                else "unknown"
                             )
-            # Check accepted_values values type matches column type – already homogeneous, but check column type
+                            if actual != "unknown" and col_type.value != actual:
+                                # For string column, actual must be string, etc.
+                                # Allow numeric promotion? For now strict
+                                if col_type.value != actual:
+                                    _add_issue(
+                                        issues,
+                                        ErrorCode.CATEGORICAL_HOMOGENEOUS,
+                                        f"{base}.values",
+                                        f"accepted_values value '{v}' type {actual} != column '{col}' type {col_type.value}",
+                                        related=str(v),
+                                    )
+                                    break
             if getattr(a, "type", None) == "column_range":
                 col = getattr(a, "column", None)
-                # min/max type should match column type? Simplified
-                pass
+                if col is not None and model_schema is not None:
+                    col_type = model_schema.get(col)
+                    if col_type is not None:
+                        for bound_name in ("min", "max"):
+                            bound_val = getattr(a, bound_name, None)
+                            if bound_val is not None:
+                                actual = (
+                                    "string"
+                                    if isinstance(bound_val, str)
+                                    else "integer"
+                                    if isinstance(bound_val, int) and not isinstance(bound_val, bool)
+                                    else "float"
+                                    if isinstance(bound_val, float)
+                                    else "boolean"
+                                    if isinstance(bound_val, bool)
+                                    else "unknown"
+                                )
+                                if actual != "unknown" and col_type.value != actual:
+                                    _add_issue(
+                                        issues,
+                                        ErrorCode.UNKNOWN,
+                                        f"{base}.{bound_name}",
+                                        f"column_range {bound_name} type {actual} != column '{col}' type {col_type.value}",
+                                        related=str(bound_val),
+                                    )
     # Check duplicate/contradictory assertions
     # Build map from (model, normalized assertion) to count
     seen_assertions: dict[tuple, list[str]] = {}
@@ -2262,27 +2359,56 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
     for a in scenario.tests:
         if a.type in ("not_null", "unique"):
             key = (a.model, a.type, tuple(a.columns))
+            if key in derived_keys:
+                _add_issue(
+                    issues,
+                    ErrorCode.CONTRADICTORY_ASSERTION,
+                    f"tests[{a.name}]",
+                    f"explicit assertion duplicates derived assertion for '{a.model}'",
+                    related=a.name,
+                )
+                continue
         elif a.type == "relationships":
             key = (a.model, a.type, tuple(a.columns), a.to_model, tuple(a.to_columns))
+            if key in derived_keys:
+                _add_issue(
+                    issues,
+                    ErrorCode.CONTRADICTORY_ASSERTION,
+                    f"tests[{a.name}]",
+                    f"explicit assertion duplicates derived assertion for '{a.model}'",
+                    related=a.name,
+                )
+                continue
         elif a.type == "row_count":
-            # For row_count, check if derived has min=1 and explicit also has min=1 (or just non-empty)
-            # If explicit is row_count with min=1, it's duplicate of derived non-empty
-            # But explicit with min=5 etc is not duplicate
-            # Simplified: if explicit is row_count with min=1 and no max, it's duplicate
+            # Duplicate: explicit row_count with min=1 and no max duplicates derived non-empty
             if getattr(a, "min", None) == 1 and getattr(a, "max", None) is None:
                 key = (a.model, "row_count")
-            else:
-                continue
+                if key in derived_keys:
+                    _add_issue(
+                        issues,
+                        ErrorCode.CONTRADICTORY_ASSERTION,
+                        f"tests[{a.name}]",
+                        f"explicit assertion duplicates derived assertion for '{a.model}'",
+                        related=a.name,
+                    )
+                    continue
+            # Contradictory: derived is min=1 (non-empty), explicit with max=0 contradicts (says max 0 but derived says at least 1)
+            # Also explicit with max <1 is contradictory
+            if getattr(a, "max", None) is not None and getattr(a, "max") < 1:
+                key = (a.model, "row_count")
+                if key in derived_keys:
+                    _add_issue(
+                        issues,
+                        ErrorCode.CONTRADICTORY_ASSERTION,
+                        f"tests[{a.name}]",
+                        f"explicit row_count max {a.max} contradicts derived min=1 for '{a.model}'",
+                        related=a.name,
+                    )
+                    continue
+            # Also check explicit min > derived max? Derived has no max, so not needed
+            continue
         else:
             continue
-        if key in derived_keys:
-            _add_issue(
-                issues,
-                ErrorCode.CONTRADICTORY_ASSERTION,
-                f"tests[{a.name}]",
-                f"explicit assertion duplicates derived assertion for '{a.model}'",
-                related=a.name,
-            )
 
     # If we added issues for duplicate with derived, need to re-sort and raise if any
     if any(i.code == ErrorCode.CONTRADICTORY_ASSERTION for i in issues):
