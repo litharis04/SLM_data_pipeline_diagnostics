@@ -188,10 +188,10 @@ def test_positive_full_scenario_passes():
     assert "stg_a" in validated.resolved_grains
     assert "raw_a" in validated.resolved_keys
     assert validated.resolved_keys["raw_a"] == ("id",)
-    # lineage must be raw lineage, not just current_model.column
+    # lineage must be raw lineage, not just current_model.column (now tuples for deep immutability)
     assert "stg_a" in validated.lineage
-    assert validated.lineage["stg_a"]["id"] == ["raw_a.id"]
-    assert validated.lineage["trans_a"]["id"] == ["raw_c.id"]
+    assert validated.lineage["stg_a"]["id"] == ("raw_a.id",)
+    assert validated.lineage["trans_a"]["id"] == ("raw_c.id",)
     # derived assertions must be comprehensive
     derived_types = {d["type"] for d in validated.derived_assertions}
     assert "not_null" in derived_types
@@ -1247,8 +1247,8 @@ def test_compiler_accepts_only_validated():
     assert requires_validated(validated) >= 1
     with pytest.raises(TypeError, match="ValidatedScenario"):
         requires_validated(s)  # type: ignore[arg-type]
-    # Also check that raw lineage and resolved schemas are present
-    assert validated.lineage["stg_a"]["id"] == ["raw_a.id"]
+    # Also check that raw lineage and resolved schemas are present (now tuples for deep immutability)
+    assert validated.lineage["stg_a"]["id"] == ("raw_a.id",)
     assert (
         validated.staging_schemas["stg_a"]["id"] == validated.intermediate_schemas["trans_a"]["id"]
     )

@@ -25,23 +25,22 @@ if TYPE_CHECKING:
 
 @dataclass(frozen=True)
 class ValidatedScenario:
-    """Result of successful semantic validation."""
+    """Result of successful semantic validation – deeply immutable."""
 
-    scenario: object  # Scenario
-    raw_by_name: dict
-    staging_by_name: dict
-    intermediate_by_name: dict
-    output_by_name: dict
-    relationships_by_name: dict
-    topological_order: tuple
-    lineage: dict  # model -> dict[column -> list[raw lineage]]
-    derived_assertions: tuple
-    # §17.1 resolved schemas and grains
-    staging_schemas: dict  # staging name -> {col -> DataType}
-    intermediate_schemas: dict
-    output_schemas: dict
-    resolved_grains: dict  # model name -> tuple[Identifier]
-    resolved_keys: dict  # raw table -> PK
+    scenario: Scenario  # type: ignore[name-defined]
+    raw_by_name: MappingProxyType  # Mapping[str, RawTable]
+    staging_by_name: MappingProxyType  # Mapping[str, StagingModel]
+    intermediate_by_name: MappingProxyType  # Mapping[str, IntermediateModel]
+    output_by_name: MappingProxyType  # Mapping[str, OutputModel]
+    relationships_by_name: MappingProxyType  # Mapping[str, RelationshipSpec]
+    topological_order: tuple[str, ...]
+    lineage: MappingProxyType  # Mapping[str, Mapping[str, tuple[str, ...]]]
+    derived_assertions: tuple[MappingProxyType, ...]
+    staging_schemas: MappingProxyType  # Mapping[str, Mapping[str, DataType]]
+    intermediate_schemas: MappingProxyType  # Mapping[str, Mapping[str, DataType]]
+    output_schemas: MappingProxyType  # Mapping[str, Mapping[str, DataType]]
+    resolved_grains: MappingProxyType  # Mapping[str, tuple[Identifier, ...]]
+    resolved_keys: MappingProxyType  # Mapping[str, tuple[Identifier, ...]]
 
 
 # ---------------------------------------------------------------------------
@@ -597,7 +596,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
         raw_col_map[tbl.name] = col_map
         raw_col_type[tbl.name] = type_map
 
-    # Helper to estimate generator capacity for feasibility
+    # Pure helper returning exact finite capacity or None when DSL does not prove one (§14)
     def _generator_capacity(col: object) -> int | None:
         gen = getattr(col, "generator", None)
         if gen is None:
@@ -607,7 +606,11 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             digits = getattr(gen, "digits", 0)
             start = getattr(gen, "start", 1)
             try:
-                return int(10**digits - start + 1)
+                max_num = 10**digits - 1
+                if start > max_num:
+                    return 0
+                # Correct width-implied maximum: 10**digits -1, capacity = max_num - start +1
+                return int(max_num - start + 1)
             except Exception:
                 return None
         if kind == "integer_range":
@@ -617,12 +620,34 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 return None
         if kind == "categorical":
             vals = getattr(gen, "values", ())
+            # Number of distinct values – already unique per local validator
             return len(vals)
         if kind == "random_string":
-            # very large, treat as infinite
-            return 10**9
+            try:
+                alphabet = getattr(gen, "alphabet", "")
+                min_len = getattr(gen, "min_length", 0)
+                max_len = getattr(gen, "max_length", 0)
+                k = len(set(alphabet))
+                if k == 0 or min_len > max_len:
+                    return None
+                # Compute sum_{l=min}^{max} k^l with safe saturation to avoid overflow
+                # Use a large threshold (1e12) rather than arbitrary constants per T14
+                total = 0
+                threshold = 10**12
+                for length in range(min_len, max_len + 1):
+                    try:
+                        term = pow(k, length)
+                    except Exception:
+                        return None
+                    total += term
+                    if total >= threshold:
+                        return threshold
+                return total
+            except Exception:
+                return None
         if kind == "boolean":
             return 2
+        # Faker-backed and deferred semantics: no finite capacity proven
         if kind in (
             "person_name",
             "email",
@@ -631,7 +656,8 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             "company_name",
             "phone_number",
         ):
-            return 10**6
+            return None
+        # float_range, date_range, timestamp_range, template_string, foreign_key – deferred
         return None
 
     # §17.3 Raw/keys/generators
@@ -656,13 +682,13 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     f"PK column '{pk_col}' must be non-nullable",
                     related=pk_col,
                 )
-        # feasibility for PK/unique vs row_count – composite PK capacity is product
+        # feasibility for PK/unique vs row_count – use exact capacities, only when provable
         max_rows = tbl.rows.max
         if tbl.primary_key:
-            # Check composite PK capacity as product
             if len(tbl.primary_key) == 1:
                 col = raw_col_map[tbl.name].get(tbl.primary_key[0])
-                if col is not None and (getattr(col, "unique", False) or True):
+                if col is not None:
+                    # For single PK, check only if capacity is provable (not None)
                     cap = _generator_capacity(col)
                     if cap is not None and cap < max_rows:
                         _add_issue(
@@ -673,16 +699,21 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             related=tbl.primary_key[0],
                         )
             else:
-                # Composite PK: product of capacities
+                # Composite PK: require all components to have known finite capacity
                 caps: list[int] = []
+                all_known = True
                 for pk_col in tbl.primary_key:
                     col = raw_col_map[tbl.name].get(pk_col)
                     if col is not None:
                         cap = _generator_capacity(col)
-                        if cap is not None:
-                            caps.append(cap)
-                if caps:
-                    # product, but cap at large number to avoid overflow
+                        if cap is None:
+                            all_known = False
+                            break
+                        caps.append(cap)
+                    else:
+                        all_known = False
+                        break
+                if all_known and caps:
                     prod = 1
                     for c in caps:
                         prod = min(prod * c, 10**12)
@@ -694,8 +725,14 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             f"composite PK capacity {prod} < max rows {max_rows}",
                             related=",".join(tbl.primary_key),
                         )
+                # If any component has unknown capacity, do not use partial product
         for col in tbl.columns:
             if getattr(col, "unique", False) and col.name not in tbl.primary_key:
+                # Only when non-null demand and capacity are provable
+                # Unique applies to non-null values, so if column is nullable, the effective max non-null rows is max_rows * (1 - null_prob)
+                # For now, conservatively check only if column is non-nullable and capacity is provable
+                if getattr(col, "nullable", False):
+                    continue
                 cap = _generator_capacity(col)
                 if cap is not None and cap < max_rows:
                     _add_issue(
@@ -2771,12 +2808,41 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
     for tbl in scenario.raw_tables:
         resolved_keys[tbl.name] = tbl.primary_key
 
-    # Wrap dicts to make ValidatedScenario deeply immutable (frozen only superficially)
+    # Recursively freeze for deep immutability
     def _freeze_dict(d: dict) -> MappingProxyType:
         return MappingProxyType(dict(d))
 
-    def _freeze_nested(d: dict) -> MappingProxyType:
-        return MappingProxyType({k: MappingProxyType(dict(v)) if isinstance(v, dict) else v for k, v in d.items()})
+    def _freeze_nested_mapping(d: dict) -> MappingProxyType:
+        # Freeze outer and inner dicts; inner values that are lists become tuples
+        frozen: dict = {}
+        for k, v in d.items():
+            if isinstance(v, dict):
+                # For lineage: inner dict of column -> list[raw lineage]
+                inner: dict = {}
+                for ik, iv in v.items():
+                    if isinstance(iv, list):
+                        inner[ik] = tuple(iv)
+                    elif isinstance(iv, tuple):
+                        inner[ik] = tuple(iv)
+                    else:
+                        inner[ik] = iv
+                frozen[k] = MappingProxyType(inner)
+            else:
+                frozen[k] = v
+        return MappingProxyType(frozen)
+
+    def _freeze_derived(derived_list: list[dict]) -> tuple:
+        # Each derived assertion dict becomes MappingProxyType with tuple values for columns
+        frozen_derived = []
+        for d in derived_list:
+            fd = {}
+            for dk, dv in d.items():
+                if isinstance(dv, (list, tuple)):
+                    fd[dk] = tuple(dv)
+                else:
+                    fd[dk] = dv
+            frozen_derived.append(MappingProxyType(fd))
+        return tuple(frozen_derived)
 
     return ValidatedScenario(
         scenario=scenario,
@@ -2786,11 +2852,11 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
         output_by_name=_freeze_dict(output_by_name),
         relationships_by_name=_freeze_dict(rel_by_name),
         topological_order=tuple(topo),
-        lineage=_freeze_nested(full_lineage),
-        derived_assertions=tuple(derived),
-        staging_schemas=_freeze_nested(staging_schema),
-        intermediate_schemas=_freeze_nested(intermediate_schema),
-        output_schemas=_freeze_nested(output_schemas),
+        lineage=_freeze_nested_mapping(full_lineage),
+        derived_assertions=_freeze_derived(derived),
+        staging_schemas=_freeze_nested_mapping(staging_schema),
+        intermediate_schemas=_freeze_nested_mapping(intermediate_schema),
+        output_schemas=_freeze_nested_mapping(output_schemas),
         resolved_grains=_freeze_dict(resolved_grains),
         resolved_keys=_freeze_dict(resolved_keys),
     )
