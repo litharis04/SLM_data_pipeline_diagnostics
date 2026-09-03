@@ -889,6 +889,17 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             if rel_name not in rel_by_name:
                 # already reported missing
                 continue
+            # Bridge tables of many-to-many relationships legitimately hold left-
+            # and right-targeting components side by side; their per-side
+            # consistency is checked in the relationship section below.
+            _rel_obj = rel_by_name.get(rel_name)
+            _is_bridge_here = (
+                _rel_obj is not None
+                and getattr(_rel_obj, "cardinality", None) == "many_to_many"
+                and getattr(getattr(_rel_obj, "bridge", None), "table", None) == tbl.name
+            )
+            if _is_bridge_here:
+                continue
             # All components should have same target_side
             sides = {getattr(c.generator, "target_side", None) for c in cols}
             if len(sides) != 1:
@@ -1453,16 +1464,43 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             f"order_by '{col}' not in staging output",
                             related=str(col),
                         )
-                # Deterministic tie-breaking: order_by should not be subset of keys alone
-                order_cols = [getattr(sk, "column", None) for sk in getattr(op, "order_by", [])]
-                if set(order_cols) <= set(getattr(op, "keys", [])):
-                    _add_issue(
-                        issues,
-                        ErrorCode.UNKNOWN,
-                        f"staging_models[{s.name}].row_operations[{op_idx}].order_by",
-                        "deduplication order_by must provide deterministic tie-breaking beyond keys",
-                        related=",".join(order_cols),
-                    )
+                # Deterministic tie-breaking: keys + order_by must contain a projected
+                # source uniqueness key (raw PK / raw unique via lineage, rename-aware).
+                _op_keys = tuple(getattr(op, "keys", ()))
+                _op_order = tuple(getattr(sk, "column", None) for sk in getattr(op, "order_by", []))
+                if all(k in target_names for k in _op_keys) and all(
+                    c in target_names for c in _op_order
+                ):
+                    _combined_targets: list[str] = []
+                    for _c in (*_op_keys, *_op_order):
+                        if _c not in _combined_targets:
+                            _combined_targets.append(_c)
+                    _union_raw: set[str] = set()
+                    _tgt_to_src = {c.target: c.source for c in s.columns}
+                    for _t in _combined_targets:
+                        _src_col = _tgt_to_src.get(_t)
+                        if _src_col is not None:
+                            _union_raw.add(f"{s.source}.{_src_col}")
+                    _proven = False
+                    _src_tbl = raw_by_name.get(s.source)
+                    if _src_tbl is not None:
+                        _pk = tuple(getattr(_src_tbl, "primary_key", ()))
+                        if _pk and all(f"{s.source}.{c}" in _union_raw for c in _pk):
+                            _proven = True
+                        if not _proven:
+                            for _rc in getattr(_src_tbl, "columns", []):
+                                if getattr(_rc, "unique", False):
+                                    if f"{s.source}.{getattr(_rc, 'name', '')}" in _union_raw:
+                                        _proven = True
+                                        break
+                    if not _proven:
+                        _add_issue(
+                            issues,
+                            ErrorCode.NON_DETERMINISTIC_DEDUP,
+                            f"staging_models[{s.name}].row_operations[{op_idx}].order_by",
+                            "deduplication keys + order_by do not contain a projected source uniqueness key – tie-break not provable",
+                            related=",".join(_op_order),
+                        )
 
     # §17.6 DAG & Intermediate
     all_model_names = set(staging_by_name.keys()) | set(intermediate_by_name.keys())
@@ -1681,8 +1719,35 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"grain '{g}' not in output schema",
                         related=g,
                     )
-            # Grain vs cardinality – for transform, grain should be from input grain lineage
-            # Simplified check: grain should be subset of output and should be unique – already checked
+            # Grain preservation for transform: declared grain must contain a projected
+            # image of a source uniqueness key (row multiplicity unchanged).
+            if all(g in out_schema for g in m.grain):
+                source_grain = None
+                if m.source in staging_by_name:
+                    source_grain = tuple(staging_by_name[m.source].grain)
+                elif m.source in intermediate_by_name:
+                    src_model = intermediate_by_name.get(m.source)
+                    if src_model is not None:
+                        source_grain = tuple(getattr(src_model, "grain", ()))
+                if source_grain:
+                    proj_map = {pc.source: pc.target for pc in m.columns}
+                    projected = tuple(proj_map.get(col) for col in source_grain)
+                    if any(c is None for c in projected):
+                        _add_issue(
+                            issues,
+                            ErrorCode.GRAIN_IMPOSSIBLE,
+                            f"intermediate_models[{name}].grain",
+                            f"grain {m.grain} drops part of source grain {source_grain} – not a valid projected image",
+                            related=m.grain[0] if m.grain else "",
+                        )
+                    elif not set(projected).issubset(set(m.grain)):
+                        _add_issue(
+                            issues,
+                            ErrorCode.GRAIN_IMPOSSIBLE,
+                            f"intermediate_models[{name}].grain",
+                            f"grain {m.grain} must contain projected image {tuple(projected)} of source grain {source_grain}",
+                            related=m.grain[0] if m.grain else "",
+                        )
             intermediate_schema[name] = out_schema
             intermediate_lineage[name] = out_lineage
 
@@ -1698,6 +1763,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 or right_lineage is None
             ):
                 continue
+            # Check each pair individually first (existence, type)
             for pair in m.join.on:
                 if pair.left not in left_schema:
                     _add_issue(
@@ -1725,105 +1791,245 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"join key type mismatch '{lt.value}' vs '{rt.value}'",
                         related=pair.left,
                     )
-                # Check lineage: join keys must be supported by raw relationship
-                # Get raw lineage for each side
-                left_raw_lin = left_lineage.get(pair.left, [])
-                right_raw_lin = right_lineage.get(pair.right, [])
 
-                # Each lineage is like ["raw_a.id"] – extract table and column
-                def _parse_raw(lin: str) -> tuple[str, str] | None:
+            # Exact join resolution: resolve complete ordered tuple through lineage to one relationship in one orientation
+            # Consider all significant raw-lineage candidates, not just first
+            def _parse_raw_lineage(lineage_list: list[str]) -> list[tuple[str, str]]:
+                res: list[tuple[str, str]] = []
+                for lin in lineage_list:
                     if "." in lin:
                         t, c = lin.split(".", 1)
-                        return (t, c)
-                    return None
+                        res.append((t, c))
+                return res
 
-                left_raw = _parse_raw(left_raw_lin[0]) if left_raw_lin else None
-                right_raw = _parse_raw(right_raw_lin[0]) if right_raw_lin else None
-                if left_raw and right_raw:
-                    found = False
-                    for rel in scenario.relationships:
-                        # Check if relationship connects these raw tables/columns (in either direction)
-                        if (
-                            rel.left.table == left_raw[0]
-                            and rel.right.table == right_raw[0]
-                            and left_raw[1] in rel.left.columns
-                            and right_raw[1] in rel.right.columns
-                        ) or (
-                            rel.left.table == right_raw[0]
-                            and rel.right.table == left_raw[0]
-                            and right_raw[1] in rel.left.columns
-                            and left_raw[1] in rel.right.columns
-                        ):
-                            # Also check arity matches – for direct relationships, single column check is enough
-                            found = True
-                            break
-                        # For composite keys, check if pair is part of relationship
-                        # Simplified: check if left_raw and right_raw are in any relationship together
-                        if (rel.left.table, rel.right.table) == (left_raw[0], right_raw[0]) or (
-                            rel.left.table,
-                            rel.right.table,
-                        ) == (right_raw[0], left_raw[0]):
-                            # Check if columns are part of relationship
-                            if (
-                                left_raw[1] in rel.left.columns
-                                and right_raw[1] in rel.right.columns
-                            ):
-                                found = True
-                            elif (
-                                left_raw[1] in rel.right.columns
-                                and right_raw[1] in rel.left.columns
-                            ):
-                                found = True
-                    if not found:
+            # Build ordered lists of raw lineage candidates for each pair
+            left_raw_options: list[list[tuple[str, str]]] = []
+            right_raw_options: list[list[tuple[str, str]]] = []
+            for pair in m.join.on:
+                left_raw_lin = left_lineage.get(pair.left, [])
+                right_raw_lin = right_lineage.get(pair.right, [])
+                left_opts = _parse_raw_lineage(left_raw_lin)
+                right_opts = _parse_raw_lineage(right_raw_lin)
+                # If no lineage, use empty to indicate missing (already reported as missing ref, suppress cascade)
+                if not left_opts:
+                    left_opts = []
+                if not right_opts:
+                    right_opts = []
+                left_raw_options.append(left_opts)
+                right_raw_options.append(right_opts)
+
+            # Check for missing lineage already reported via missing ref, suppress further
+            has_missing_ref = any(
+                pair.left not in left_schema or pair.right not in right_schema for pair in m.join.on
+            )
+            if not has_missing_ref:
+                # Check for contradictory mapping: left column mapped to multiple right columns, etc.
+                left_to_right: dict[str, set[str]] = {}
+                right_to_left: dict[str, set[str]] = {}
+                for pair in m.join.on:
+                    left_to_right.setdefault(pair.left, set()).add(pair.right)
+                    right_to_left.setdefault(pair.right, set()).add(pair.left)
+                for lcol, rcols in left_to_right.items():
+                    if len(rcols) > 1:
                         _add_issue(
                             issues,
-                            ErrorCode.JOIN_KEY_MISMATCH,
+                            ErrorCode.CONTRADICTORY_JOIN_MAPPING,
                             f"intermediate_models[{name}].join.on",
-                            f"join keys '{pair.left}'/'{pair.right}' not supported by traceable raw relationship lineage",
-                            related=pair.left,
+                            f"left column '{lcol}' mapped to multiple right columns {sorted(rcols)} – contradictory join mapping",
+                            related=lcol,
                         )
-                # Grain vs cardinality: validate grain against join cardinality
-                # For inner join, grain should be combination or from one side; for left join, grain must be from left
-                # Simplified: for left join, grain must be subset of left side's grain or output; for inner, grain must be unique
-                # We check that grain is subset of output (already) and that for left join, grain columns are from left
-                if m.join.type == "left":
-                    for g in m.grain:
-                        # Find which side g comes from
-                        g_side = None
-                        for jc in m.columns:
-                            if jc.target == g:
-                                g_side = jc.side
+                for rcol, lcols in right_to_left.items():
+                    if len(lcols) > 1:
+                        _add_issue(
+                            issues,
+                            ErrorCode.CONTRADICTORY_JOIN_MAPPING,
+                            f"intermediate_models[{name}].join.on",
+                            f"right column '{rcol}' mapped from multiple left columns {sorted(lcols)} – contradictory",
+                            related=rcol,
+                        )
+                # Resolve the complete ordered tuple to one relationship in one orientation.
+                # Uses resolved_rels for direction/cardinality and considers all lineage candidates.
+                found_rel = None
+                found_orientation = None
+                for rel_name, resolved in resolved_rels.items():
+                    rel = rel_by_name.get(rel_name)
+                    if rel is None:
+                        continue
+                    if resolved.cardinality in ("one_to_one", "one_to_many", "many_to_one"):
+                        if len(m.join.on) != len(resolved.left_columns):
+                            continue
+                        forward_ok = True
+                        for idx in range(len(m.join.on)):
+                            exp_left = (resolved.left_table, resolved.left_columns[idx])
+                            exp_right = (resolved.right_table, resolved.right_columns[idx])
+                            if exp_left not in left_raw_options[idx] or exp_right not in right_raw_options[idx]:
+                                forward_ok = False
                                 break
-                        if g_side is None:
-                            for dc in m.derived_columns:
-                                if dc.name == g:
-                                    # For derived, check its expression lineage
-                                    expr_cols = _collect_expression_columns(dc.expression)
-                                    # If any expression column is from right, then derived is from right
-                                    for ec in expr_cols:
-                                        if ec in right_schema:
-                                            g_side = "right"
-                                        elif ec in left_schema:
-                                            if g_side is None:
-                                                g_side = "left"
-                                            elif g_side == "right":
-                                                g_side = "both"
-                        # For left join, grain must be from left (preserves left grain)
-                        if g_side == "right":
+                        if forward_ok:
+                            orientation_ok: str | None = "forward"
+                        else:
+                            reverse_ok = True
+                            for idx in range(len(m.join.on)):
+                                exp_left_rev = (resolved.right_table, resolved.right_columns[idx])
+                                exp_right_rev = (resolved.left_table, resolved.left_columns[idx])
+                                if exp_left_rev not in left_raw_options[idx] or exp_right_rev not in right_raw_options[idx]:
+                                    reverse_ok = False
+                                    break
+                            orientation_ok = "reverse" if reverse_ok else None
+                        if orientation_ok:
+                            if found_rel is not None:
+                                _add_issue(
+                                    issues,
+                                    ErrorCode.CONTRADICTORY_JOIN_MAPPING,
+                                    f"intermediate_models[{name}].join.on",
+                                    "join keys match multiple relationships – ambiguous",
+                                    related=m.join.on[0].left if m.join.on else "",
+                                )
+                                found_rel = None
+                                break
+                            found_rel = rel
+                            found_orientation = orientation_ok
+                    else:  # many_to_many – bridge-mediated only
+                        if resolved.bridge_table is None:
+                            continue
+                        bridge_patterns = [
+                            ("bridge-left-forward", [(resolved.bridge_table, c) for c in (resolved.bridge_left_columns or ())], [(resolved.left_table, c) for c in resolved.left_columns]),
+                            ("bridge-left-reverse", [(resolved.left_table, c) for c in resolved.left_columns], [(resolved.bridge_table, c) for c in (resolved.bridge_left_columns or ())]),
+                            ("bridge-right-forward", [(resolved.bridge_table, c) for c in (resolved.bridge_right_columns or ())], [(resolved.right_table, c) for c in resolved.right_columns]),
+                            ("bridge-right-reverse", [(resolved.right_table, c) for c in resolved.right_columns], [(resolved.bridge_table, c) for c in (resolved.bridge_right_columns or ())]),
+                        ]
+                        for pattern_name, exp_left_seq, exp_right_seq in bridge_patterns:
+                            if len(m.join.on) != len(exp_left_seq):
+                                continue
+                            ok = True
+                            for idx in range(len(m.join.on)):
+                                if exp_left_seq[idx] not in left_raw_options[idx] or exp_right_seq[idx] not in right_raw_options[idx]:
+                                    ok = False
+                                    break
+                            if ok:
+                                if found_rel is not None:
+                                    _add_issue(
+                                        issues,
+                                        ErrorCode.CONTRADICTORY_JOIN_MAPPING,
+                                        f"intermediate_models[{name}].join.on",
+                                        "join keys match multiple relationships – ambiguous",
+                                        related=m.join.on[0].left if m.join.on else "",
+                                    )
+                                    found_rel = None
+                                    break
+                                found_rel = rel
+                                found_orientation = pattern_name
+                                break
+                if found_rel is None and not has_missing_ref:
+                    _add_issue(
+                        issues,
+                        ErrorCode.UNSUPPORTED_JOIN_LINEAGE,
+                        f"intermediate_models[{name}].join.on",
+                        "join keys not supported by a single declared raw relationship lineage in one consistent orientation (arity, ordered pairing, or mixed relationships)",
+                        related=m.join.on[0].left if m.join.on else "",
+                    )
+                # If found, we can store resolved relationship for later grain checks?
+                # For now, just ensure we don't use pair-wise shortcuts anymore
+                # Grain preservation from cardinality, join type, source grains, projection.
+                # Only run when lineage resolved; otherwise suppress cascade (unsupported already reported).
+                if found_rel is not None and not has_missing_ref:
+                    resolved = resolved_rels.get(found_rel.name)
+                    if resolved is not None:
+                        # Input grains (declared) mapped to output targets.
+                        left_grain_src = tuple(staging_by_name[m.left].grain) if m.left in staging_by_name else tuple(intermediate_by_name[m.left].grain) if m.left in intermediate_by_name else ()
+                        right_grain_src = tuple(staging_by_name[m.right].grain) if m.right in staging_by_name else tuple(intermediate_by_name[m.right].grain) if m.right in intermediate_by_name else ()
+                        proj_left = {jc.source: jc.target for jc in m.columns if jc.side == "left"}
+                        proj_right = {jc.source: jc.target for jc in m.columns if jc.side == "right"}
+                        left_image = tuple(proj_left[c] for c in left_grain_src if c in proj_left)
+                        right_image = tuple(proj_right[c] for c in right_grain_src if c in proj_right)
+                        # Combined is structurally sufficient only when both sides projected
+                        # their grains; otherwise it degenerates to a single side.
+                        _combined_valid = bool(left_image) and bool(right_image)
+                        # Build combined preserving order without duplicates.
+                        _seen: set[str] = set()
+                        _combined_list: list[str] = []
+                        for c in (*left_image, *right_image):
+                            if c not in _seen:
+                                _seen.add(c)
+                                _combined_list.append(c)
+                        combined = tuple(_combined_list) if _combined_valid else ()
+                        grain_set = set(m.grain)
+
+                        def _covers(base: tuple[str, ...]) -> bool:
+                            return bool(base) and set(base).issubset(grain_set)
+
+                        allowed: list[tuple[str, ...]] = []
+                        join_type = m.join.type
+                        card = resolved.cardinality
+                        orient = found_orientation or ""
+                        if card == "one_to_one":
+                            if join_type == "inner":
+                                allowed = [left_image, right_image, combined]
+                            else:  # left join: right-only not preserved (nulls)
+                                allowed = [left_image, combined]
+                        elif card in ("one_to_many", "many_to_one"):
+                            # Determine which join side is the many side.
+                            # 1-N: U=rel.left, M=rel.right; forward => join.right=M.
+                            # N-1: U=rel.right, M=rel.left; forward => join.left=M.
+                            if card == "one_to_many":
+                                many_side = "right" if orient == "forward" else "left"
+                            else:  # many_to_one
+                                many_side = "left" if orient == "forward" else "right"
+                            if join_type == "inner":
+                                if many_side == "right":
+                                    allowed = [right_image, combined]
+                                else:
+                                    allowed = [left_image, combined]
+                            else:  # left join
+                                if many_side == "left":
+                                    allowed = [left_image, combined]
+                                else:
+                                    # left is one-side: fan-out duplicates left grain; right-only has nulls
+                                    allowed = [combined]
+                        else:  # many_to_many bridge-mediated
+                            # Bridge side is many; endpoint side is one.
+                            bridge_side: str | None = None
+                            if orient in ("bridge-left-forward", "bridge-right-forward"):
+                                # join.left traces bridge
+                                bridge_side = "left"
+                            elif orient in ("bridge-left-reverse", "bridge-right-reverse"):
+                                bridge_side = "right"
+                            if join_type == "inner":
+                                if bridge_side == "left":
+                                    allowed = [left_image, combined]
+                                elif bridge_side == "right":
+                                    allowed = [right_image, combined]
+                                else:
+                                    allowed = [combined]
+                            else:  # left join
+                                if bridge_side == "left":
+                                    allowed = [left_image, combined]
+                                else:
+                                    allowed = [combined]
+                        allowed = [a for a in allowed if a]
+                        if not allowed:
+                            # Grain images not projected; declared grain cannot preserve uniqueness.
                             _add_issue(
                                 issues,
-                                ErrorCode.GRAIN_IMPOSSIBLE,
+                                ErrorCode.IMPOSSIBLE_JOIN_GRAIN,
                                 f"intermediate_models[{name}].grain",
-                                f"grain '{g}' for left join must be from left side, got right",
-                                related=g,
+                                f"grain {m.grain} has no projected source grain image to preserve (left={left_image}, right={right_image})",
+                                related=m.grain[0] if m.grain else "",
                             )
-                        elif g_side == "both":
+                        elif not any(_covers(a) for a in allowed):
+                            # Describe expected preservation for actionable message.
+                            if card == "one_to_one":
+                                expected = "left, right, or combined projected grain" if join_type == "inner" else "left or combined projected grain"
+                            elif join_type == "left" and allowed == [combined]:
+                                expected = "combined projected grain (left-only fan-out and right-only nulls not preserved)"
+                            else:
+                                expected = "many-side or combined projected grain"
                             _add_issue(
                                 issues,
-                                ErrorCode.GRAIN_IMPOSSIBLE,
+                                ErrorCode.IMPOSSIBLE_JOIN_GRAIN,
                                 f"intermediate_models[{name}].grain",
-                                f"grain '{g}' for left join must be from left side only",
-                                related=g,
+                                f"grain {m.grain} is not possible for {join_type} {card} join ({orient}); expected {expected}",
+                                related=m.grain[0] if m.grain else "",
                             )
             out_schema = {}
             out_lineage = {}
@@ -2048,16 +2254,49 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"order_by '{sk.column}' not in source",
                         related=sk.column,
                     )
-            # Deterministic tie-breaking: order_by should extend beyond keys
-            order_cols = [sk.column for sk in m.order_by]
-            if set(order_cols) <= set(m.keys):
-                _add_issue(
-                    issues,
-                    ErrorCode.UNKNOWN,
-                    f"intermediate_models[{name}].order_by",
-                    "deduplication order_by must provide deterministic tie-breaking beyond keys",
-                    related=",".join(order_cols),
-                )
+            # Deterministic tie-breaking: keys + order_by must contain a source
+            # uniqueness key (source grain or raw PK via lineage). Rename-aware.
+            if all(k in src_schema for k in m.keys) and all(sk.column in src_schema for sk in m.order_by):
+                _combined: list[str] = []
+                for _c in (*m.keys, *(sk.column for sk in m.order_by)):
+                    if _c not in _combined:
+                        _combined.append(_c)
+                _proven_dedup = False
+                _src_grain: tuple[str, ...] = ()
+                if m.source in staging_by_name:
+                    _src_grain = tuple(staging_by_name[m.source].grain)
+                elif m.source in intermediate_by_name:
+                    _src_model = intermediate_by_name.get(m.source)
+                    if _src_model is not None:
+                        _src_grain = tuple(getattr(_src_model, "grain", ()))
+                if _src_grain and set(_src_grain).issubset(set(_combined)):
+                    _proven_dedup = True
+                if not _proven_dedup:
+                    _union_raw_dedup: set[str] = set()
+                    for _c in _combined:
+                        for _lin in src_lineage.get(_c, []):
+                            _union_raw_dedup.add(_lin)
+                    for _tbl in scenario.raw_tables:
+                        _pk = tuple(getattr(_tbl, "primary_key", ()))
+                        if _pk and all(f"{_tbl.name}.{c}" in _union_raw_dedup for c in _pk):
+                            _proven_dedup = True
+                            break
+                        if not _proven_dedup:
+                            for _rc in getattr(_tbl, "columns", []):
+                                if getattr(_rc, "unique", False):
+                                    if f"{_tbl.name}.{getattr(_rc, 'name', '')}" in _union_raw_dedup:
+                                        _proven_dedup = True
+                                        break
+                            if _proven_dedup:
+                                break
+                if not _proven_dedup:
+                    _add_issue(
+                        issues,
+                        ErrorCode.NON_DETERMINISTIC_DEDUP,
+                        f"intermediate_models[{name}].order_by",
+                        "deduplication keys + order_by do not contain a source uniqueness key – tie-break not provable",
+                        related=",".join(sk.column for sk in m.order_by),
+                    )
             for g in m.grain:
                 if g not in src_schema:
                     _add_issue(

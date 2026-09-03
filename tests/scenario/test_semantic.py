@@ -162,7 +162,15 @@ def _base_scenario() -> dict:
         ),
         "intermediate_models": (
             _trans("trans_a", "stg_c"),
-            _join("join_a", "stg_a", "stg_b", left_key="id", right_key="a_id"),
+            {
+                "operation": "join",
+                "name": "join_a",
+                "left": "stg_a",
+                "right": "stg_b",
+                "join": {"type": "inner", "on": ({"left": "id", "right": "a_id"},)},
+                "columns": ({"side": "right", "source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
         ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
@@ -944,31 +952,55 @@ def test_aggregate_filter_type_mismatch():
 
 
 def test_deterministic_tie_breaking():
+    # Non-deterministic: dedup over a non-unique column whose lineage covers no raw PK.
     base = _base_scenario()
+    base["raw_tables"] = (
+        _raw_with_cols(
+            "raw_a",
+            [
+                {"name": "id", "type": "integer", "generator": _INT_GEN},
+                {"name": "val", "type": "integer", "generator": _INT_GEN},
+            ],
+            pk=("id",),
+        ),
+        base["raw_tables"][1],
+        base["raw_tables"][2],
+    )
+    base["staging_models"] = (
+        {
+            "name": "stg_a",
+            "source": "raw_a",
+            "columns": ({"source": "id", "target": "id"}, {"source": "val", "target": "val"}),
+            "grain": ("id",),
+        },
+        base["staging_models"][1],
+        base["staging_models"][2],
+    )
     base["intermediate_models"] = (
         base["intermediate_models"][0],
         {
             "operation": "deduplicate",
             "name": "dedup_a",
             "source": "stg_a",
-            "keys": ("id",),
-            "order_by": ({"column": "id"},),  # order_by same as keys – not deterministic
-            "grain": ("id",),
+            "keys": ("val",),
+            "order_by": ({"column": "val"},),
+            "grain": ("val",),
         },
     )
     base["output_models"] = (
         {
             "name": "out_a",
             "source": "dedup_a",
-            "group_by": ({"source": "id", "target": "id"},),
-            "grain": ("id",),
+            "group_by": ({"source": "val", "target": "val"},),
+            "grain": ("val",),
             "metrics": ({"name": "cnt", "function": "count_rows"},),
         },
     )
     s = Scenario.model_validate(base)
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
-    assert any("deterministic" in i.message.lower() for i in exc.value.issues)
+    assert any("deterministic" in i.message.lower() or "tie-break" in i.message.lower() for i in exc.value.issues)
+    assert any(i.code == "E134" for i in exc.value.issues)
 
 
 def test_composite_pk_feasibility():

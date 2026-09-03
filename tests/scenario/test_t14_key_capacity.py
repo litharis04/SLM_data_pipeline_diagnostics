@@ -27,11 +27,11 @@ def _base():
         ),
         "intermediate_models": (
             {"operation": "transform", "name": "trans_a", "source": "stg_c", "columns": ({"source": "id", "target": "id"},), "grain": ("id",)},
-            {"operation": "join", "name": "join_a", "left": "stg_a", "right": "stg_b", "join": {"type": "inner", "on": ({"left": "id", "right": "a_id"},)}, "columns": ({"side": "left", "source": "id", "target": "id"},), "grain": ("id",)},
+            {"operation": "join", "name": "join_a", "left": "stg_a", "right": "stg_b", "join": {"type": "inner", "on": ({"left": "id", "right": "a_id"},)}, "columns": ({"side": "left", "source": "id", "target": "lid"}, {"side": "right", "source": "id", "target": "rid"}), "grain": ("lid", "rid")},
         ),
         "output_models": (
             {"name": "out_a", "source": "trans_a", "group_by": ({"source": "id", "target": "id"},), "grain": ("id",), "metrics": ({"name": "cnt", "function": "count_rows"},)},
-            {"name": "out_b", "source": "join_a", "group_by": ({"source": "id", "target": "id"},), "grain": ("id",), "metrics": ({"name": "cnt2", "function": "count_rows"},)},
+            {"name": "out_b", "source": "join_a", "group_by": ({"source": "lid", "target": "lid"}, {"source": "rid", "target": "rid"}), "grain": ("lid", "rid"), "metrics": ({"name": "cnt2", "function": "count_rows"},)},
         ),
     }
 
