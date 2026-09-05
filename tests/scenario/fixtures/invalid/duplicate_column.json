@@ -1,0 +1,200 @@
+{
+  "schema_version": "1.0",
+  "scenario_id": "invalid_fixture",
+  "domain": "testdomain",
+  "raw_tables": [
+    {
+      "name": "raw_a",
+      "rows": {
+        "min": 1,
+        "max": 10
+      },
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "generator": {
+            "kind": "integer_range",
+            "min": 1,
+            "max": 10
+          }
+        },
+        {
+          "name": "id",
+          "type": "integer",
+          "generator": {
+            "kind": "integer_range",
+            "min": 1,
+            "max": 10
+          }
+        }
+      ],
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "name": "raw_b",
+      "rows": {
+        "min": 1,
+        "max": 10
+      },
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "generator": {
+            "kind": "integer_range",
+            "min": 1,
+            "max": 10
+          }
+        }
+      ],
+      "primary_key": [
+        "id"
+      ]
+    },
+    {
+      "name": "raw_c",
+      "rows": {
+        "min": 1,
+        "max": 10
+      },
+      "columns": [
+        {
+          "name": "id",
+          "type": "integer",
+          "generator": {
+            "kind": "integer_range",
+            "min": 1,
+            "max": 10
+          }
+        }
+      ],
+      "primary_key": [
+        "id"
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "name": "rel_a",
+      "cardinality": "one_to_many",
+      "left": {
+        "table": "raw_a",
+        "columns": [
+          "id"
+        ]
+      },
+      "right": {
+        "table": "raw_b",
+        "columns": [
+          "id"
+        ]
+      }
+    }
+  ],
+  "staging_models": [
+    {
+      "name": "stg_a",
+      "source": "raw_a",
+      "columns": [
+        {
+          "source": "id",
+          "target": "id"
+        }
+      ],
+      "grain": [
+        "id"
+      ]
+    },
+    {
+      "name": "stg_b",
+      "source": "raw_b",
+      "columns": [
+        {
+          "source": "id",
+          "target": "id"
+        }
+      ],
+      "grain": [
+        "id"
+      ]
+    },
+    {
+      "name": "stg_c",
+      "source": "raw_c",
+      "columns": [
+        {
+          "source": "id",
+          "target": "id"
+        }
+      ],
+      "grain": [
+        "id"
+      ]
+    }
+  ],
+  "intermediate_models": [
+    {
+      "operation": "transform",
+      "name": "trans_a",
+      "source": "stg_a",
+      "columns": [
+        {
+          "source": "id",
+          "target": "id"
+        }
+      ],
+      "grain": [
+        "id"
+      ]
+    },
+    {
+      "operation": "join",
+      "name": "join_a",
+      "left": "stg_b",
+      "right": "stg_c",
+      "join": {
+        "type": "inner",
+        "on": [
+          {
+            "left": "id",
+            "right": "id"
+          }
+        ]
+      },
+      "columns": [
+        {
+          "side": "left",
+          "source": "id",
+          "target": "id"
+        }
+      ],
+      "grain": [
+        "id"
+      ]
+    }
+  ],
+  "output_models": [
+    {
+      "name": "out_a",
+      "source": "trans_a",
+      "group_by": [
+        {
+          "source": "id",
+          "target": "id"
+        }
+      ],
+      "grain": [
+        "id"
+      ],
+      "metrics": [
+        {
+          "name": "cnt",
+          "function": "count_rows"
+        }
+      ]
+    }
+  ]
+}
