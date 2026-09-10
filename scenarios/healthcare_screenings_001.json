@@ -1,0 +1,468 @@
+{
+  "description": "Healthcare screenings pipeline: binary risk flags, year and quarter derivation in the transform.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "screening_id",
+          "target": "screening_id"
+        },
+        {
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "source": "site_id",
+          "target": "site_id"
+        },
+        {
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "source": "screen_date",
+          "target": "screen_date"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "year",
+            "value": {
+              "column": "screen_date",
+              "kind": "column"
+            }
+          },
+          "name": "yr",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "quarter",
+            "value": {
+              "column": "screen_date",
+              "kind": "column"
+            }
+          },
+          "name": "qtr",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "screening_id"
+      ],
+      "name": "t_screenings",
+      "operation": "transform",
+      "source": "stg_screenings"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "screening_id",
+          "target": "screening_id"
+        },
+        {
+          "side": "left",
+          "source": "yr",
+          "target": "yr"
+        },
+        {
+          "side": "left",
+          "source": "qtr",
+          "target": "qtr"
+        },
+        {
+          "side": "left",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "side": "left",
+          "source": "site_id",
+          "target": "site_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "screening_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "program_id",
+            "right": "program_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_screenings",
+      "name": "j_scr_programs",
+      "operation": "join",
+      "right": "stg_programs"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "screening_id",
+          "target": "screening_id"
+        },
+        {
+          "side": "left",
+          "source": "qtr",
+          "target": "qtr"
+        },
+        {
+          "side": "left",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "screening_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "site_id",
+            "right": "site_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_scr_programs",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_sites"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "qtr"
+      ],
+      "group_by": [
+        {
+          "source": "qtr",
+          "target": "qtr"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "result",
+          "function": "avg",
+          "name": "avg_result"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_screenings"
+        }
+      ],
+      "name": "o_result_by_quarter",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PG-"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "coordinator",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_programs",
+      "primary_key": [
+        "program_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "site_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_sites",
+      "primary_key": [
+        "site_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SC-"
+          },
+          "name": "screening_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_program_screenings",
+            "target_side": "left"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_site_screenings",
+            "target_side": "right"
+          },
+          "name": "site_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1,
+            "min": 0
+          },
+          "name": "risk",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "screen_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "result",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_screenings",
+      "primary_key": [
+        "screening_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_programs"
+      },
+      "name": "rel_program_screenings",
+      "right": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_screenings"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "site_id"
+        ],
+        "table": "raw_screenings"
+      },
+      "name": "rel_site_screenings",
+      "right": {
+        "columns": [
+          "site_id"
+        ],
+        "table": "raw_sites"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_screenings_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "coordinator",
+          "target": "coordinator"
+        }
+      ],
+      "grain": [
+        "program_id"
+      ],
+      "name": "stg_programs",
+      "row_operations": [],
+      "source": "raw_programs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "site_id",
+          "target": "site_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "site_id"
+      ],
+      "name": "stg_sites",
+      "row_operations": [],
+      "source": "raw_sites"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "screening_id",
+          "target": "screening_id"
+        },
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "site_id",
+          "target": "site_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "risk",
+          "target": "flag"
+        },
+        {
+          "operations": [],
+          "source": "screen_date",
+          "target": "screen_date"
+        },
+        {
+          "operations": [],
+          "source": "result",
+          "target": "result"
+        }
+      ],
+      "grain": [
+        "screening_id"
+      ],
+      "name": "stg_screenings",
+      "row_operations": [],
+      "source": "raw_screenings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "result",
+      "min": 0.0,
+      "model": "stg_screenings",
+      "name": "result_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

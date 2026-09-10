@@ -1,0 +1,519 @@
+{
+  "description": "Transport fuel pipeline: nested large-or-alt-fuel filter, high-emitter counts and diesel volumes.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "fueling_id",
+          "target": "fueling_id"
+        },
+        {
+          "source": "vehicle_id",
+          "target": "vehicle_id"
+        },
+        {
+          "source": "fuel",
+          "target": "fuel"
+        },
+        {
+          "source": "liters",
+          "target": "liters"
+        },
+        {
+          "source": "co2",
+          "target": "co2"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "conditions": [
+            {
+              "kind": "comparison",
+              "left": {
+                "column": "liters",
+                "kind": "column"
+              },
+              "operator": "gt",
+              "right": {
+                "kind": "literal",
+                "value": 0.0
+              }
+            },
+            {
+              "conditions": [
+                {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "liters",
+                    "kind": "column"
+                  },
+                  "operator": "gt",
+                  "right": {
+                    "kind": "literal",
+                    "value": 100.0
+                  }
+                },
+                {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "fuel",
+                    "kind": "column"
+                  },
+                  "operator": "eq",
+                  "right": {
+                    "kind": "literal",
+                    "value": "cng"
+                  }
+                }
+              ],
+              "kind": "any"
+            }
+          ],
+          "kind": "all"
+        }
+      ],
+      "grain": [
+        "fueling_id"
+      ],
+      "name": "t_fuelings",
+      "operation": "transform",
+      "source": "stg_fuelings"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fueling_id",
+          "target": "fueling_id"
+        },
+        {
+          "side": "left",
+          "source": "fuel",
+          "target": "fuel"
+        },
+        {
+          "side": "left",
+          "source": "liters",
+          "target": "liters"
+        },
+        {
+          "side": "left",
+          "source": "co2",
+          "target": "co2"
+        },
+        {
+          "side": "right",
+          "source": "depot_id",
+          "target": "depot_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "fueling_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "vehicle_id",
+            "right": "vehicle_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_fuelings",
+      "name": "j_fuel_vehicles",
+      "operation": "join",
+      "right": "stg_vehicles"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fueling_id",
+          "target": "fueling_id"
+        },
+        {
+          "side": "left",
+          "source": "fuel",
+          "target": "fuel"
+        },
+        {
+          "side": "left",
+          "source": "liters",
+          "target": "liters"
+        },
+        {
+          "side": "left",
+          "source": "co2",
+          "target": "co2"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "fueling_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "depot_id",
+            "right": "depot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_fuel_vehicles",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_depots"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "fuel"
+      ],
+      "group_by": [
+        {
+          "source": "fuel",
+          "target": "fuel"
+        }
+      ],
+      "metrics": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "co2",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 500.0
+            }
+          },
+          "function": "conditional_count",
+          "name": "n_high"
+        },
+        {
+          "column": "liters",
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "fuel",
+              "kind": "column"
+            },
+            "operator": "eq",
+            "right": {
+              "kind": "literal",
+              "value": "diesel"
+            }
+          },
+          "function": "conditional_sum",
+          "name": "diesel_vol"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_fuelings"
+        }
+      ],
+      "name": "o_emissions_by_fuel",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DP-"
+          },
+          "name": "depot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_depots",
+      "primary_key": [
+        "depot_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "VH-"
+          },
+          "name": "vehicle_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_depot_vehicles",
+            "target_side": "left"
+          },
+          "name": "depot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 7,
+            "min_length": 7
+          },
+          "name": "plate",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vehicles",
+      "primary_key": [
+        "vehicle_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "FL-"
+          },
+          "name": "fueling_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_vehicle_fuelings",
+            "target_side": "left"
+          },
+          "name": "vehicle_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "cng",
+              "diesel"
+            ]
+          },
+          "name": "fuel",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 5.0
+          },
+          "name": "liters",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000.0,
+            "min": 10.0
+          },
+          "name": "co2",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_fuelings",
+      "primary_key": [
+        "fueling_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "depot_id"
+        ],
+        "table": "raw_depots"
+      },
+      "name": "rel_depot_vehicles",
+      "right": {
+        "columns": [
+          "depot_id"
+        ],
+        "table": "raw_vehicles"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "vehicle_id"
+        ],
+        "table": "raw_vehicles"
+      },
+      "name": "rel_vehicle_fuelings",
+      "right": {
+        "columns": [
+          "vehicle_id"
+        ],
+        "table": "raw_fuelings"
+      }
+    }
+  ],
+  "scenario_id": "transport_fuel_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "depot_id"
+      ],
+      "name": "stg_depots",
+      "row_operations": [],
+      "source": "raw_depots"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "vehicle_id",
+          "target": "vehicle_id"
+        },
+        {
+          "operations": [],
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "operations": [],
+          "source": "plate",
+          "target": "plate"
+        }
+      ],
+      "grain": [
+        "vehicle_id"
+      ],
+      "name": "stg_vehicles",
+      "row_operations": [],
+      "source": "raw_vehicles"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "fueling_id",
+          "target": "fueling_id"
+        },
+        {
+          "operations": [],
+          "source": "vehicle_id",
+          "target": "vehicle_id"
+        },
+        {
+          "operations": [],
+          "source": "fuel",
+          "target": "fuel"
+        },
+        {
+          "operations": [],
+          "source": "liters",
+          "target": "liters"
+        },
+        {
+          "operations": [],
+          "source": "co2",
+          "target": "co2"
+        }
+      ],
+      "grain": [
+        "fueling_id"
+      ],
+      "name": "stg_fuelings",
+      "row_operations": [],
+      "source": "raw_fuelings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "fuel",
+      "model": "stg_fuelings",
+      "name": "fuel_values",
+      "type": "accepted_values",
+      "values": [
+        "cng",
+        "diesel"
+      ]
+    }
+  ]
+}

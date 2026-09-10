@@ -1,0 +1,397 @@
+{
+  "description": "Media archives pipeline: prefixless reel IDs, single-digit shelves and full-capacity barcodes.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "side": "left",
+          "source": "loan_date",
+          "target": "loan_date"
+        },
+        {
+          "side": "right",
+          "source": "reel_id",
+          "target": "reel_id"
+        },
+        {
+          "side": "right",
+          "source": "vault_id",
+          "target": "vault_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "loan_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "reel_id",
+            "right": "reel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_loans",
+      "name": "j_loans_reels",
+      "operation": "join",
+      "right": "stg_reels"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "side": "left",
+          "source": "loan_date",
+          "target": "loan_date"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "loan_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "vault_id",
+            "right": "vault_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_loans_reels",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_vaults"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "city"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "loan_date",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_loans"
+        }
+      ],
+      "name": "o_latest_by_city",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "VT-"
+          },
+          "name": "vault_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vaults",
+      "primary_key": [
+        "vault_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id"
+          },
+          "name": "reel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_vault_reels",
+            "target_side": "left"
+          },
+          "name": "vault_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "digits": 1,
+            "kind": "formatted_id",
+            "prefix": "S-"
+          },
+          "name": "shelf",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "digits": 18,
+            "kind": "formatted_id",
+            "prefix": "B-"
+          },
+          "name": "barcode",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_reels",
+      "primary_key": [
+        "reel_id"
+      ],
+      "rows": {
+        "max": 54,
+        "min": 18
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "loan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_reel_loans",
+            "target_side": "left"
+          },
+          "name": "reel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "loan_date",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_loans",
+      "primary_key": [
+        "loan_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "vault_id"
+        ],
+        "table": "raw_vaults"
+      },
+      "name": "rel_vault_reels",
+      "right": {
+        "columns": [
+          "vault_id"
+        ],
+        "table": "raw_reels"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "reel_id"
+        ],
+        "table": "raw_reels"
+      },
+      "name": "rel_reel_loans",
+      "right": {
+        "columns": [
+          "reel_id"
+        ],
+        "table": "raw_loans"
+      }
+    }
+  ],
+  "scenario_id": "media_archives_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "vault_id",
+          "target": "vault_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "vault_id"
+      ],
+      "name": "stg_vaults",
+      "row_operations": [],
+      "source": "raw_vaults"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reel_id",
+          "target": "reel_id"
+        },
+        {
+          "operations": [],
+          "source": "vault_id",
+          "target": "vault_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "operations": [],
+          "source": "shelf",
+          "target": "shelf"
+        },
+        {
+          "operations": [],
+          "source": "barcode",
+          "target": "barcode"
+        }
+      ],
+      "grain": [
+        "reel_id"
+      ],
+      "name": "stg_reels",
+      "row_operations": [],
+      "source": "raw_reels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "operations": [],
+          "source": "reel_id",
+          "target": "reel_id"
+        },
+        {
+          "operations": [],
+          "source": "loan_date",
+          "target": "loan_date"
+        }
+      ],
+      "grain": [
+        "loan_id"
+      ],
+      "name": "stg_loans",
+      "row_operations": [],
+      "source": "raw_loans"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "loan_date"
+      ],
+      "model": "stg_loans",
+      "name": "loan_date_present",
+      "type": "not_null"
+    }
+  ]
+}

@@ -1,0 +1,445 @@
+{
+  "description": "Manufacturing batch pipeline: out-of-band measurement capture, temporal minima and null-skipping inspector counts.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "measure_id",
+          "target": "measure_id"
+        },
+        {
+          "side": "left",
+          "source": "taken_at",
+          "target": "taken_at"
+        },
+        {
+          "side": "left",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "side": "left",
+          "source": "inspector",
+          "target": "inspector"
+        },
+        {
+          "side": "right",
+          "source": "line_id",
+          "target": "line_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "measure_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "batch_id",
+            "right": "batch_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_measurements",
+      "name": "j_meas_batches",
+      "operation": "join",
+      "right": "stg_batches"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "measure_id",
+          "target": "measure_id"
+        },
+        {
+          "side": "left",
+          "source": "taken_at",
+          "target": "taken_at"
+        },
+        {
+          "side": "left",
+          "source": "inspector",
+          "target": "inspector"
+        },
+        {
+          "side": "right",
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "measure_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "line_id",
+            "right": "line_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_meas_batches",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_lines"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "line_name"
+      ],
+      "group_by": [
+        {
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "taken_at",
+          "function": "min",
+          "name": "first_taken"
+        },
+        {
+          "column": "inspector",
+          "function": "count",
+          "name": "reviewed"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_measures"
+        }
+      ],
+      "name": "o_first_by_line",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "line_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_lines",
+      "primary_key": [
+        "line_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "BT-"
+          },
+          "name": "batch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_line_batches",
+            "target_side": "left"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "planned",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_batches",
+      "primary_key": [
+        "batch_id"
+      ],
+      "rows": {
+        "max": 54,
+        "min": 18
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "MS-"
+          },
+          "name": "measure_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_batch_measurements",
+            "target_side": "left"
+          },
+          "name": "batch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "taken_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 0.0
+          },
+          "name": "value",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "inspector",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_measurements",
+      "primary_key": [
+        "measure_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_lines"
+      },
+      "name": "rel_line_batches",
+      "right": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_batches"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "batch_id"
+        ],
+        "table": "raw_batches"
+      },
+      "name": "rel_batch_measurements",
+      "right": {
+        "columns": [
+          "batch_id"
+        ],
+        "table": "raw_measurements"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_batch_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "grain": [
+        "line_id"
+      ],
+      "name": "stg_lines",
+      "row_operations": [],
+      "source": "raw_lines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "planned",
+          "target": "planned"
+        }
+      ],
+      "grain": [
+        "batch_id"
+      ],
+      "name": "stg_batches",
+      "row_operations": [],
+      "source": "raw_batches"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "measure_id",
+          "target": "measure_id"
+        },
+        {
+          "operations": [],
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "operations": [],
+          "source": "taken_at",
+          "target": "taken_at"
+        },
+        {
+          "operations": [],
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "operations": [],
+          "source": "inspector",
+          "target": "inspector"
+        }
+      ],
+      "grain": [
+        "measure_id"
+      ],
+      "name": "stg_measurements",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "value",
+                  "kind": "column"
+                },
+                "operator": "gt",
+                "right": {
+                  "kind": "literal",
+                  "value": 400.0
+                }
+              },
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "value",
+                  "kind": "column"
+                },
+                "operator": "lt",
+                "right": {
+                  "kind": "literal",
+                  "value": 100.0
+                }
+              }
+            ],
+            "kind": "any"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_measurements"
+    }
+  ],
+  "tests": [
+    {
+      "column": "value",
+      "min": 0.0,
+      "model": "stg_measurements",
+      "name": "value_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

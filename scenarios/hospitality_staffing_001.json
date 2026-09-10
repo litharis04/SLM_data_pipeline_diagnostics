@@ -1,0 +1,417 @@
+{
+  "description": "Hospitality staffing pipeline: supervised shifts only, integer priority contract, hotel presence contract.",
+  "domain": "hospitality",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "assign_id",
+          "target": "assign_id"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "right",
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "side": "right",
+          "source": "supervisor",
+          "target": "supervisor"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "condition": {
+            "kind": "is_null",
+            "value": {
+              "column": "supervisor",
+              "kind": "column"
+            }
+          },
+          "kind": "not"
+        }
+      ],
+      "grain": [
+        "assign_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "shift_id",
+            "right": "shift_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_assignments",
+      "name": "j_assign_shifts",
+      "operation": "join",
+      "right": "stg_shifts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "assign_id",
+          "target": "assign_id"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "right",
+          "source": "hotel_name",
+          "target": "hotel_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "assign_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hotel_id",
+            "right": "hotel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_assign_shifts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_hotels"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "hotel_name"
+      ],
+      "group_by": [
+        {
+          "source": "hotel_name",
+          "target": "hotel_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "hours",
+          "function": "sum",
+          "name": "total_hours"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_assignments"
+        }
+      ],
+      "name": "o_hours_by_hotel",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HT-"
+          },
+          "name": "hotel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "hotel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hotels",
+      "primary_key": [
+        "hotel_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "SH-"
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hotel_shifts",
+            "target_side": "left"
+          },
+          "name": "hotel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "supervisor",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 3,
+            "min": 1
+          },
+          "name": "priority",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_shifts",
+      "primary_key": [
+        "shift_id"
+      ],
+      "rows": {
+        "max": 72,
+        "min": 24
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AS-"
+          },
+          "name": "assign_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_shift_assignments",
+            "target_side": "left"
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "staff",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 12.0,
+            "min": 1.0
+          },
+          "name": "hours",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_assignments",
+      "primary_key": [
+        "assign_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "hotel_id"
+        ],
+        "table": "raw_hotels"
+      },
+      "name": "rel_hotel_shifts",
+      "right": {
+        "columns": [
+          "hotel_id"
+        ],
+        "table": "raw_shifts"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_shifts"
+      },
+      "name": "rel_shift_assignments",
+      "right": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_assignments"
+      }
+    }
+  ],
+  "scenario_id": "hospitality_staffing_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "operations": [],
+          "source": "hotel_name",
+          "target": "hotel_name"
+        }
+      ],
+      "grain": [
+        "hotel_id"
+      ],
+      "name": "stg_hotels",
+      "row_operations": [],
+      "source": "raw_hotels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "operations": [],
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "operations": [],
+          "source": "supervisor",
+          "target": "supervisor"
+        },
+        {
+          "operations": [],
+          "source": "priority",
+          "target": "priority"
+        }
+      ],
+      "grain": [
+        "shift_id"
+      ],
+      "name": "stg_shifts",
+      "row_operations": [],
+      "source": "raw_shifts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "assign_id",
+          "target": "assign_id"
+        },
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "operations": [],
+          "source": "staff",
+          "target": "staff"
+        },
+        {
+          "operations": [],
+          "source": "hours",
+          "target": "hours"
+        }
+      ],
+      "grain": [
+        "assign_id"
+      ],
+      "name": "stg_assignments",
+      "row_operations": [],
+      "source": "raw_assignments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "priority",
+      "model": "stg_shifts",
+      "name": "priority_values",
+      "type": "accepted_values",
+      "values": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "min": 1,
+      "model": "stg_hotels",
+      "name": "hotels_present",
+      "type": "row_count"
+    }
+  ]
+}

@@ -1,0 +1,536 @@
+{
+  "description": "Education grants pipeline: float approval scores, display-name fallback and nested award arithmetic.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "grant_id",
+          "target": "grant_id"
+        },
+        {
+          "side": "left",
+          "source": "fund_id",
+          "target": "fund_id"
+        },
+        {
+          "side": "left",
+          "source": "base",
+          "target": "base"
+        },
+        {
+          "side": "left",
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "side": "left",
+          "source": "factor",
+          "target": "factor"
+        },
+        {
+          "side": "right",
+          "source": "nickname",
+          "target": "nickname"
+        },
+        {
+          "side": "right",
+          "source": "donor_name",
+          "target": "donor_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "grant_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "donor_id",
+            "right": "donor_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_grants",
+      "name": "j_grants_donors",
+      "operation": "join",
+      "right": "stg_donors"
+    },
+    {
+      "columns": [
+        {
+          "source": "grant_id",
+          "target": "grant_id"
+        },
+        {
+          "source": "fund_id",
+          "target": "fund_id"
+        },
+        {
+          "source": "base",
+          "target": "base"
+        },
+        {
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "source": "factor",
+          "target": "factor"
+        },
+        {
+          "source": "nickname",
+          "target": "nickname"
+        },
+        {
+          "source": "donor_name",
+          "target": "donor_name"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "kind": "binary",
+              "left": {
+                "column": "base",
+                "kind": "column"
+              },
+              "operator": "add",
+              "right": {
+                "column": "bonus",
+                "kind": "column"
+              }
+            },
+            "operator": "multiply",
+            "right": {
+              "column": "factor",
+              "kind": "column"
+            }
+          },
+          "name": "total",
+          "type": "float"
+        },
+        {
+          "expression": {
+            "kind": "coalesce",
+            "values": [
+              {
+                "column": "nickname",
+                "kind": "column"
+              },
+              {
+                "column": "donor_name",
+                "kind": "column"
+              }
+            ]
+          },
+          "name": "display",
+          "type": "string"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "grant_id"
+      ],
+      "name": "t_awards",
+      "operation": "transform",
+      "source": "j_grants_donors"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "grant_id",
+          "target": "grant_id"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "display",
+          "target": "display"
+        },
+        {
+          "side": "right",
+          "source": "fund_name",
+          "target": "fund_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "grant_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "fund_id",
+            "right": "fund_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_awards",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_funds"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "fund_name"
+      ],
+      "group_by": [
+        {
+          "source": "fund_name",
+          "target": "fund_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total",
+          "function": "sum",
+          "name": "awarded"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_grants"
+        }
+      ],
+      "name": "o_awarded_by_fund",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "DN-"
+          },
+          "name": "donor_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "donor_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 10,
+            "min_length": 3
+          },
+          "name": "nickname",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_donors",
+      "primary_key": [
+        "donor_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FD-"
+          },
+          "name": "fund_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "fund_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_funds",
+      "primary_key": [
+        "fund_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "GR-"
+          },
+          "name": "grant_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_donor_grants",
+            "target_side": "right"
+          },
+          "name": "donor_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_fund_grants",
+            "target_side": "right"
+          },
+          "name": "fund_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 1000.0
+          },
+          "name": "base",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20000.0,
+            "min": 0.0
+          },
+          "name": "bonus",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1.5,
+            "min": 0.5
+          },
+          "name": "factor",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "approved",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_grants",
+      "primary_key": [
+        "grant_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "donor_id"
+        ],
+        "table": "raw_grants"
+      },
+      "name": "rel_donor_grants",
+      "right": {
+        "columns": [
+          "donor_id"
+        ],
+        "table": "raw_donors"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "fund_id"
+        ],
+        "table": "raw_grants"
+      },
+      "name": "rel_fund_grants",
+      "right": {
+        "columns": [
+          "fund_id"
+        ],
+        "table": "raw_funds"
+      }
+    }
+  ],
+  "scenario_id": "education_grants_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "donor_id",
+          "target": "donor_id"
+        },
+        {
+          "operations": [],
+          "source": "donor_name",
+          "target": "donor_name"
+        },
+        {
+          "operations": [],
+          "source": "nickname",
+          "target": "nickname"
+        }
+      ],
+      "grain": [
+        "donor_id"
+      ],
+      "name": "stg_donors",
+      "row_operations": [],
+      "source": "raw_donors"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "fund_id",
+          "target": "fund_id"
+        },
+        {
+          "operations": [],
+          "source": "fund_name",
+          "target": "fund_name"
+        }
+      ],
+      "grain": [
+        "fund_id"
+      ],
+      "name": "stg_funds",
+      "row_operations": [],
+      "source": "raw_funds"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "grant_id",
+          "target": "grant_id"
+        },
+        {
+          "operations": [],
+          "source": "donor_id",
+          "target": "donor_id"
+        },
+        {
+          "operations": [],
+          "source": "fund_id",
+          "target": "fund_id"
+        },
+        {
+          "operations": [],
+          "source": "base",
+          "target": "base"
+        },
+        {
+          "operations": [],
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "operations": [],
+          "source": "factor",
+          "target": "factor"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "approved",
+          "target": "score"
+        }
+      ],
+      "grain": [
+        "grant_id"
+      ],
+      "name": "stg_grants",
+      "row_operations": [],
+      "source": "raw_grants"
+    }
+  ],
+  "tests": [
+    {
+      "column": "score",
+      "min": 0.0,
+      "model": "stg_grants",
+      "name": "score_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}
