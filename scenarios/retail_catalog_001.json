@@ -1,0 +1,444 @@
+{
+  "description": "Retail catalog pipeline: unique weighted brand codes, print-ready launch and first-seen labels.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "stock_id",
+          "target": "stock_id"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "left",
+          "source": "seen_label",
+          "target": "seen_label"
+        },
+        {
+          "side": "right",
+          "source": "brand_id",
+          "target": "brand_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "stock_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "product_id",
+            "right": "product_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_stock",
+      "name": "j_stock_products",
+      "operation": "join",
+      "right": "stg_products"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "stock_id",
+          "target": "stock_id"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "right",
+          "source": "brand_code",
+          "target": "brand_code"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "stock_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "brand_id",
+            "right": "brand_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_stock_products",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_brands"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "brand_code"
+      ],
+      "group_by": [
+        {
+          "source": "brand_code",
+          "target": "brand_code"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "qty",
+          "function": "sum",
+          "name": "total_qty"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_items"
+        }
+      ],
+      "name": "o_qty_by_brand",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "BR-"
+          },
+          "name": "brand_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "B1",
+              "B2",
+              "B3",
+              "B4",
+              "B5",
+              "B6"
+            ],
+            "weights": [
+              1.0,
+              2.0,
+              3.0,
+              2.0,
+              1.0,
+              1.0
+            ]
+          },
+          "name": "brand_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "company_name"
+          },
+          "name": "brand_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_brands",
+      "primary_key": [
+        "brand_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PD-"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_brand_products",
+            "target_side": "left"
+          },
+          "name": "brand_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "product_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2023-12-31",
+            "min": "2020-01-01"
+          },
+          "name": "launch_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SK-"
+          },
+          "name": "stock_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_product_stock",
+            "target_side": "left"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000,
+            "min": 0
+          },
+          "name": "qty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "first_seen",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        }
+      ],
+      "name": "raw_stock",
+      "primary_key": [
+        "stock_id"
+      ],
+      "rows": {
+        "max": 240,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "brand_id"
+        ],
+        "table": "raw_brands"
+      },
+      "name": "rel_brand_products",
+      "right": {
+        "columns": [
+          "brand_id"
+        ],
+        "table": "raw_products"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_products"
+      },
+      "name": "rel_product_stock",
+      "right": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_stock"
+      }
+    }
+  ],
+  "scenario_id": "retail_catalog_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "brand_id",
+          "target": "brand_id"
+        },
+        {
+          "operations": [],
+          "source": "brand_code",
+          "target": "brand_code"
+        },
+        {
+          "operations": [],
+          "source": "brand_name",
+          "target": "brand_name"
+        }
+      ],
+      "grain": [
+        "brand_id"
+      ],
+      "name": "stg_brands",
+      "row_operations": [],
+      "source": "raw_brands"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "brand_id",
+          "target": "brand_id"
+        },
+        {
+          "operations": [],
+          "source": "product_name",
+          "target": "product_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "launch_date",
+          "target": "launch_label"
+        }
+      ],
+      "grain": [
+        "product_id"
+      ],
+      "name": "stg_products",
+      "row_operations": [],
+      "source": "raw_products"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "stock_id",
+          "target": "stock_id"
+        },
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "first_seen",
+          "target": "seen_label"
+        }
+      ],
+      "grain": [
+        "stock_id"
+      ],
+      "name": "stg_stock",
+      "row_operations": [],
+      "source": "raw_stock"
+    }
+  ],
+  "tests": [
+    {
+      "column": "brand_code",
+      "model": "stg_brands",
+      "name": "brand_values",
+      "type": "accepted_values",
+      "values": [
+        "B1",
+        "B2",
+        "B3",
+        "B4",
+        "B5",
+        "B6"
+      ]
+    }
+  ]
+}

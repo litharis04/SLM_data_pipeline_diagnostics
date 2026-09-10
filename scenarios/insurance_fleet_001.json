@@ -1,0 +1,445 @@
+{
+  "description": "Insurance fleet pipeline: composite term linkage asserted at intermediate level, print-ready amount labels.",
+  "domain": "insurance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "right",
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "side": "right",
+          "source": "term_no",
+          "target": "term_no"
+        },
+        {
+          "side": "left",
+          "source": "fee",
+          "target": "fee"
+        },
+        {
+          "side": "right",
+          "source": "premium",
+          "target": "premium"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "policy_id",
+            "right": "policy_id"
+          },
+          {
+            "left": "term_no",
+            "right": "term_no"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_claims",
+      "name": "j_claims_terms",
+      "operation": "join",
+      "right": "stg_terms"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "fee",
+          "target": "fee"
+        },
+        {
+          "side": "right",
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "policy_id",
+            "right": "policy_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_claims_terms",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_policies"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "product"
+      ],
+      "group_by": [
+        {
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "fee",
+          "function": "sum",
+          "name": "total_amount"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_claims"
+        }
+      ],
+      "name": "o_amount_by_product",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PP-"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "cargo",
+              "liability"
+            ]
+          },
+          "name": "product",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_policies",
+      "primary_key": [
+        "policy_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_policy_terms",
+            "target_side": "left"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 3,
+            "min": 1
+          },
+          "name": "term_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 10000.0,
+            "min": 500.0
+          },
+          "name": "premium",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_terms",
+      "primary_key": [
+        "policy_id",
+        "term_no"
+      ],
+      "rows": {
+        "max": 180,
+        "min": 60
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "FC-"
+          },
+          "name": "claim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_term_claims",
+            "target_side": "right"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_term_claims",
+            "target_side": "right"
+          },
+          "name": "term_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50000.0,
+            "min": 100.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "settled",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 0.0
+          },
+          "name": "fee",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_claims",
+      "primary_key": [
+        "claim_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_policies"
+      },
+      "name": "rel_policy_terms",
+      "right": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_terms"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "policy_id",
+          "term_no"
+        ],
+        "table": "raw_claims"
+      },
+      "name": "rel_term_claims",
+      "right": {
+        "columns": [
+          "policy_id",
+          "term_no"
+        ],
+        "table": "raw_terms"
+      }
+    }
+  ],
+  "scenario_id": "insurance_fleet_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "grain": [
+        "policy_id"
+      ],
+      "name": "stg_policies",
+      "row_operations": [],
+      "source": "raw_policies"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "term_no",
+          "target": "term_no"
+        },
+        {
+          "operations": [],
+          "source": "premium",
+          "target": "premium"
+        }
+      ],
+      "grain": [
+        "policy_id",
+        "term_no"
+      ],
+      "name": "stg_terms",
+      "row_operations": [],
+      "source": "raw_terms"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "term_no",
+          "target": "term_no"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "amount",
+          "target": "amount_label"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "settled",
+          "target": "settled_label"
+        },
+        {
+          "operations": [],
+          "source": "fee",
+          "target": "fee"
+        }
+      ],
+      "grain": [
+        "claim_id"
+      ],
+      "name": "stg_claims",
+      "row_operations": [],
+      "source": "raw_claims"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "policy_id",
+        "term_no"
+      ],
+      "model": "j_claims_terms",
+      "name": "term_link",
+      "to_columns": [
+        "policy_id",
+        "term_no"
+      ],
+      "to_model": "raw_terms",
+      "type": "relationships"
+    }
+  ]
+}

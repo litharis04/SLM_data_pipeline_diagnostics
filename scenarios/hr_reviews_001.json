@@ -1,0 +1,536 @@
+{
+  "description": "HR reviews pipeline: on-time non-top ratings, nested adjusted-score derivation.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "source": "base",
+          "target": "base"
+        },
+        {
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "source": "multiplier",
+          "target": "multiplier"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "kind": "binary",
+              "left": {
+                "column": "base",
+                "kind": "column"
+              },
+              "operator": "add",
+              "right": {
+                "column": "bonus",
+                "kind": "column"
+              }
+            },
+            "operator": "multiply",
+            "right": {
+              "column": "multiplier",
+              "kind": "column"
+            }
+          },
+          "name": "adjusted",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "review_id"
+      ],
+      "name": "t_reviews",
+      "operation": "transform",
+      "source": "stg_reviews"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "side": "left",
+          "source": "adjusted",
+          "target": "adjusted"
+        },
+        {
+          "side": "right",
+          "source": "dept_id",
+          "target": "dept_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "review_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "emp_id",
+            "right": "emp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_reviews",
+      "name": "j_rev_emps",
+      "operation": "join",
+      "right": "stg_employees"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "side": "left",
+          "source": "adjusted",
+          "target": "adjusted"
+        },
+        {
+          "side": "right",
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "review_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "dept_id",
+            "right": "dept_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_rev_emps",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_departments"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "dept_name"
+      ],
+      "group_by": [
+        {
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "adjusted",
+          "function": "avg",
+          "name": "avg_adjusted"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_reviews"
+        }
+      ],
+      "name": "o_adjusted_by_dept",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DP-"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "dept_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_departments",
+      "primary_key": [
+        "dept_id"
+      ],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EP-"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_dept_emps",
+            "target_side": "left"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_employees",
+      "primary_key": [
+        "emp_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RW-"
+          },
+          "name": "review_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_emp_reviews",
+            "target_side": "left"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "completed",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "due",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "rating",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 10.0
+          },
+          "name": "base",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20.0,
+            "min": 0.0
+          },
+          "name": "bonus",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1.5,
+            "min": 0.5
+          },
+          "name": "multiplier",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_reviews",
+      "primary_key": [
+        "review_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "dept_id"
+        ],
+        "table": "raw_departments"
+      },
+      "name": "rel_dept_emps",
+      "right": {
+        "columns": [
+          "dept_id"
+        ],
+        "table": "raw_employees"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_employees"
+      },
+      "name": "rel_emp_reviews",
+      "right": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_reviews"
+      }
+    }
+  ],
+  "scenario_id": "hr_reviews_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "dept_id",
+          "target": "dept_id"
+        },
+        {
+          "operations": [],
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "grain": [
+        "dept_id"
+      ],
+      "name": "stg_departments",
+      "row_operations": [],
+      "source": "raw_departments"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "dept_id",
+          "target": "dept_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "emp_id"
+      ],
+      "name": "stg_employees",
+      "row_operations": [],
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "completed",
+          "target": "completed"
+        },
+        {
+          "operations": [],
+          "source": "due",
+          "target": "due"
+        },
+        {
+          "operations": [],
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "operations": [],
+          "source": "base",
+          "target": "base"
+        },
+        {
+          "operations": [],
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "operations": [],
+          "source": "multiplier",
+          "target": "multiplier"
+        }
+      ],
+      "grain": [
+        "review_id"
+      ],
+      "name": "stg_reviews",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "completed",
+                  "kind": "column"
+                },
+                "operator": "lte",
+                "right": {
+                  "column": "due",
+                  "kind": "column"
+                }
+              },
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "rating",
+                  "kind": "column"
+                },
+                "operator": "lte",
+                "right": {
+                  "kind": "literal",
+                  "value": 4
+                }
+              }
+            ],
+            "kind": "all"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_reviews"
+    }
+  ],
+  "tests": [
+    {
+      "column": "adjusted",
+      "min": 0.0,
+      "model": "t_reviews",
+      "name": "adjusted_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

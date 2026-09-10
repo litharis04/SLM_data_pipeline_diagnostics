@@ -1,0 +1,533 @@
+{
+  "description": "HR shifts pipeline: dashless department codes, compact hire-date parsing, dimensional department-shift output.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "att_id",
+          "target": "att_id"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "left",
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "side": "right",
+          "source": "dept_id",
+          "target": "dept_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "att_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "emp_id",
+            "right": "emp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_attendance",
+      "name": "j_att_emps",
+      "operation": "join",
+      "right": "stg_employees"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "att_id",
+          "target": "att_id"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "left",
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "side": "right",
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "att_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "dept_id",
+            "right": "dept_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_att_emps",
+      "name": "j_full_dept",
+      "operation": "join",
+      "right": "stg_departments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "att_id",
+          "target": "att_id"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "left",
+          "source": "dept_name",
+          "target": "dept_name"
+        },
+        {
+          "side": "right",
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "att_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "shift_id",
+            "right": "shift_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_full_dept",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_shifts"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [
+        "dept_name",
+        "shift_id"
+      ],
+      "filters": [],
+      "grain": [
+        "dept_name",
+        "shift_id"
+      ],
+      "group_by": [
+        {
+          "source": "dept_name",
+          "target": "dept_name"
+        },
+        {
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "hours",
+          "function": "sum",
+          "name": "total_hours"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_shifts"
+        }
+      ],
+      "name": "o_hours_by_dept_shift",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DD-"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "D-01",
+              "D-02",
+              "D-03",
+              "D-04",
+              "D-05"
+            ]
+          },
+          "name": "code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "dept_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_departments",
+      "primary_key": [
+        "dept_id"
+      ],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "day",
+              "night"
+            ]
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_shifts",
+      "primary_key": [
+        "shift_id"
+      ],
+      "rows": {
+        "max": 2,
+        "min": 2
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EM-"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_dept_emps",
+            "target_side": "left"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "20230115",
+              "20230601",
+              "20240115"
+            ]
+          },
+          "name": "hire_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_employees",
+      "primary_key": [
+        "emp_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AT-"
+          },
+          "name": "att_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_emp_attendance",
+            "target_side": "left"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_shift_attendance",
+            "target_side": "right"
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 12.0,
+            "min": 1.0
+          },
+          "name": "hours",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_attendance",
+      "primary_key": [
+        "att_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "dept_id"
+        ],
+        "table": "raw_departments"
+      },
+      "name": "rel_dept_emps",
+      "right": {
+        "columns": [
+          "dept_id"
+        ],
+        "table": "raw_employees"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_employees"
+      },
+      "name": "rel_emp_attendance",
+      "right": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_attendance"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_attendance"
+      },
+      "name": "rel_shift_attendance",
+      "right": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_shifts"
+      }
+    }
+  ],
+  "scenario_id": "hr_shifts_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "dept_id",
+          "target": "dept_id"
+        },
+        {
+          "operations": [
+            {
+              "new": "",
+              "old": "-",
+              "op": "replace"
+            }
+          ],
+          "source": "code",
+          "target": "code"
+        },
+        {
+          "operations": [],
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "grain": [
+        "dept_id"
+      ],
+      "name": "stg_departments",
+      "row_operations": [],
+      "source": "raw_departments"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "grain": [
+        "shift_id"
+      ],
+      "name": "stg_shifts",
+      "row_operations": [],
+      "source": "raw_shifts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "dept_id",
+          "target": "dept_id"
+        },
+        {
+          "operations": [
+            {
+              "format": "%Y%m%d",
+              "op": "cast",
+              "type": "date"
+            }
+          ],
+          "source": "hire_str",
+          "target": "hire_date"
+        }
+      ],
+      "grain": [
+        "emp_id"
+      ],
+      "name": "stg_employees",
+      "row_operations": [],
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "att_id",
+          "target": "att_id"
+        },
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "operations": [],
+          "source": "hours",
+          "target": "hours"
+        }
+      ],
+      "grain": [
+        "att_id"
+      ],
+      "name": "stg_attendance",
+      "row_operations": [],
+      "source": "raw_attendance"
+    }
+  ],
+  "tests": [
+    {
+      "column": "shift_id",
+      "model": "stg_shifts",
+      "name": "shift_values",
+      "type": "accepted_values",
+      "values": [
+        "day",
+        "night"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,408 @@
+{
+  "description": "Healthcare dosage pipeline: tiny unit master with minimum-capacity keys, unified float doses and whole-milliliter counters.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "admin_id",
+          "target": "admin_id"
+        },
+        {
+          "side": "left",
+          "source": "pct_ml",
+          "target": "pct_ml"
+        },
+        {
+          "side": "right",
+          "source": "med_id",
+          "target": "med_id"
+        },
+        {
+          "side": "right",
+          "source": "dose",
+          "target": "dose"
+        },
+        {
+          "side": "right",
+          "source": "unit_id",
+          "target": "unit_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "admin_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "med_id",
+            "right": "med_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_admins",
+      "name": "j_admin_meds",
+      "operation": "join",
+      "right": "stg_meds"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "admin_id",
+          "target": "admin_id"
+        },
+        {
+          "side": "left",
+          "source": "pct_ml",
+          "target": "pct_ml"
+        },
+        {
+          "side": "left",
+          "source": "dose",
+          "target": "dose"
+        },
+        {
+          "side": "right",
+          "source": "unit_name",
+          "target": "unit_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "admin_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "unit_id",
+            "right": "unit_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_admin_meds",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_units"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "unit_name"
+      ],
+      "group_by": [
+        {
+          "source": "unit_name",
+          "target": "unit_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "dose",
+          "function": "sum",
+          "name": "total_dose"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_admins"
+        }
+      ],
+      "name": "o_dose_by_unit",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 1,
+            "kind": "formatted_id",
+            "prefix": "U-"
+          },
+          "name": "unit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "mg",
+              "mL",
+              "units"
+            ]
+          },
+          "name": "unit_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_units",
+      "primary_key": [
+        "unit_id"
+      ],
+      "rows": {
+        "max": 4,
+        "min": 4
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "MD-"
+          },
+          "name": "med_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_unit_meds",
+            "target_side": "right"
+          },
+          "name": "unit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "med_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000,
+            "min": 5
+          },
+          "name": "dose_mg",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_medications",
+      "primary_key": [
+        "med_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AD-"
+          },
+          "name": "admin_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_med_admins",
+            "target_side": "left"
+          },
+          "name": "med_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 0.5
+          },
+          "name": "volume_ml",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_admins",
+      "primary_key": [
+        "admin_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "unit_id"
+        ],
+        "table": "raw_medications"
+      },
+      "name": "rel_unit_meds",
+      "right": {
+        "columns": [
+          "unit_id"
+        ],
+        "table": "raw_units"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "med_id"
+        ],
+        "table": "raw_medications"
+      },
+      "name": "rel_med_admins",
+      "right": {
+        "columns": [
+          "med_id"
+        ],
+        "table": "raw_admins"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_dosage_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "operations": [],
+          "source": "unit_name",
+          "target": "unit_name"
+        }
+      ],
+      "grain": [
+        "unit_id"
+      ],
+      "name": "stg_units",
+      "row_operations": [],
+      "source": "raw_units"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "med_id",
+          "target": "med_id"
+        },
+        {
+          "operations": [],
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "operations": [],
+          "source": "med_name",
+          "target": "med_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "dose_mg",
+          "target": "dose"
+        }
+      ],
+      "grain": [
+        "med_id"
+      ],
+      "name": "stg_meds",
+      "row_operations": [],
+      "source": "raw_medications"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "admin_id",
+          "target": "admin_id"
+        },
+        {
+          "operations": [],
+          "source": "med_id",
+          "target": "med_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "volume_ml",
+          "target": "pct_ml"
+        }
+      ],
+      "grain": [
+        "admin_id"
+      ],
+      "name": "stg_admins",
+      "row_operations": [],
+      "source": "raw_admins"
+    }
+  ],
+  "tests": [
+    {
+      "column": "unit_name",
+      "model": "stg_units",
+      "name": "unit_values",
+      "type": "accepted_values",
+      "values": [
+        "mg",
+        "mL",
+        "units"
+      ]
+    }
+  ]
+}

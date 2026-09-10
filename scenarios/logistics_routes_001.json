@@ -1,0 +1,452 @@
+{
+  "description": "Logistics routes pipeline: many-to-many driver to route-day linkage, boolean export codes.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "assign_id",
+          "target": "assign_id"
+        },
+        {
+          "side": "left",
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "side": "left",
+          "source": "day",
+          "target": "day"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "left",
+          "source": "night_flag",
+          "target": "night_flag"
+        },
+        {
+          "side": "right",
+          "source": "driver_name",
+          "target": "driver_name"
+        },
+        {
+          "side": "left",
+          "source": "express_score",
+          "target": "express_score"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "assign_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "driver_id",
+            "right": "driver_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_assignments",
+      "name": "j_assign_drivers",
+      "operation": "join",
+      "right": "stg_drivers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "assign_id",
+          "target": "assign_id"
+        },
+        {
+          "side": "left",
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "side": "left",
+          "source": "express_score",
+          "target": "express_score"
+        },
+        {
+          "side": "right",
+          "source": "day",
+          "target": "day"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "assign_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "route_id",
+            "right": "route_id"
+          },
+          {
+            "left": "day",
+            "right": "day"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_assign_drivers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_route_days"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "day"
+      ],
+      "group_by": [
+        {
+          "source": "day",
+          "target": "day"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "hours",
+          "function": "sum",
+          "name": "total_hours"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_assignments"
+        }
+      ],
+      "name": "o_hours_by_day",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "DR-"
+          },
+          "name": "driver_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "driver_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_drivers",
+      "primary_key": [
+        "driver_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RT-"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "fri",
+              "mon",
+              "thu",
+              "tue",
+              "wed"
+            ]
+          },
+          "name": "day",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_route_days",
+      "primary_key": [
+        "route_id",
+        "day"
+      ],
+      "rows": {
+        "max": 25,
+        "min": 25
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AS-"
+          },
+          "name": "assign_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_assignments",
+            "target_side": "left"
+          },
+          "name": "driver_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_assignments",
+            "target_side": "right"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_assignments",
+            "target_side": "right"
+          },
+          "name": "day",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 12.0,
+            "min": 1.0
+          },
+          "name": "hours",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "night",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean",
+            "true_probability": 0.1
+          },
+          "name": "express",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_assignments",
+      "primary_key": [
+        "assign_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "bridge": {
+        "left_columns": [
+          "driver_id"
+        ],
+        "right_columns": [
+          "route_id",
+          "day"
+        ],
+        "table": "raw_assignments"
+      },
+      "cardinality": "many_to_many",
+      "left": {
+        "columns": [
+          "driver_id"
+        ],
+        "table": "raw_drivers"
+      },
+      "name": "rel_assignments",
+      "right": {
+        "columns": [
+          "route_id",
+          "day"
+        ],
+        "table": "raw_route_days"
+      }
+    }
+  ],
+  "scenario_id": "logistics_routes_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "driver_id",
+          "target": "driver_id"
+        },
+        {
+          "operations": [],
+          "source": "driver_name",
+          "target": "driver_name"
+        }
+      ],
+      "grain": [
+        "driver_id"
+      ],
+      "name": "stg_drivers",
+      "row_operations": [],
+      "source": "raw_drivers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "day",
+          "target": "day"
+        }
+      ],
+      "grain": [
+        "route_id",
+        "day"
+      ],
+      "name": "stg_route_days",
+      "row_operations": [],
+      "source": "raw_route_days"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "assign_id",
+          "target": "assign_id"
+        },
+        {
+          "operations": [],
+          "source": "driver_id",
+          "target": "driver_id"
+        },
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "day",
+          "target": "day"
+        },
+        {
+          "operations": [],
+          "source": "hours",
+          "target": "hours"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "night",
+          "target": "night_flag"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "express",
+          "target": "express_score"
+        }
+      ],
+      "grain": [
+        "assign_id"
+      ],
+      "name": "stg_assignments",
+      "row_operations": [],
+      "source": "raw_assignments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "day",
+      "model": "stg_route_days",
+      "name": "day_values",
+      "type": "accepted_values",
+      "values": [
+        "fri",
+        "mon",
+        "thu",
+        "tue",
+        "wed"
+      ]
+    }
+  ]
+}

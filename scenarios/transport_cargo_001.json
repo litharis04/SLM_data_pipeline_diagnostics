@@ -1,0 +1,485 @@
+{
+  "description": "Transport cargo pipeline: integer fee arithmetic and display-name fallback in one transform, dual outputs sharing one source.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "source": "client_id",
+          "target": "client_id"
+        },
+        {
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "source": "base_fee",
+          "target": "base_fee"
+        },
+        {
+          "source": "extra_fee",
+          "target": "extra_fee"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "base_fee",
+              "kind": "column"
+            },
+            "operator": "add",
+            "right": {
+              "column": "extra_fee",
+              "kind": "column"
+            }
+          },
+          "name": "total",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "ship_id"
+      ],
+      "name": "t_shipments",
+      "operation": "transform",
+      "source": "stg_shipments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "side": "right",
+          "source": "client_name",
+          "target": "client_name"
+        },
+        {
+          "side": "right",
+          "source": "nickname",
+          "target": "nickname"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "coalesce",
+            "values": [
+              {
+                "column": "nickname",
+                "kind": "column"
+              },
+              {
+                "column": "client_name",
+                "kind": "column"
+              }
+            ]
+          },
+          "name": "display",
+          "type": "string"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "ship_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "client_id",
+            "right": "client_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_shipments",
+      "name": "j_ship_clients",
+      "operation": "join",
+      "right": "stg_clients"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "display",
+          "target": "display"
+        },
+        {
+          "side": "right",
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ship_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "vessel_id",
+            "right": "vessel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ship_clients",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_vessels"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "display"
+      ],
+      "group_by": [
+        {
+          "source": "display",
+          "target": "display"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total",
+          "function": "sum",
+          "name": "revenue"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_shipments"
+        }
+      ],
+      "name": "o_revenue_by_display",
+      "source": "j_full"
+    },
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "vessel_name"
+      ],
+      "group_by": [
+        {
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_sailings"
+        }
+      ],
+      "name": "o_sailings_by_vessel",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CL-"
+          },
+          "name": "client_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "client_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 10,
+            "min_length": 3
+          },
+          "name": "nickname",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_clients",
+      "primary_key": [
+        "client_id"
+      ],
+      "rows": {
+        "max": 25,
+        "min": 25
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "VS-"
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "vessel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vessels",
+      "primary_key": [
+        "vessel_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SP-"
+          },
+          "name": "ship_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_client_shipments",
+            "target_side": "left"
+          },
+          "name": "client_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_vessel_shipments",
+            "target_side": "right"
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5000,
+            "min": 100
+          },
+          "name": "base_fee",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000,
+            "min": 0
+          },
+          "name": "extra_fee",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_shipments",
+      "primary_key": [
+        "ship_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "client_id"
+        ],
+        "table": "raw_clients"
+      },
+      "name": "rel_client_shipments",
+      "right": {
+        "columns": [
+          "client_id"
+        ],
+        "table": "raw_shipments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "vessel_id"
+        ],
+        "table": "raw_shipments"
+      },
+      "name": "rel_vessel_shipments",
+      "right": {
+        "columns": [
+          "vessel_id"
+        ],
+        "table": "raw_vessels"
+      }
+    }
+  ],
+  "scenario_id": "transport_cargo_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "client_id",
+          "target": "client_id"
+        },
+        {
+          "operations": [],
+          "source": "client_name",
+          "target": "client_name"
+        },
+        {
+          "operations": [],
+          "source": "nickname",
+          "target": "nickname"
+        }
+      ],
+      "grain": [
+        "client_id"
+      ],
+      "name": "stg_clients",
+      "row_operations": [],
+      "source": "raw_clients"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "operations": [],
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "grain": [
+        "vessel_id"
+      ],
+      "name": "stg_vessels",
+      "row_operations": [],
+      "source": "raw_vessels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "operations": [],
+          "source": "client_id",
+          "target": "client_id"
+        },
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "operations": [],
+          "source": "base_fee",
+          "target": "base_fee"
+        },
+        {
+          "operations": [],
+          "source": "extra_fee",
+          "target": "extra_fee"
+        }
+      ],
+      "grain": [
+        "ship_id"
+      ],
+      "name": "stg_shipments",
+      "row_operations": [],
+      "source": "raw_shipments"
+    }
+  ]
+}

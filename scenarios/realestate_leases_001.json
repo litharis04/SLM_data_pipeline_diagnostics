@@ -1,0 +1,487 @@
+{
+  "description": "Real-estate leases pipeline: declared-but-absent tenant notes, ISO move-in parsing, kept status codes.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lease_id",
+          "target": "lease_id"
+        },
+        {
+          "side": "left",
+          "source": "rent",
+          "target": "rent"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "beds",
+          "target": "beds"
+        },
+        {
+          "side": "right",
+          "source": "prop_id",
+          "target": "prop_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lease_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "unit_id",
+            "right": "unit_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_leases",
+      "name": "j_leases_units",
+      "operation": "join",
+      "right": "stg_units"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lease_id",
+          "target": "lease_id"
+        },
+        {
+          "side": "left",
+          "source": "rent",
+          "target": "rent"
+        },
+        {
+          "side": "left",
+          "source": "beds",
+          "target": "beds"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lease_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "prop_id",
+            "right": "prop_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_leases_units",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_properties"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "city"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "rent",
+          "function": "avg",
+          "name": "avg_rent"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_leases"
+        }
+      ],
+      "name": "o_rent_by_city",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_properties",
+      "primary_key": [
+        "prop_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "UN-"
+          },
+          "name": "unit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_prop_units",
+            "target_side": "left"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "beds",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_units",
+      "primary_key": [
+        "unit_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LE-"
+          },
+          "name": "lease_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_unit_leases",
+            "target_side": "left"
+          },
+          "name": "unit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "tenant",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "2024-01-05T12:00:00",
+              "2024-03-10T09:30:00",
+              "2024-06-01T15:00:00"
+            ]
+          },
+          "name": "moved_ts",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "active",
+              "ended",
+              "pending"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 5000.0,
+            "min": 500.0
+          },
+          "name": "rent",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "notes",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "terms",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_leases",
+      "primary_key": [
+        "lease_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_properties"
+      },
+      "name": "rel_prop_units",
+      "right": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_units"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "unit_id"
+        ],
+        "table": "raw_units"
+      },
+      "name": "rel_unit_leases",
+      "right": {
+        "columns": [
+          "unit_id"
+        ],
+        "table": "raw_leases"
+      }
+    }
+  ],
+  "scenario_id": "realestate_leases_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "prop_id"
+      ],
+      "name": "stg_properties",
+      "row_operations": [],
+      "source": "raw_properties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [],
+          "source": "beds",
+          "target": "beds"
+        }
+      ],
+      "grain": [
+        "unit_id"
+      ],
+      "name": "stg_units",
+      "row_operations": [],
+      "source": "raw_units"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "lease_id",
+          "target": "lease_id"
+        },
+        {
+          "operations": [],
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "operations": [],
+          "source": "tenant",
+          "target": "tenant"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "timestamp"
+            }
+          ],
+          "source": "moved_ts",
+          "target": "moved_at"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "active": "A"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "rent",
+          "target": "rent"
+        },
+        {
+          "operations": [],
+          "source": "notes",
+          "target": "notes"
+        },
+        {
+          "operations": [],
+          "source": "terms",
+          "target": "terms"
+        }
+      ],
+      "grain": [
+        "lease_id"
+      ],
+      "name": "stg_leases",
+      "row_operations": [],
+      "source": "raw_leases"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "notes",
+        "terms"
+      ],
+      "model": "stg_leases",
+      "name": "tenant_notes_present",
+      "type": "not_null"
+    },
+    {
+      "column": "status",
+      "model": "stg_leases",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "A",
+        "ended",
+        "pending"
+      ]
+    }
+  ]
+}

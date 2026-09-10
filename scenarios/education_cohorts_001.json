@@ -1,0 +1,586 @@
+{
+  "description": "Education cohorts pipeline: one-to-one transcript linkage, opposed staging row-operation orders.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "side": "left",
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "student_name",
+          "target": "student_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "course_id",
+        "student_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "student_id",
+            "right": "student_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_enrollments",
+      "name": "j_enr_students",
+      "operation": "join",
+      "right": "stg_students"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "side": "left",
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "side": "right",
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "course_id",
+        "student_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "course_id",
+            "right": "course_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_enr_students",
+      "name": "j_full_courses",
+      "operation": "join",
+      "right": "stg_courses"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "side": "left",
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "side": "left",
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "side": "right",
+          "source": "gpa",
+          "target": "gpa"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "course_id",
+        "student_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "student_id",
+            "right": "student_id"
+          },
+          {
+            "left": "course_id",
+            "right": "course_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_full_courses",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_transcripts"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "title"
+      ],
+      "group_by": [
+        {
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "gpa",
+          "function": "avg",
+          "name": "avg_gpa"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_records"
+        }
+      ],
+      "name": "o_gpa_by_title",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SD-"
+          },
+          "name": "student_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "student_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_students",
+      "primary_key": [
+        "student_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 40
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CR-"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 6
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_courses",
+      "primary_key": [
+        "course_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_student_enrollments",
+            "target_side": "left"
+          },
+          "name": "student_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_course_enrollments",
+            "target_side": "right"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-09-01",
+            "min": "2023-09-01"
+          },
+          "name": "enrolled",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "active",
+              "dropped"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_enrollments",
+      "primary_key": [
+        "student_id",
+        "course_id"
+      ],
+      "rows": {
+        "max": 240,
+        "min": 240
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_enroll_transcripts",
+            "target_side": "right"
+          },
+          "name": "student_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_enroll_transcripts",
+            "target_side": "right"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2023-12-01"
+          },
+          "name": "issued",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 4.0,
+            "min": 0.0
+          },
+          "name": "gpa",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_transcripts",
+      "primary_key": [
+        "student_id",
+        "course_id"
+      ],
+      "rows": {
+        "max": 120,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "student_id"
+        ],
+        "table": "raw_students"
+      },
+      "name": "rel_student_enrollments",
+      "right": {
+        "columns": [
+          "student_id"
+        ],
+        "table": "raw_enrollments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_enrollments"
+      },
+      "name": "rel_course_enrollments",
+      "right": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_courses"
+      }
+    },
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "student_id",
+          "course_id"
+        ],
+        "table": "raw_transcripts"
+      },
+      "name": "rel_enroll_transcripts",
+      "right": {
+        "columns": [
+          "student_id",
+          "course_id"
+        ],
+        "table": "raw_enrollments"
+      }
+    }
+  ],
+  "scenario_id": "education_cohorts_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "operations": [],
+          "source": "student_name",
+          "target": "student_name"
+        }
+      ],
+      "grain": [
+        "student_id"
+      ],
+      "name": "stg_students",
+      "row_operations": [],
+      "source": "raw_students"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "grain": [
+        "course_id"
+      ],
+      "name": "stg_courses",
+      "row_operations": [],
+      "source": "raw_courses"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "enrolled",
+          "target": "enrolled"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        }
+      ],
+      "grain": [
+        "course_id",
+        "student_id"
+      ],
+      "name": "stg_enrollments",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "status",
+              "kind": "column"
+            },
+            "operator": "ne",
+            "right": {
+              "kind": "literal",
+              "value": "dropped"
+            }
+          },
+          "op": "filter"
+        },
+        {
+          "keys": [
+            "course_id",
+            "student_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "enrolled",
+              "direction": "desc"
+            }
+          ]
+        }
+      ],
+      "source": "raw_enrollments"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "issued",
+          "target": "issued"
+        },
+        {
+          "operations": [],
+          "source": "gpa",
+          "target": "gpa"
+        }
+      ],
+      "grain": [
+        "course_id",
+        "student_id"
+      ],
+      "name": "stg_transcripts",
+      "row_operations": [
+        {
+          "keys": [
+            "course_id",
+            "student_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "issued",
+              "direction": "desc"
+            }
+          ]
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "gpa",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0.0
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_transcripts"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "stg_enrollments",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "active",
+        "dropped"
+      ]
+    }
+  ]
+}

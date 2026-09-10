@@ -1,0 +1,448 @@
+{
+  "description": "Transport parcels pipeline: busy-depot weight conditional over a join-sourced output, normalized names and codes.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "parcel_id",
+          "target": "parcel_id"
+        },
+        {
+          "side": "left",
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "side": "left",
+          "source": "weight",
+          "target": "weight"
+        },
+        {
+          "side": "right",
+          "source": "code",
+          "target": "code"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "parcel_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "courier_id",
+            "right": "courier_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_parcels",
+      "name": "j_par_couriers",
+      "operation": "join",
+      "right": "stg_couriers"
+    },
+    {
+      "filters": [],
+      "grain": [
+        "depot_id"
+      ],
+      "group_by": [
+        {
+          "source": "depot_id",
+          "target": "depot_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "weight",
+          "function": "sum",
+          "name": "total_weight"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_parcels"
+        }
+      ],
+      "name": "a_depot_stats",
+      "operation": "aggregate",
+      "source": "j_par_couriers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "side": "left",
+          "source": "total_weight",
+          "target": "total_weight"
+        },
+        {
+          "side": "left",
+          "source": "n_parcels",
+          "target": "n_parcels"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "depot_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "depot_id",
+            "right": "depot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_depot_stats",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_depots"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "city"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total_weight",
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "n_parcels",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 100
+            }
+          },
+          "function": "conditional_sum",
+          "name": "busy_weight"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_depots"
+        }
+      ],
+      "name": "o_busy_by_city",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DP-"
+          },
+          "name": "depot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_depots",
+      "primary_key": [
+        "depot_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CR-"
+          },
+          "name": "courier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "bike",
+              "van"
+            ]
+          },
+          "name": "code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "courier_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_couriers",
+      "primary_key": [
+        "courier_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PX-"
+          },
+          "name": "parcel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_depot_parcels",
+            "target_side": "left"
+          },
+          "name": "depot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_courier_parcels",
+            "target_side": "right"
+          },
+          "name": "courier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "sender",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50.0,
+            "min": 0.1
+          },
+          "name": "weight",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_parcels",
+      "primary_key": [
+        "parcel_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "depot_id"
+        ],
+        "table": "raw_depots"
+      },
+      "name": "rel_depot_parcels",
+      "right": {
+        "columns": [
+          "depot_id"
+        ],
+        "table": "raw_parcels"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "courier_id"
+        ],
+        "table": "raw_parcels"
+      },
+      "name": "rel_courier_parcels",
+      "right": {
+        "columns": [
+          "courier_id"
+        ],
+        "table": "raw_couriers"
+      }
+    }
+  ],
+  "scenario_id": "transport_parcels_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "depot_id"
+      ],
+      "name": "stg_depots",
+      "row_operations": [],
+      "source": "raw_depots"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "courier_id",
+          "target": "courier_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "upper"
+            }
+          ],
+          "source": "code",
+          "target": "code"
+        },
+        {
+          "operations": [],
+          "source": "courier_name",
+          "target": "courier_name"
+        }
+      ],
+      "grain": [
+        "courier_id"
+      ],
+      "name": "stg_couriers",
+      "row_operations": [],
+      "source": "raw_couriers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "parcel_id",
+          "target": "parcel_id"
+        },
+        {
+          "operations": [],
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "operations": [],
+          "source": "courier_id",
+          "target": "courier_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "lower"
+            }
+          ],
+          "source": "sender",
+          "target": "sender"
+        },
+        {
+          "operations": [],
+          "source": "weight",
+          "target": "weight"
+        }
+      ],
+      "grain": [
+        "parcel_id"
+      ],
+      "name": "stg_parcels",
+      "row_operations": [],
+      "source": "raw_parcels"
+    }
+  ],
+  "tests": [
+    {
+      "column": "code",
+      "model": "stg_couriers",
+      "name": "code_values",
+      "type": "accepted_values",
+      "values": [
+        "BIKE",
+        "VAN"
+      ]
+    }
+  ]
+}

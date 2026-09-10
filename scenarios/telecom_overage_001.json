@@ -1,0 +1,475 @@
+{
+  "description": "Telecom overage pipeline: pay-as-you-go usages kept through a left join, derived extra and share metrics.",
+  "domain": "telecom",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "usage_id",
+          "target": "usage_id"
+        },
+        {
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "source": "mb",
+          "target": "mb"
+        },
+        {
+          "source": "quota",
+          "target": "quota"
+        },
+        {
+          "source": "overage",
+          "target": "overage"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "mb",
+              "kind": "column"
+            },
+            "operator": "subtract",
+            "right": {
+              "column": "quota",
+              "kind": "column"
+            }
+          },
+          "name": "extra",
+          "type": "float"
+        },
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "overage",
+              "kind": "column"
+            },
+            "operator": "divide",
+            "right": {
+              "column": "mb",
+              "kind": "column"
+            }
+          },
+          "name": "share",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "usage_id"
+      ],
+      "name": "t_usages",
+      "operation": "transform",
+      "source": "stg_usages"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "usage_id",
+          "target": "usage_id"
+        },
+        {
+          "side": "left",
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "side": "left",
+          "source": "extra",
+          "target": "extra"
+        },
+        {
+          "side": "left",
+          "source": "share",
+          "target": "share"
+        },
+        {
+          "side": "right",
+          "source": "plan_name",
+          "target": "plan_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "usage_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plan_id",
+            "right": "plan_id"
+          }
+        ],
+        "type": "left"
+      },
+      "left": "t_usages",
+      "name": "j_use_plans",
+      "operation": "join",
+      "right": "stg_plans"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "usage_id",
+          "target": "usage_id"
+        },
+        {
+          "side": "left",
+          "source": "extra",
+          "target": "extra"
+        },
+        {
+          "side": "left",
+          "source": "plan_name",
+          "target": "plan_name"
+        },
+        {
+          "side": "right",
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "usage_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "sub_id",
+            "right": "sub_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_use_plans",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_subscribers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "plan_name"
+      ],
+      "group_by": [
+        {
+          "source": "plan_name",
+          "target": "plan_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "extra",
+          "function": "sum",
+          "name": "total_extra"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_usages"
+        }
+      ],
+      "name": "o_extra_by_plan",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TS-"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "sub_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_subscribers",
+      "primary_key": [
+        "sub_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PP-"
+          },
+          "name": "plan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "plan_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_plans",
+      "primary_key": [
+        "plan_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "US-"
+          },
+          "name": "usage_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sub_usages",
+            "target_side": "left"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_plan_usages",
+            "target_side": "right"
+          },
+          "name": "plan_id",
+          "null_probability": 0.25,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20000.0,
+            "min": 1.0
+          },
+          "name": "mb",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 10000.0,
+            "min": 0.0
+          },
+          "name": "quota",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 0.0
+          },
+          "name": "overage",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_usages",
+      "primary_key": [
+        "usage_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_subscribers"
+      },
+      "name": "rel_sub_usages",
+      "right": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_usages"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "plan_id"
+        ],
+        "table": "raw_usages"
+      },
+      "name": "rel_plan_usages",
+      "right": {
+        "columns": [
+          "plan_id"
+        ],
+        "table": "raw_plans"
+      }
+    }
+  ],
+  "scenario_id": "telecom_overage_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "grain": [
+        "sub_id"
+      ],
+      "name": "stg_subscribers",
+      "row_operations": [],
+      "source": "raw_subscribers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "operations": [],
+          "source": "plan_name",
+          "target": "plan_name"
+        }
+      ],
+      "grain": [
+        "plan_id"
+      ],
+      "name": "stg_plans",
+      "row_operations": [],
+      "source": "raw_plans"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "usage_id",
+          "target": "usage_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "operations": [],
+          "source": "mb",
+          "target": "mb"
+        },
+        {
+          "operations": [],
+          "source": "quota",
+          "target": "quota"
+        },
+        {
+          "operations": [],
+          "source": "overage",
+          "target": "overage"
+        }
+      ],
+      "grain": [
+        "usage_id"
+      ],
+      "name": "stg_usages",
+      "row_operations": [],
+      "source": "raw_usages"
+    }
+  ],
+  "tests": [
+    {
+      "column": "mb",
+      "min": 0.0,
+      "model": "stg_usages",
+      "name": "mb_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}
