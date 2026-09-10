@@ -3,8 +3,10 @@
 Baseline plan slice T01: domain families, scenario sizes, scalar types, raw generators,
 column properties, and key roles. Slice T02 (appended below, after the `D-` rows):
 relationships, staging columns and rows, cast type transitions, and the first interaction
-families. Later slices (T03–T04) append intermediate-model, expression, topology, output,
-assertion, and remaining interaction rows after the existing rows; row order is significant
+families. Slice T03 (appended below, after the T02 rows): intermediate operations, joins
+and grain, structured expressions and conditions, DAG topology motifs, and the related
+interactions. Slice T04 appends outputs, metrics, assertions, and remaining interactions
+after the existing rows; row order is significant
 because it breaks selection ties and MUST NOT be changed during an authoring run.
 
 Conventions:
@@ -167,6 +169,102 @@ Conventions:
 | I-STG-003 | A staging chain on a nullable column applies `map_values` with `on_unmapped == "null"`. | 3 | 0 |
 | I-ROW-001 | A staging model deduplicates on keys equal to its declared `grain` (deduplication establishes the grain). | 3 | 0 |
 | I-ROW-002 | A staging model with both `filter` and `deduplicate` deduplicates on keys that trace via lineage to the raw primary key. | 3 | 0 |
+| F-INT-001 | The scenario declares at least one `transform` intermediate model. | 5 | 0 |
+| F-INT-002 | The scenario declares at least one `join` intermediate model. | 5 | 0 |
+| F-INT-003 | The scenario declares at least one `aggregate` intermediate model. | 5 | 0 |
+| F-INT-004 | The scenario declares at least one `deduplicate` intermediate model. | 5 | 0 |
+| F-JOIN-001 | At least one join uses type `inner`. | 5 | 0 |
+| F-JOIN-002 | At least one join uses type `left`. | 5 | 0 |
+| F-JOIN-003 | At least one join's keys resolve to a declared `one_to_many` relationship lineage. | 5 | 0 |
+| F-JOIN-004 | At least one join's keys resolve to a declared `many_to_one` relationship lineage. | 5 | 0 |
+| F-JOIN-005 | At least one join's keys resolve to a declared `one_to_one` relationship lineage. | 5 | 0 |
+| F-JOIN-006 | At least one join's keys resolve through a `many_to_many` bridge pattern. | 5 | 0 |
+| F-PLC-001 | At least one `transform` model reads directly from a staging model. | 5 | 0 |
+| F-PLC-002 | At least one `transform` model reads from another intermediate model. | 5 | 0 |
+| F-PLC-003 | At least one `aggregate` model reads directly from a staging model. | 5 | 0 |
+| F-PLC-004 | At least one `aggregate` model reads from another intermediate model. | 5 | 0 |
+| F-PLC-005 | At least one `deduplicate` model reads directly from a staging model. | 5 | 0 |
+| F-PLC-006 | At least one `deduplicate` model reads from another intermediate model. | 5 | 0 |
+| F-PRJ-001 | At least one join projects left-side columns only (no right-side columns). | 5 | 0 |
+| F-PRJ-002 | At least one join projects right-side columns only (no left-side columns). | 5 | 0 |
+| F-PRJ-003 | At least one join projects columns from both sides. | 5 | 0 |
+| F-GRN-001 | At least one intermediate model declares a single-column grain. | 5 | 0 |
+| F-GRN-002 | At least one intermediate model declares a composite grain (at least 2 columns). | 5 | 0 |
+| F-SRT-001 | At least one deduplication `order_by` (staging or intermediate) uses direction `asc`. | 5 | 0 |
+| F-SRT-002 | At least one deduplication `order_by` (staging or intermediate) uses direction `desc`. | 5 | 0 |
+| F-EXP-001 | At least one expression is a `column` reference. | 5 | 0 |
+| F-EXP-002 | At least one expression is a `literal`. | 5 | 0 |
+| F-EXP-003 | At least one expression is `binary` arithmetic. | 5 | 0 |
+| F-EXP-004 | At least one expression is a `date_part` extraction. | 5 | 0 |
+| F-EXP-005 | At least one expression is a `coalesce`. | 5 | 0 |
+| F-EXP-006 | At least one `binary` expression uses operator `add`. | 5 | 0 |
+| F-EXP-007 | At least one `binary` expression uses operator `subtract`. | 5 | 0 |
+| F-EXP-008 | At least one `binary` expression uses operator `multiply`. | 5 | 0 |
+| F-EXP-009 | At least one `binary` expression uses operator `divide` (runtime safe-division semantics). | 5 | 0 |
+| F-EXP-010 | At least one `date_part` expression extracts `year`. | 5 | 0 |
+| F-EXP-011 | At least one `date_part` expression extracts `quarter`. | 5 | 0 |
+| F-EXP-012 | At least one `date_part` expression extracts `month`. | 5 | 0 |
+| F-EXP-013 | At least one `date_part` expression extracts `day`. | 5 | 0 |
+| F-EXP-014 | At least one `date_part` expression extracts `day_of_week`. | 5 | 0 |
+| F-EXP-015 | At least one `binary` expression operates on integer operands. | 5 | 0 |
+| F-EXP-016 | At least one `binary` expression operates on float operands. | 5 | 0 |
+| F-EXP-017 | At least one `date_part` expression operates on a date value. | 5 | 0 |
+| F-EXP-018 | At least one `date_part` expression operates on a timestamp value. | 5 | 0 |
+| F-EXP-019 | At least one `coalesce` expression combines string values. | 5 | 0 |
+| F-EXP-020 | At least one nested expression exists (an expression node with a non-leaf expression child, depth at least 2). | 5 | 0 |
+| F-EXP-021 | At least one `transform` model declares a derived column. | 5 | 0 |
+| F-EXP-022 | At least one `join` model declares a derived column. | 5 | 0 |
+| F-CND-001 | At least one condition is a `comparison`. | 5 | 0 |
+| F-CND-002 | At least one condition is an `in` membership test. | 5 | 0 |
+| F-CND-003 | At least one condition is an `is_null` test. | 5 | 0 |
+| F-CND-004 | At least one condition is an `all` conjunction. | 5 | 0 |
+| F-CND-005 | At least one condition is an `any` disjunction. | 5 | 0 |
+| F-CND-006 | At least one condition is a `not` negation. | 5 | 0 |
+| F-CND-007 | At least one `comparison` uses operator `eq`. | 5 | 0 |
+| F-CND-008 | At least one `comparison` uses operator `ne`. | 5 | 0 |
+| F-CND-009 | At least one `comparison` uses operator `lt`. | 5 | 0 |
+| F-CND-010 | At least one `comparison` uses operator `lte`. | 5 | 0 |
+| F-CND-011 | At least one `comparison` uses operator `gt`. | 5 | 0 |
+| F-CND-012 | At least one `comparison` uses operator `gte`. | 5 | 0 |
+| F-CND-013 | At least one `in` condition uses `negated == true`. | 5 | 0 |
+| F-CND-014 | At least one `is_null` condition uses `negated == true` (not-null test). | 5 | 0 |
+| F-CND-015 | At least one `comparison` operates on numeric operands. | 5 | 0 |
+| F-CND-016 | At least one `comparison` operates on string operands. | 5 | 0 |
+| F-CND-017 | At least one `comparison` operates on date/timestamp operands. | 5 | 0 |
+| F-CND-018 | At least one boolean combination (`all`/`any`/`not`) is nested inside another condition (depth at least 2). | 5 | 0 |
+| F-CND-019 | At least one staging model declares a `filter` row-operation condition. | 5 | 0 |
+| F-CND-020 | At least one `transform` model declares a filter condition. | 5 | 0 |
+| F-CND-021 | At least one `join` model declares a filter condition. | 5 | 0 |
+| F-CND-022 | At least one `aggregate` model declares a pre-aggregation filter condition. | 5 | 0 |
+| F-CND-023 | At least one output model declares a pre-aggregation filter condition. | 5 | 0 |
+| T-CHAIN-001 | At least two intermediate models form a linear chain (an intermediate directly consuming another intermediate, single upstream). | 3 | 0 |
+| T-FAN-001 | A join has two distinct direct inputs (fan-in from two upstream branches). | 3 | 0 |
+| T-FAN-002 | A model has at least three distinct transitive staging ancestors (fan-in from three upstream branches). | 3 | 0 |
+| T-BRANCH-001 | A staging or intermediate model is consumed by at least two intermediate models (branching from a shared upstream). | 3 | 0 |
+| T-REUSE-001 | An intermediate model is the source of at least two output models, or of an intermediate and an output model (upstream reuse). | 3 | 0 |
+| T-JOIN-001 | A join over two staging inputs feeds a downstream model (early join). | 3 | 0 |
+| T-JOIN-002 | A join has at least one intermediate input that is itself transformed, joined, or aggregated (late join). | 3 | 0 |
+| T-AGG-001 | A join has an aggregated intermediate ancestor (aggregation before the join). | 3 | 0 |
+| T-AGG-002 | An aggregate model has a join ancestor (aggregation after the join). | 3 | 0 |
+| T-DEDUP-001 | A deduplicate intermediate is consumed by a transform, join, or aggregate intermediate (deduplication before another transformation). | 3 | 0 |
+| T-DEDUP-002 | A deduplicate intermediate has a join ancestor (deduplication after a fan-in operation). | 3 | 0 |
+| T-OUT-001 | Two output models share a transitive intermediate ancestor (shared ancestry). | 3 | 0 |
+| T-OUT-002 | Two output models declare different grains (grain column sets are not equal). | 3 | 0 |
+| T-PART-001 | Every raw table reaches at least one output, and at least two outputs have different transitive staging-ancestor sets (full participation through structurally different paths). | 3 | 0 |
+| I-ORD-001 | A `transform` model reads directly from an `aggregate` model (row-level derivation over a grouped grain). | 3 | 0 |
+| I-ORD-002 | A `transform` model reads directly from a `deduplicate` model (derivation over a deduplicated grain). | 3 | 0 |
+| I-ORD-003 | A `join` model has a direct `deduplicate` input (fan-in over deduplicated keys). | 3 | 0 |
+| I-JOIN-001 | An `inner` join over a `one_to_many` lineage projects both sides and declares a composite grain. | 3 | 0 |
+| I-JOIN-002 | A `left` join over a `many_to_one` lineage projects both sides and keeps the left input's projected grain. | 3 | 0 |
+| I-JOIN-003 | An `inner` join over a `one_to_one` lineage projects a single side and declares a single-column grain. | 3 | 0 |
+| I-JAG-001 | A `join` model has a direct `aggregate` input (aggregation before the join). | 3 | 0 |
+| I-JAG-002 | An `aggregate` model has a direct `join` input (aggregation after the join). | 3 | 0 |
+| I-SHR-001 | Two intermediate models share one upstream with different operations (branching into different downstream operations). | 3 | 0 |
+| I-SHR-002 | Two output models share one intermediate source with different grains. | 3 | 0 |
+| I-EXP-001 | A `binary` arithmetic expression over numeric columns appears in a derived column. | 3 | 0 |
+| I-EXP-002 | A `date_part` extraction over a timestamp appears in a derived column. | 3 | 0 |
+| I-CND-001 | A `comparison` over string operands appears in a filter condition. | 3 | 0 |
+| I-CND-002 | A `comparison` over date/timestamp operands appears in a filter condition. | 3 | 0 |
 
 ## Scenario claims
 
