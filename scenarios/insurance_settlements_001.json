@@ -1,0 +1,451 @@
+{
+  "description": "Insurance settlements pipeline: deduplicated claim feed, printable report labels, derived net recovery.",
+  "domain": "insurance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "left",
+          "source": "deductible",
+          "target": "deductible"
+        },
+        {
+          "side": "right",
+          "source": "holder_id",
+          "target": "holder_id"
+        },
+        {
+          "side": "right",
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "amount",
+              "kind": "column"
+            },
+            "operator": "subtract",
+            "right": {
+              "column": "deductible",
+              "kind": "column"
+            }
+          },
+          "name": "net",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "policy_id",
+            "right": "policy_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_claims",
+      "name": "j_claims_policies",
+      "operation": "join",
+      "right": "stg_policies"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "net",
+          "target": "net"
+        },
+        {
+          "side": "left",
+          "source": "product",
+          "target": "product"
+        },
+        {
+          "side": "right",
+          "source": "holder_name",
+          "target": "holder_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "holder_id",
+            "right": "holder_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_claims_policies",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_holders"
+    },
+    {
+      "grain": [
+        "claim_id"
+      ],
+      "keys": [
+        "claim_id"
+      ],
+      "name": "d_claims",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "reported_label",
+          "direction": "desc"
+        }
+      ],
+      "source": "stg_claims"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "product"
+      ],
+      "group_by": [
+        {
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "net",
+          "function": "sum",
+          "name": "total_net"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_claims"
+        }
+      ],
+      "name": "o_net_by_product",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HH-"
+          },
+          "name": "holder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "holder_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_holders",
+      "primary_key": [
+        "holder_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_holder_policies",
+            "target_side": "left"
+          },
+          "name": "holder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "auto",
+              "home"
+            ]
+          },
+          "name": "product",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_policies",
+      "primary_key": [
+        "policy_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CS-"
+          },
+          "name": "claim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_policy_claims",
+            "target_side": "left"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "reported_ts",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50000.0,
+            "min": 100.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 5000.0,
+            "min": 0.0
+          },
+          "name": "deductible",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_claims",
+      "primary_key": [
+        "claim_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "holder_id"
+        ],
+        "table": "raw_holders"
+      },
+      "name": "rel_holder_policies",
+      "right": {
+        "columns": [
+          "holder_id"
+        ],
+        "table": "raw_policies"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_policies"
+      },
+      "name": "rel_policy_claims",
+      "right": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_claims"
+      }
+    }
+  ],
+  "scenario_id": "insurance_settlements_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "holder_id",
+          "target": "holder_id"
+        },
+        {
+          "operations": [],
+          "source": "holder_name",
+          "target": "holder_name"
+        }
+      ],
+      "grain": [
+        "holder_id"
+      ],
+      "name": "stg_holders",
+      "row_operations": [],
+      "source": "raw_holders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "holder_id",
+          "target": "holder_id"
+        },
+        {
+          "operations": [],
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "grain": [
+        "policy_id"
+      ],
+      "name": "stg_policies",
+      "row_operations": [],
+      "source": "raw_policies"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "reported_ts",
+          "target": "reported_label"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "operations": [],
+          "source": "deductible",
+          "target": "deductible"
+        }
+      ],
+      "grain": [
+        "claim_id"
+      ],
+      "name": "stg_claims",
+      "row_operations": [],
+      "source": "raw_claims"
+    }
+  ],
+  "tests": [
+    {
+      "column": "product",
+      "model": "stg_policies",
+      "name": "product_values",
+      "type": "accepted_values",
+      "values": [
+        "auto",
+        "home"
+      ]
+    }
+  ]
+}
