@@ -5,8 +5,11 @@ column properties, and key roles. Slice T02 (appended below, after the `D-` rows
 relationships, staging columns and rows, cast type transitions, and the first interaction
 families. Slice T03 (appended below, after the T02 rows): intermediate operations, joins
 and grain, structured expressions and conditions, DAG topology motifs, and the related
-interactions. Slice T04 appends outputs, metrics, assertions, and remaining interactions
-after the existing rows; row order is significant
+interactions. Slice T04 (appended below, after the T03 rows): outputs, metrics, explicit
+assertions, and the remaining interactions. The baseline plan is now frozen and ready for
+T05 authoring. Output counts are covered by F-SIZE-005/006 and are not repeated; row order
+is significant because it breaks selection ties and MUST NOT be changed during an
+authoring run.
 because it breaks selection ties and MUST NOT be changed during an authoring run.
 
 Conventions:
@@ -15,6 +18,8 @@ Conventions:
 - `I-` rows are important interaction requirements with target 3. Each names a combination
   that changes compilation semantics, lineage or grain reasoning, generated data behavior,
   or fault applicability; superficial combinations stay covered by their atomic rows.
+- `T-` rows are DAG or data-flow topology motif requirements with target 3. Each names an
+  executable graph structure, not a renaming of an equivalent graph in another domain.
 - `D-` rows are domain-family requirements with target 6. Every scenario belongs to exactly
   one domain family and claims exactly one `D-` row.
 - Every predicate is decidable from the scenario file and its `ValidatedScenario`.
@@ -265,6 +270,63 @@ Conventions:
 | I-EXP-002 | A `date_part` extraction over a timestamp appears in a derived column. | 3 | 0 |
 | I-CND-001 | A `comparison` over string operands appears in a filter condition. | 3 | 0 |
 | I-CND-002 | A `comparison` over date/timestamp operands appears in a filter condition. | 3 | 0 |
+| F-OUT-001 | At least one output is row-preserving (grouping covers the source model's grain). | 5 | 0 |
+| F-OUT-002 | At least one output is coarsening (grouping reduces the source model's grain). | 5 | 0 |
+| F-OUT-003 | At least one output groups by a single key. | 5 | 0 |
+| F-OUT-004 | At least one output groups by multiple keys. | 5 | 0 |
+| F-OUT-005 | At least one output declares no dimensions. | 5 | 0 |
+| F-OUT-006 | At least one output declares at least one dimension. | 5 | 0 |
+| F-OUT-007 | At least one output `group_by` contains a rename (`source != target`). | 5 | 0 |
+| F-OUT-008 | At least one output `group_by` is fully passthrough (every `source == target`). | 5 | 0 |
+| F-OUT-009 | At least one output declares a single-column grain. | 5 | 0 |
+| F-OUT-010 | At least one output declares a composite grain (at least 2 columns). | 5 | 0 |
+| F-OUT-011 | At least one output model shares its source with another intermediate or output model. | 5 | 0 |
+| F-MET-001 | At least one metric uses function `count_rows`. | 5 | 0 |
+| F-MET-002 | At least one metric uses function `count`. | 5 | 0 |
+| F-MET-003 | At least one metric uses function `count_distinct`. | 5 | 0 |
+| F-MET-004 | At least one metric uses function `sum`. | 5 | 0 |
+| F-MET-005 | At least one metric uses function `avg`. | 5 | 0 |
+| F-MET-006 | At least one metric uses function `min`. | 5 | 0 |
+| F-MET-007 | At least one metric uses function `max`. | 5 | 0 |
+| F-MET-008 | At least one metric uses function `conditional_count`. | 5 | 0 |
+| F-MET-009 | At least one metric uses function `conditional_sum`. | 5 | 0 |
+| F-MET-010 | At least one metric appears in an `aggregate` intermediate model. | 5 | 0 |
+| F-MET-011 | At least one metric appears in an output model. | 5 | 0 |
+| F-MET-012 | At least one numeric metric (`sum`, `avg`, or `conditional_sum`) takes an integer or float column. | 5 | 0 |
+| F-MET-013 | At least one `min`/`max` metric takes a date or timestamp column. | 5 | 0 |
+| F-MET-014 | At least one `count`/`count_distinct` metric takes a nullable column (null-skipping aggregation). | 5 | 0 |
+| F-ASM-001 | The scenario declares an explicit `not_null` assertion. | 5 | 0 |
+| F-ASM-002 | The scenario declares an explicit `unique` assertion. | 5 | 0 |
+| F-ASM-003 | The scenario declares an explicit `accepted_values` assertion. | 5 | 0 |
+| F-ASM-004 | The scenario declares an explicit `relationships` assertion. | 5 | 0 |
+| F-ASM-005 | The scenario declares an explicit `row_count` assertion. | 5 | 0 |
+| F-ASM-006 | The scenario declares an explicit `column_range` assertion. | 5 | 0 |
+| F-ASM-007 | At least one `not_null` assertion covers at least 2 columns. | 5 | 0 |
+| F-ASM-008 | At least one `unique` assertion covers at least 2 columns (composite order retained). | 5 | 0 |
+| F-ASM-009 | At least one `accepted_values` assertion targets a string column. | 5 | 0 |
+| F-ASM-010 | At least one `accepted_values` assertion targets a numeric column. | 5 | 0 |
+| F-ASM-011 | At least one `relationships` assertion has composite arity (at least 2 columns per side). | 5 | 0 |
+| F-ASM-012 | At least one `row_count` assertion sets only `min`. | 5 | 0 |
+| F-ASM-013 | At least one `row_count` assertion sets only `max`. | 5 | 0 |
+| F-ASM-014 | At least one `row_count` assertion sets both `min` and `max`. | 5 | 0 |
+| F-ASM-015 | At least one `column_range` assertion sets only `min`. | 5 | 0 |
+| F-ASM-016 | At least one `column_range` assertion sets only `max`. | 5 | 0 |
+| F-ASM-017 | At least one `column_range` assertion sets both `min` and `max`. | 5 | 0 |
+| F-ASM-018 | At least one `column_range` assertion uses `inclusive == false`. | 5 | 0 |
+| F-ASM-019 | At least one explicit assertion targets a raw table. | 5 | 0 |
+| F-ASM-020 | At least one explicit assertion targets a staging model. | 5 | 0 |
+| F-ASM-021 | At least one explicit assertion targets an intermediate model. | 5 | 0 |
+| F-ASM-022 | At least one explicit assertion targets an output model. | 5 | 0 |
+| I-OUT-001 | An output model computes a conditional metric (`conditional_count` or `conditional_sum`) over an aggregated intermediate source. | 3 | 0 |
+| I-OUT-002 | An output model computes a numeric metric (`sum` or `avg`) over a join-sourced upstream. | 3 | 0 |
+| I-OUT-003 | An output model declares at least 2 dimensions equal to its composite grain. | 3 | 0 |
+| I-OUT-004 | An output model with a single-column grain reads from a deduplicate model (grain preserved through deduplication). | 3 | 0 |
+| I-ASM-001 | A `not_null` assertion targets a nullable string column of a staging model. | 3 | 0 |
+| I-ASM-002 | A `unique` assertion over a composite key targets an intermediate model. | 3 | 0 |
+| I-ASM-003 | A `row_count` assertion with both bounds targets an output model. | 3 | 0 |
+| I-ASM-004 | A `column_range` assertion targets a metric column of an output model. | 3 | 0 |
+| I-ASM-005 | A composite-arity `relationships` assertion points from an intermediate model to a raw table. | 3 | 0 |
+| I-CND-003 | A conditional metric (`conditional_count` or `conditional_sum`) carries a `comparison` condition. | 3 | 0 |
 
 ## Scenario claims
 
