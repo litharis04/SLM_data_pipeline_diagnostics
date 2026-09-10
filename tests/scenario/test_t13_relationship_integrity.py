@@ -322,7 +322,10 @@ def test_composite_wrong_target_side():
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
     # Should fail due to FK on non-dependent column or missing FK on dependent
-    assert any("foreign_key" in i.message.lower() or "dependent" in i.message.lower() for i in exc.value.issues)
+    assert any(
+        "foreign_key" in i.message.lower() or "dependent" in i.message.lower()
+        for i in exc.value.issues
+    )
 
 
 def test_one_to_one_partial_fk():
@@ -395,19 +398,85 @@ def test_fk_on_unrelated_column():
     data = _base()
     # Use a simple valid base and add spare column
     data["relationships"] = (
-        {"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("id",)}},
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id",)},
+            "right": {"table": "raw_b", "columns": ("id",)},
+        },
     )
     # Make raw_a PK just id for this test, so left side is unique
     data["raw_tables"] = (
-        {"name": "raw_a", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}},), "primary_key": ("id",)},
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "spare", "type": "integer", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
-        {"name": "raw_c", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}},), "primary_key": ("id",)},
-        {"name": "bridge_t", "rows": {"min": 1, "max": 10}, "columns": ({"name": "a_id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "b_id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}), "primary_key": ()},
+        {
+            "name": "raw_a",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+            ),
+            "primary_key": ("id",),
+        },
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "spare",
+                    "type": "integer",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
+        {
+            "name": "raw_c",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+            ),
+            "primary_key": ("id",),
+        },
+        {
+            "name": "bridge_t",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "a_id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "b_id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+            ),
+            "primary_key": (),
+        },
     )
     s = Scenario.model_validate(data)
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
-    assert any("foreign_key" in i.message.lower() or "dependent" in i.message.lower() for i in exc.value.issues)
+    assert any(
+        "foreign_key" in i.message.lower() or "dependent" in i.message.lower()
+        for i in exc.value.issues
+    )
 
 
 def test_missing_bridge_columns():
@@ -718,6 +787,7 @@ def test_partial_null_composite_fk():
 def test_valid_direct_relationships():
     # Use a known valid scenario from test_semantic
     from tests.scenario.test_semantic import _base_scenario
+
     data = _base_scenario()
     s = Scenario.model_validate(data)
     validated = validate_semantics(s)
@@ -728,6 +798,7 @@ def test_valid_direct_relationships():
 
 def test_valid_composite_and_m2m():
     from tests.scenario.test_semantic import _base_scenario
+
     data = _base_scenario()
     s = Scenario.model_validate(data)
     validated = validate_semantics(s)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from data_pipeline_diagnostics.scenario.errors import SemanticValidationError
+from data_pipeline_diagnostics.scenario.errors import ErrorCode, SemanticValidationError
 from data_pipeline_diagnostics.scenario.models import Scenario
 from data_pipeline_diagnostics.scenario.semantic import ValidatedScenario, validate_semantics
 
@@ -215,13 +215,10 @@ def test_positive_full_scenario_passes():
     ]
     assert list(validated.staging_schemas.keys()) == list(validated2.staging_schemas.keys())
 
-    # compiler boundary – bare Scenario should not be accepted where ValidatedScenario required
-    def _compiler_accepts(vs: ValidatedScenario) -> None:
-        assert isinstance(vs, ValidatedScenario)
-
-    _compiler_accepts(validated)
-    with pytest.raises(Exception):
-        _compiler_accepts(s)  # type: ignore[arg-type]
+    # compiler boundary is covered by test_compiler_accepts_only_validated;
+    # here just pin the result type.
+    assert isinstance(validated, ValidatedScenario)
+    assert not isinstance(s, ValidatedScenario)
 
 
 def test_deterministic_issue_ordering():
@@ -289,6 +286,10 @@ def test_missing_reference():
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
     assert any("nonexistent" in i.message for i in exc.value.issues)
+    assert any(
+        (i.path, i.code) == ("relationships[0].left.table", ErrorCode.MISSING_REF)
+        for i in exc.value.issues
+    )
 
 
 def test_generator_type_mismatch():
@@ -531,6 +532,14 @@ def test_invalid_staging_chain():
     assert any(
         "trim" in i.message.lower() or "string" in i.message.lower() for i in exc.value.issues
     )
+    assert any(
+        (i.path, i.code)
+        == (
+            "staging_models[stg_a].columns[id].operations[0]",
+            ErrorCode.STAGING_OPERATION_CHAIN,
+        )
+        for i in exc.value.issues
+    )
     # also test grain still fails if needed, but chain is primary
     base2 = _base_scenario()
     base2["staging_models"] = (
@@ -581,6 +590,7 @@ def test_cyclic_dag():
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
     assert any("cycle" in i.message.lower() for i in exc.value.issues)
+    assert any(i.code == ErrorCode.DAG_CYCLE for i in exc.value.issues)
 
 
 def test_invalid_layer_dependency():
@@ -684,6 +694,7 @@ def test_impossible_grain():
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
     assert any("grain" in i.message.lower() for i in exc.value.issues)
+    assert any(i.code == ErrorCode.GRAIN_IMPOSSIBLE for i in exc.value.issues)
 
 
 def test_invalid_metric_type():
@@ -766,6 +777,7 @@ def test_contradictory_assertion():
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
     assert any("duplicate" in i.message.lower() for i in exc.value.issues)
+    assert any(i.code == ErrorCode.CONTRADICTORY_ASSERTION for i in exc.value.issues)
     # Explicit that duplicates derived (PK not_null is derived)
     base2 = _base_scenario()
     # raw_a has PK id, derived will be not_null on raw_a.id, so explicit duplicate should fail
@@ -858,6 +870,7 @@ def test_join_without_supporting_lineage():
         "not supported" in i.message.lower() and "relationship" in i.message.lower()
         for i in exc.value.issues
     )
+    assert any(i.code == ErrorCode.UNSUPPORTED_JOIN_LINEAGE for i in exc.value.issues)
 
 
 def test_staging_filter_type_mismatch():
@@ -999,7 +1012,10 @@ def test_deterministic_tie_breaking():
     s = Scenario.model_validate(base)
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s)
-    assert any("deterministic" in i.message.lower() or "tie-break" in i.message.lower() for i in exc.value.issues)
+    assert any(
+        "deterministic" in i.message.lower() or "tie-break" in i.message.lower()
+        for i in exc.value.issues
+    )
     assert any(i.code == "E134" for i in exc.value.issues)
 
 
@@ -1255,6 +1271,16 @@ def test_validated_scenario_frozen_deep():
         validated.lineage["stg_a"]["new_col"] = ["raw_a.new"]  # type: ignore[index]
     with pytest.raises(Exception):
         validated.staging_schemas["stg_a"]["new_col"] = "test"  # type: ignore[index]
+    with pytest.raises(Exception):
+        validated.intermediate_schemas["trans_a"]["new_col"] = "test"  # type: ignore[index]
+    with pytest.raises(Exception):
+        validated.output_schemas["out_a"]["new_col"] = "test"  # type: ignore[index]
+    # Derived assertion inner sequences are tuples
+    for d in validated.derived_assertions:
+        for v in d.values():
+            if isinstance(v, tuple):
+                with pytest.raises(Exception):
+                    v.append("new")  # type: ignore[attr-defined]
 
 
 def test_compiler_accepts_only_validated():

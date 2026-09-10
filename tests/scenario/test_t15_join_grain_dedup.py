@@ -111,7 +111,15 @@ def _one_to_one_base():
         ),
         "intermediate_models": (
             _trans("trans_a", "stg_c", (("id", "id"),), ("id",)),
-            _join("join_a", "stg_a", "stg_b", "inner", (("id", "b_id"),), (("left", "id", "id"),), ("id",)),
+            _join(
+                "join_a",
+                "stg_a",
+                "stg_b",
+                "inner",
+                (("id", "b_id"),),
+                (("left", "id", "id"),),
+                ("id",),
+            ),
         ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
@@ -124,7 +132,15 @@ def test_valid_one_to_one_both_orientations():
     # reverse orientation: left=stg_b, right=stg_a
     data["intermediate_models"] = (
         data["intermediate_models"][0],
-        _join("join_a", "stg_b", "stg_a", "inner", (("b_id", "id"),), (("right", "id", "id"),), ("id",)),
+        _join(
+            "join_a",
+            "stg_b",
+            "stg_a",
+            "inner",
+            (("b_id", "id"),),
+            (("right", "id", "id"),),
+            ("id",),
+        ),
     )
     v2 = _validate_ok(data)
     assert "join_a" in v2.topological_order
@@ -148,7 +164,15 @@ def test_valid_many_to_one_preserves_many_grain():
         ),
         "intermediate_models": (
             _trans("trans_a", "stg_c", (("id", "id"),), ("id",)),
-            _join("join_a", "stg_b", "stg_a", "inner", (("a_id", "id"),), (("left", "id", "id"),), ("id",)),
+            _join(
+                "join_a",
+                "stg_b",
+                "stg_a",
+                "inner",
+                (("a_id", "id"),),
+                (("left", "id", "id"),),
+                ("id",),
+            ),
         ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
@@ -174,7 +198,15 @@ def test_one_to_many_one_side_grain_invalid():
         "intermediate_models": (
             _trans("trans_a", "stg_c", (("id", "id"),), ("id",)),
             # one-to-many inner join, grain only from one (left) side – fan-out duplicates it
-            _join("join_a", "stg_a", "stg_b", "inner", (("id", "a_id"),), (("left", "id", "id"),), ("id",)),
+            _join(
+                "join_a",
+                "stg_a",
+                "stg_b",
+                "inner",
+                (("id", "a_id"),),
+                (("left", "id", "id"),),
+                ("id",),
+            ),
         ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
@@ -200,7 +232,15 @@ def test_left_join_right_only_grain_invalid():
         ),
         "intermediate_models": (
             _trans("trans_a", "stg_c", (("id", "id"),), ("id",)),
-            _join("join_a", "stg_a", "stg_b", "left", (("id", "a_id"),), (("right", "id", "id"),), ("id",)),
+            _join(
+                "join_a",
+                "stg_a",
+                "stg_b",
+                "left",
+                (("id", "a_id"),),
+                (("right", "id", "id"),),
+                ("id",),
+            ),
         ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
@@ -247,7 +287,10 @@ def test_valid_combined_grain_multiplicative_join():
             {
                 "name": "out_b",
                 "source": "join_a",
-                "group_by": ({"source": "lid", "target": "lid"}, {"source": "rid", "target": "rid"}),
+                "group_by": (
+                    {"source": "lid", "target": "lid"},
+                    {"source": "rid", "target": "rid"},
+                ),
                 "grain": ("lid", "rid"),
                 "metrics": ({"name": "cnt2", "function": "count_rows"},),
             },
@@ -265,12 +308,18 @@ def _composite_base():
             _raw("raw_a", (_id_col("id"), _id_col("seq")), ("id", "seq")),
             _raw(
                 "raw_b",
-                (_id_col("id"), _fk_col("a_id", "rel_c", "left"), _fk_col("a_seq", "rel_c", "left")),
+                (
+                    _id_col("id"),
+                    _fk_col("a_id", "rel_c", "left"),
+                    _fk_col("a_seq", "rel_c", "left"),
+                ),
                 (),
             ),
             _raw("raw_c", (_id_col("id"),), ("id",)),
         ),
-        "relationships": (_rel("rel_c", "raw_a", ("id", "seq"), "raw_b", ("a_id", "a_seq"), "one_to_many"),),
+        "relationships": (
+            _rel("rel_c", "raw_a", ("id", "seq"), "raw_b", ("a_id", "a_seq"), "one_to_many"),
+        ),
         "staging_models": (
             _stg("stg_a", "raw_a", (("id", "id"), ("seq", "seq")), ("id", "seq")),
             _stg("stg_b", "raw_b", (("id", "id"), ("a_id", "a_id"), ("a_seq", "a_seq")), ("id",)),
@@ -345,11 +394,24 @@ def test_join_pairs_from_two_relationships():
         "staging_models": (
             _stg("stg_a", "raw_a", (("id", "id"),), ("id",)),
             _stg("stg_b", "raw_b", (("id", "id"), ("a_id", "a_id")), ("id",)),
-            _stg("stg_c", "raw_c", ({"source": "id", "target": "id"}, {"source": "x_id", "target": "x_id"}), ("id",)),
+            _stg(
+                "stg_c",
+                "raw_c",
+                ({"source": "id", "target": "id"}, {"source": "x_id", "target": "x_id"}),
+                ("id",),
+            ),
         ),
         "intermediate_models": (
             _trans("trans_a", "stg_a", (("id", "id"),), ("id",)),
-            _join("join_a", "stg_b", "stg_c", "inner", (("a_id", "x_id"),), (("left", "id", "id"),), ("id",)),
+            _join(
+                "join_a",
+                "stg_b",
+                "stg_c",
+                "inner",
+                (("a_id", "x_id"),),
+                (("left", "id", "id"),),
+                ("id",),
+            ),
         ),
         "output_models": (_out("out_a", "trans_a"), _out("out_b", "join_a")),
     }
@@ -436,7 +498,15 @@ def test_deterministic_dedup_with_source_key():
             _stg("stg_c", "raw_c", (("id", "id"), ("ts", "ts")), ("id",)),
         ),
         "intermediate_models": (
-            _join("join_a", "stg_a", "stg_b", "inner", (("id", "a_id"),), (("right", "id", "id"),), ("id",)),
+            _join(
+                "join_a",
+                "stg_a",
+                "stg_b",
+                "inner",
+                (("id", "a_id"),),
+                (("right", "id", "id"),),
+                ("id",),
+            ),
             {
                 "operation": "deduplicate",
                 "name": "dedup_a",
@@ -528,10 +598,17 @@ def test_staging_dedup_renamed_keys():
             {
                 "name": "stg_a",
                 "source": "raw_a",
-                "columns": ({"source": "id", "target": "user_id"}, {"source": "ts", "target": "updated_at"}),
+                "columns": (
+                    {"source": "id", "target": "user_id"},
+                    {"source": "ts", "target": "updated_at"},
+                ),
                 "grain": ("user_id",),
                 "row_operations": (
-                    {"op": "deduplicate", "keys": ("user_id",), "order_by": ({"column": "updated_at"},)},
+                    {
+                        "op": "deduplicate",
+                        "keys": ("user_id",),
+                        "order_by": ({"column": "updated_at"},),
+                    },
                 ),
             },
             _stg("stg_b", "raw_b", (("id", "id"), ("a_id", "a_id")), ("id",)),
@@ -560,7 +637,10 @@ def test_staging_dedup_renamed_keys():
             {
                 "name": "out_b",
                 "source": "join_a",
-                "group_by": ({"source": "uid_l", "target": "uid_l"}, {"source": "rid", "target": "rid"}),
+                "group_by": (
+                    {"source": "uid_l", "target": "uid_l"},
+                    {"source": "rid", "target": "rid"},
+                ),
                 "grain": ("uid_l", "rid"),
                 "metrics": ({"name": "cnt2", "function": "count_rows"},),
             },
@@ -590,7 +670,11 @@ def test_valid_bridge_mediated_join():
                 "cardinality": "many_to_many",
                 "left": {"table": "raw_a", "columns": ("id",)},
                 "right": {"table": "raw_c", "columns": ("id",)},
-                "bridge": {"table": "bridge_t", "left_columns": ("a_id",), "right_columns": ("b_id",)},
+                "bridge": {
+                    "table": "bridge_t",
+                    "left_columns": ("a_id",),
+                    "right_columns": ("b_id",),
+                },
             },
         ),
         "staging_models": (
@@ -600,14 +684,25 @@ def test_valid_bridge_mediated_join():
         ),
         "intermediate_models": (
             _trans("trans_a", "stg_c", (("id", "id"),), ("id",)),
-            _join("join_a", "stg_bridge", "stg_a", "inner", (("a_id", "id"),), (("left", "a_id", "aid"), ("left", "b_id", "bid")), ("aid", "bid")),
+            _join(
+                "join_a",
+                "stg_bridge",
+                "stg_a",
+                "inner",
+                (("a_id", "id"),),
+                (("left", "a_id", "aid"), ("left", "b_id", "bid")),
+                ("aid", "bid"),
+            ),
         ),
         "output_models": (
             _out("out_a", "trans_a"),
             {
                 "name": "out_b",
                 "source": "join_a",
-                "group_by": ({"source": "aid", "target": "aid"}, {"source": "bid", "target": "bid"}),
+                "group_by": (
+                    {"source": "aid", "target": "aid"},
+                    {"source": "bid", "target": "bid"},
+                ),
                 "grain": ("aid", "bid"),
                 "metrics": ({"name": "cnt2", "function": "count_rows"},),
             },

@@ -15,23 +15,119 @@ def _base():
         "scenario_id": "test_t14",
         "domain": "testdomain",
         "raw_tables": (
-            {"name": "raw_a", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}},), "primary_key": ("id",)},
-            {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "integer", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
-            {"name": "raw_c", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}},), "primary_key": ("id",)},
+            {
+                "name": "raw_a",
+                "rows": {"min": 1, "max": 10},
+                "columns": (
+                    {
+                        "name": "id",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                ),
+                "primary_key": ("id",),
+            },
+            {
+                "name": "raw_b",
+                "rows": {"min": 1, "max": 10},
+                "columns": (
+                    {
+                        "name": "id",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                    {
+                        "name": "a_id",
+                        "type": "integer",
+                        "generator": {
+                            "kind": "foreign_key",
+                            "relationship": "rel_a",
+                            "target_side": "left",
+                        },
+                    },
+                ),
+                "primary_key": (),
+            },
+            {
+                "name": "raw_c",
+                "rows": {"min": 1, "max": 10},
+                "columns": (
+                    {
+                        "name": "id",
+                        "type": "integer",
+                        "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                    },
+                ),
+                "primary_key": ("id",),
+            },
         ),
-        "relationships": ({"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("a_id",)}},),
+        "relationships": (
+            {
+                "name": "rel_a",
+                "cardinality": "one_to_many",
+                "left": {"table": "raw_a", "columns": ("id",)},
+                "right": {"table": "raw_b", "columns": ("a_id",)},
+            },
+        ),
         "staging_models": (
-            {"name": "stg_a", "source": "raw_a", "columns": ({"source": "id", "target": "id"},), "grain": ("id",)},
-            {"name": "stg_b", "source": "raw_b", "columns": ({"source": "id", "target": "id"}, {"source": "a_id", "target": "a_id"}), "grain": ("id",)},
-            {"name": "stg_c", "source": "raw_c", "columns": ({"source": "id", "target": "id"},), "grain": ("id",)},
+            {
+                "name": "stg_a",
+                "source": "raw_a",
+                "columns": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
+            {
+                "name": "stg_b",
+                "source": "raw_b",
+                "columns": ({"source": "id", "target": "id"}, {"source": "a_id", "target": "a_id"}),
+                "grain": ("id",),
+            },
+            {
+                "name": "stg_c",
+                "source": "raw_c",
+                "columns": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
         ),
         "intermediate_models": (
-            {"operation": "transform", "name": "trans_a", "source": "stg_c", "columns": ({"source": "id", "target": "id"},), "grain": ("id",)},
-            {"operation": "join", "name": "join_a", "left": "stg_a", "right": "stg_b", "join": {"type": "inner", "on": ({"left": "id", "right": "a_id"},)}, "columns": ({"side": "left", "source": "id", "target": "lid"}, {"side": "right", "source": "id", "target": "rid"}), "grain": ("lid", "rid")},
+            {
+                "operation": "transform",
+                "name": "trans_a",
+                "source": "stg_c",
+                "columns": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+            },
+            {
+                "operation": "join",
+                "name": "join_a",
+                "left": "stg_a",
+                "right": "stg_b",
+                "join": {"type": "inner", "on": ({"left": "id", "right": "a_id"},)},
+                "columns": (
+                    {"side": "left", "source": "id", "target": "lid"},
+                    {"side": "right", "source": "id", "target": "rid"},
+                ),
+                "grain": ("lid", "rid"),
+            },
         ),
         "output_models": (
-            {"name": "out_a", "source": "trans_a", "group_by": ({"source": "id", "target": "id"},), "grain": ("id",), "metrics": ({"name": "cnt", "function": "count_rows"},)},
-            {"name": "out_b", "source": "join_a", "group_by": ({"source": "lid", "target": "lid"}, {"source": "rid", "target": "rid"}), "grain": ("lid", "rid"), "metrics": ({"name": "cnt2", "function": "count_rows"},)},
+            {
+                "name": "out_a",
+                "source": "trans_a",
+                "group_by": ({"source": "id", "target": "id"},),
+                "grain": ("id",),
+                "metrics": ({"name": "cnt", "function": "count_rows"},),
+            },
+            {
+                "name": "out_b",
+                "source": "join_a",
+                "group_by": (
+                    {"source": "lid", "target": "lid"},
+                    {"source": "rid", "target": "rid"},
+                ),
+                "grain": ("lid", "rid"),
+                "metrics": ({"name": "cnt2", "function": "count_rows"},),
+            },
         ),
     }
 
@@ -78,10 +174,37 @@ def test_formatted_id_boundary():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
-    data["relationships"] = ({"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("a_id",)}},)
+    data["relationships"] = (
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id",)},
+            "right": {"table": "raw_b", "columns": ("a_id",)},
+        },
+    )
     s = Scenario.model_validate(data)
     # Should pass
     validate_semantics(s)
@@ -99,7 +222,27 @@ def test_formatted_id_boundary():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
     s2 = Scenario.model_validate(data)
@@ -119,7 +262,27 @@ def test_formatted_id_boundary():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
     s3 = Scenario.model_validate(data)
@@ -146,10 +309,37 @@ def test_random_string_capacity_one():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
-    data["relationships"] = ({"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("a_id",)}},)
+    data["relationships"] = (
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id",)},
+            "right": {"table": "raw_b", "columns": ("a_id",)},
+        },
+    )
     s = Scenario.model_validate(data)
     # capacity 1, max_rows 1 => pass
     validate_semantics(s)
@@ -172,10 +362,37 @@ def test_random_string_capacity_one():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
-    data["relationships"] = ({"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("a_id",)}},)
+    data["relationships"] = (
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id",)},
+            "right": {"table": "raw_b", "columns": ("a_id",)},
+        },
+    )
     s2 = Scenario.model_validate(data)
     with pytest.raises(SemanticValidationError) as exc:
         validate_semantics(s2)
@@ -203,10 +420,37 @@ def test_random_string_multiple_lengths():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
-    data["relationships"] = ({"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("a_id",)}},)
+    data["relationships"] = (
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id",)},
+            "right": {"table": "raw_b", "columns": ("a_id",)},
+        },
+    )
     s = Scenario.model_validate(data)
     validate_semantics(s)  # 6 should pass
     data["raw_tables"] = (
@@ -227,7 +471,27 @@ def test_random_string_multiple_lengths():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
     s2 = Scenario.model_validate(data)
@@ -250,10 +514,37 @@ def test_no_arbitrary_faker_rejection():
             ),
             "primary_key": ("id",),
         },
-        {"name": "raw_b", "rows": {"min": 1, "max": 10}, "columns": ({"name": "id", "type": "integer", "generator": {"kind": "integer_range", "min": 1, "max": 10}}, {"name": "a_id", "type": "string", "generator": {"kind": "foreign_key", "relationship": "rel_a", "target_side": "left"}}), "primary_key": ()},
+        {
+            "name": "raw_b",
+            "rows": {"min": 1, "max": 10},
+            "columns": (
+                {
+                    "name": "id",
+                    "type": "integer",
+                    "generator": {"kind": "integer_range", "min": 1, "max": 10},
+                },
+                {
+                    "name": "a_id",
+                    "type": "string",
+                    "generator": {
+                        "kind": "foreign_key",
+                        "relationship": "rel_a",
+                        "target_side": "left",
+                    },
+                },
+            ),
+            "primary_key": (),
+        },
         data["raw_tables"][2],
     )
-    data["relationships"] = ({"name": "rel_a", "cardinality": "one_to_many", "left": {"table": "raw_a", "columns": ("id",)}, "right": {"table": "raw_b", "columns": ("a_id",)}},)
+    data["relationships"] = (
+        {
+            "name": "rel_a",
+            "cardinality": "one_to_many",
+            "left": {"table": "raw_a", "columns": ("id",)},
+            "right": {"table": "raw_b", "columns": ("a_id",)},
+        },
+    )
     s = Scenario.model_validate(data)
     # Faker has no finite capacity proven, should not be rejected based on capacity
     validate_semantics(s)

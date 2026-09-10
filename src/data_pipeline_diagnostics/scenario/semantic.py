@@ -206,6 +206,525 @@ def _scalar_to_datatype(value: object) -> DataType | None:
     return None
 
 
+def _plain(value: object) -> object:
+    """Return the plain-dict form of a parsed Expression/Condition node."""
+    if hasattr(value, "model_dump"):
+        return value.model_dump()  # type: ignore[union-attr]
+    return value
+
+
+def _parse_data_type(value: object) -> DataType | None:
+    """Parse a ``DataType`` from itself or its string value; ``None`` when unparseable."""
+    if isinstance(value, DataType):
+        return value
+    if isinstance(value, str):
+        try:
+            return DataType(value)
+        except ValueError:
+            return None
+    return None
+
+
+_TEMPLATE_PH_RE = re.compile(r"\{([a-z][a-z0-9_]*)\}")
+
+
+def _template_placeholders(template: object) -> list[str]:
+    """Return placeholder names of a template string in a single regex pass."""
+    if not isinstance(template, str):
+        return []
+    return _TEMPLATE_PH_RE.findall(template)
+
+
+def _generator_capacity(col: object) -> int | None:
+    """Return the exact finite distinct-value capacity proven by the DSL, else ``None`` (§14)."""
+    gen = getattr(col, "generator", None)
+    if gen is None:
+        return None
+    kind = getattr(gen, "kind", None)
+    if kind == "formatted_id":
+        digits = getattr(gen, "digits", 0)
+        start = getattr(gen, "start", 1)
+        try:
+            max_num = 10**digits - 1
+            if start > max_num:
+                return 0
+            # Correct width-implied maximum: 10**digits -1, capacity = max_num - start +1
+            return int(max_num - start + 1)
+        except TypeError, ValueError, ArithmeticError:
+            return None
+    if kind == "integer_range":
+        try:
+            return int(getattr(gen, "max") - getattr(gen, "min") + 1)
+        except TypeError, ValueError, ArithmeticError:
+            return None
+    if kind == "categorical":
+        vals = getattr(gen, "values", ())
+        # Number of distinct values – already unique per local validator
+        return len(vals)
+    if kind == "random_string":
+        try:
+            alphabet = getattr(gen, "alphabet", "")
+            min_len = getattr(gen, "min_length", 0)
+            max_len = getattr(gen, "max_length", 0)
+            k = len(set(alphabet))
+            if k == 0 or min_len > max_len:
+                return None
+            # Compute sum_{l=min}^{max} k^l with safe saturation to avoid overflow
+            # Use a large threshold (1e12) rather than arbitrary constants per T14
+            total = 0
+            threshold = 10**12
+            for length in range(min_len, max_len + 1):
+                try:
+                    term = pow(k, length)
+                except ArithmeticError:
+                    return None
+                total += term
+                if total >= threshold:
+                    return threshold
+            return total
+        except TypeError, ValueError, ArithmeticError:
+            return None
+    if kind == "boolean":
+        return 2
+    # Faker-backed and deferred semantics: no finite capacity proven
+    if kind in (
+        "person_name",
+        "email",
+        "city",
+        "street_address",
+        "company_name",
+        "phone_number",
+    ):
+        return None
+    # float_range, date_range, timestamp_range, template_string, foreign_key – deferred
+    return None
+
+
+def _resolve_chain_type(source_type: DataType | None, operations: tuple) -> DataType | None:
+    """Pure staging column-operation type evolution (no issues emitted)."""
+    cur_type = source_type
+    for op in operations:
+        op_kind = getattr(op, "op", None)
+        if op_kind in ("trim", "lower", "upper", "replace", "map_values"):
+            if op_kind == "replace":
+                cur_type = DataType.string
+            elif op_kind == "map_values":
+                cur_type = DataType.string
+        elif op_kind == "cast":
+            target_type = _parse_data_type(getattr(op, "type", None))
+            cur_type = target_type if isinstance(target_type, DataType) else cur_type
+        # null_if/coalesce keep the same type
+    return cur_type
+
+
+def _check_column_chain(
+    *,
+    model_name: str,
+    col_source: str,
+    source_type: DataType | None,
+    operations: tuple,
+    issues: list[SemanticIssue],
+) -> DataType | None:
+    """Validate one staging column-operation chain; return its final type.
+
+    Single-pass replacement for the former repeated chain derivations. Emits
+    STAGING_OPERATION_CHAIN issues with the historical paths/messages.
+    NOTE (T16): the pure ``format``-without-date-target branch was removed here –
+    it is owned by Pydantic (CastOperation._check_format, proven by
+    test_cast_with_forbidden_format). The source-type half stays below.
+    """
+    cur_type = source_type
+    for op_idx, op in enumerate(operations):
+        path = f"staging_models[{model_name}].columns[{col_source}].operations[{op_idx}]"
+        op_kind = getattr(op, "op", None)
+        # Check trim/lower/upper/map_values only on string
+        if op_kind in ("trim", "lower", "upper", "replace", "map_values"):
+            if cur_type != DataType.string:
+                _add_issue(
+                    issues,
+                    ErrorCode.STAGING_OPERATION_CHAIN,
+                    path,
+                    f"operation '{op_kind}' only valid on string, got '{cur_type.value if cur_type else 'unknown'}'",
+                    related=col_source,
+                )
+            # replace/map_values keep string
+            if op_kind == "replace":
+                cur_type = DataType.string
+            elif op_kind == "map_values":
+                cur_type = DataType.string
+        elif op_kind == "cast":
+            target_type = _parse_data_type(getattr(op, "type", None))
+            # Only the source-type half is semantic; pure format misuse is Pydantic-owned.
+            if target_type in (DataType.date, DataType.timestamp) and cur_type != DataType.string:
+                _add_issue(
+                    issues,
+                    ErrorCode.STAGING_OPERATION_CHAIN,
+                    path,
+                    f"cast to {target_type.value} requires string source, got '{cur_type.value if cur_type else 'unknown'}'",
+                    related=col_source,
+                )
+            cur_type = target_type if isinstance(target_type, DataType) else cur_type
+        elif op_kind == "null_if":
+            for v in getattr(op, "values", ()):
+                actual = _scalar_to_datatype(v)
+                if cur_type and actual is not None and actual.value != cur_type.value:
+                    _add_issue(
+                        issues,
+                        ErrorCode.STAGING_OPERATION_CHAIN,
+                        path,
+                        f"null_if value '{v}' type {actual.value} != column type {cur_type.value}",
+                        related=str(v),
+                    )
+        elif op_kind == "coalesce":
+            v = getattr(op, "value", None)
+            actual = _scalar_to_datatype(v)
+            if cur_type and actual is not None and actual.value != cur_type.value:
+                _add_issue(
+                    issues,
+                    ErrorCode.STAGING_OPERATION_CHAIN,
+                    path,
+                    f"coalesce value type {actual.value} != column type {cur_type.value}",
+                    related=str(v),
+                )
+            # coalesce keeps same type (or maybe string)
+    return cur_type
+
+
+def _is_unique_side(
+    table: str,
+    cols: tuple,
+    *,
+    raw_by_name: dict[str, object],
+    raw_col_map: dict[str, dict[str, object]],
+) -> bool:
+    tbl = raw_by_name.get(table)
+    if tbl is None:
+        return False
+    if tuple(cols) == tuple(getattr(tbl, "primary_key", ())):
+        return True
+    col_objs = [raw_col_map.get(table, {}).get(c) for c in cols]
+    if all(getattr(c, "unique", False) for c in col_objs if c is not None):
+        return True
+    return False
+
+
+def _has_exact_fk(
+    table: str,
+    cols: tuple[str, ...],
+    target_side: str,
+    *,
+    rel_name: str,
+    raw_col_map: dict[str, dict[str, object]],
+    issues: list[SemanticIssue],
+    base: str,
+) -> bool:
+    """Require every dependent endpoint component to have correct FK, and only those."""
+    cmap = raw_col_map.get(table, {})
+    # Check that every dependent column has FK with correct relationship and target_side
+    for cname in cols:
+        col = cmap.get(cname)
+        if col is None:
+            return False
+        gen = getattr(col, "generator", None)
+        if getattr(gen, "kind", None) != "foreign_key":
+            return False
+        if getattr(gen, "relationship", None) != rel_name:
+            return False
+        if getattr(gen, "target_side", None) != target_side:
+            return False
+    # Check that no non-dependent column in the same table claims this relationship
+    for cname, col in cmap.items():
+        if cname in cols:
+            continue
+        gen = getattr(col, "generator", None)
+        if (
+            getattr(gen, "kind", None) == "foreign_key"
+            and getattr(gen, "relationship", None) == rel_name
+        ):
+            # Non-endpoint column incorrectly claims this relationship
+            _add_issue(
+                issues,
+                ErrorCode.FOREIGN_KEY_SIDE,
+                f"{base}",
+                f"column '{cname}' in table '{table}' incorrectly claims relationship '{rel_name}' but is not dependent endpoint",
+                related=cname,
+            )
+            return False
+    return True
+
+
+def _check_composite_nullability(
+    table: str,
+    cols: tuple[str, ...],
+    *,
+    rel_name: str,
+    raw_col_map: dict[str, dict[str, object]],
+    issues: list[SemanticIssue],
+    base: str,
+) -> None:
+    """Atomic composite FK must not have mixed nullability."""
+    cmap = raw_col_map.get(table, {})
+    nullables = []
+    for cname in cols:
+        col = cmap.get(cname)
+        if col is not None:
+            nullables.append(getattr(col, "nullable", False))
+    # If any is nullable and any is not, it's partial-null risk
+    if len(set(nullables)) > 1:
+        _add_issue(
+            issues,
+            ErrorCode.FOREIGN_KEY_SIDE,
+            f"{base}",
+            f"composite FK '{rel_name}' has incompatible partial-null nullability {nullables}",
+            related=rel_name,
+        )
+
+
+def _claim_fk_owner(
+    fk_owner: dict[tuple[str, str], str],
+    table: str,
+    col: str,
+    rel_name: str,
+    issues: list[SemanticIssue],
+    path: str,
+    *,
+    label: str = "column",
+    owner_prefix: str = "relationship ",
+) -> None:
+    """Track FK ownership; report conflicting ownership of one dependent column."""
+    key = (table, col)
+    owner = fk_owner.get(key)
+    if owner is not None and owner != rel_name:
+        _add_issue(
+            issues,
+            ErrorCode.FOREIGN_KEY_SIDE,
+            path,
+            f"{label} '{col}' already owned by {owner_prefix}'{owner}'",
+            related=col,
+        )
+    else:
+        fk_owner[key] = rel_name
+
+
+def _lookup_schema(
+    name: str,
+    raw_col_type: dict[str, dict[str, DataType]],
+    staging_schema: dict[str, dict[str, DataType]],
+    intermediate_schema: dict[str, dict[str, DataType]],
+    output_schemas: dict[str, dict[str, DataType]],
+) -> dict[str, DataType] | None:
+    """Return the resolved schema for any known model/table name, else ``None``."""
+    if name in raw_col_type:
+        return raw_col_type[name]
+    if name in staging_schema:
+        return staging_schema[name]
+    if name in intermediate_schema:
+        return intermediate_schema[name]
+    if name in output_schemas:
+        return output_schemas[name]
+    return None
+
+
+def _model_exists(
+    name: str,
+    raw_by_name: dict[str, object],
+    staging_by_name: dict[str, object],
+    intermediate_by_name: dict[str, object],
+    output_by_name: dict[str, object],
+) -> bool:
+    """Return True when a table/model name exists in any symbol table."""
+    return (
+        name in raw_by_name
+        or name in staging_by_name
+        or name in intermediate_by_name
+        or name in output_by_name
+    )
+
+
+def _model_deps(m: object) -> list[str]:
+    """Return declared upstream dependencies of an intermediate model (explicit dispatch)."""
+    deps: list[str] = []
+    source = getattr(m, "source", None)
+    if source is not None:
+        deps.append(source)
+    left = getattr(m, "left", None)
+    right = getattr(m, "right", None)
+    if left is not None:
+        deps.append(left)
+    if right is not None:
+        deps.append(right)
+    return deps
+
+
+def _metric_column(
+    met: object, src_schema: dict[str, DataType]
+) -> tuple[str | None, DataType | None]:
+    """Return (column_name, column_type) for metrics carrying a column, else (None, None)."""
+    col_name = getattr(met, "column", None)
+    if col_name is None:
+        return None, None
+    return col_name, src_schema.get(col_name)
+
+
+def _check_metric_condition(
+    met: object, src_schema: dict[str, DataType], issues: list[SemanticIssue], path: str
+) -> None:
+    """Validate a conditional metric's condition when the metric carries one."""
+    cond = getattr(met, "condition", None)
+    if cond is not None:
+        _check_condition(cond, src_schema, issues, path)
+
+
+def _metric_output_type(met: object, src_schema: dict[str, DataType]) -> DataType:
+    """Return the §13 output-schema type for a metric (§12.3/§14 shared rule)."""
+    function = getattr(met, "function", None)
+    if function in ("count_rows", "count", "count_distinct", "conditional_count"):
+        return DataType.integer
+    if function in ("sum", "avg", "conditional_sum"):
+        return DataType.float
+    if function in ("min", "max"):
+        col_name = getattr(met, "column", None)
+        ctype = src_schema.get(col_name) if col_name else DataType.string
+        return ctype if ctype else DataType.string
+    return DataType.string
+
+
+def _metric_raw_lineage(
+    met: object,
+    src_schema: dict[str, DataType],
+    src_lineage: dict[str, list[str]],
+    source_label: str,
+) -> list[str]:
+    """Collect raw lineage of a metric's column and condition columns."""
+    raw_lin: list[str] = []
+    col = getattr(met, "column", None)
+    if col and col in src_lineage:
+        raw_lin.extend(src_lineage[col])
+    cond = getattr(met, "condition", None)
+    for cc in _collect_condition_columns(cond):
+        if cc in src_lineage:
+            raw_lin.extend(src_lineage[cc])
+        elif cc in src_schema:
+            raw_lin.append(f"{source_label}.{cc}")
+    return raw_lin
+
+
+def _check_derived_column(
+    dc: object,
+    schema: dict[str, DataType],
+    issues: list[SemanticIssue],
+    path: str,
+) -> DataType:
+    """Type-check one derived column against its projected namespace; return its type.
+
+    NOTE (T16): projected/derived name collisions are owned by Pydantic
+    (``_unique_output_names``); this helper only checks typing, not collisions.
+    """
+    inferred = _infer_expression_type(getattr(dc, "expression", None), schema)
+    declared = _parse_data_type(getattr(dc, "type", None))
+    name = getattr(dc, "name", "")
+    if inferred is None and not _is_column_unresolved(getattr(dc, "expression", None), schema):
+        _add_issue(
+            issues,
+            ErrorCode.INVALID_EXPRESSION_TYPE,
+            path,
+            "invalid expression: statically incompatible types",
+            related=name,
+        )
+    elif inferred is not None and declared is not None and inferred != declared:
+        _add_issue(
+            issues,
+            ErrorCode.INVALID_EXPRESSION_TYPE,
+            path,
+            f"declared type '{declared.value}' != inferred '{inferred.value}'",
+            related=name,
+        )
+    _check_expression_columns(getattr(dc, "expression", None), schema, issues, path)
+    return declared if declared is not None else DataType.string
+
+
+def _check_bridge_side(
+    *,
+    rel_name: str,
+    base: str,
+    side: str,
+    bridge_cols: tuple[str, ...],
+    endpoint_cols: tuple[str, ...],
+    endpoint_table: str,
+    bridge_table: str,
+    raw_col_map: dict[str, dict[str, object]],
+    raw_col_type: dict[str, dict[str, DataType]],
+    issues: list[SemanticIssue],
+) -> None:
+    """Validate one bridge side (types + FK generators) against its endpoint."""
+    attr = f"{side}_columns"
+    for bcol_name, ecol_name in zip(bridge_cols, endpoint_cols):
+        bcol = raw_col_map.get(bridge_table, {}).get(bcol_name)
+        if bcol is None:
+            continue
+        etype = raw_col_type.get(endpoint_table, {}).get(ecol_name)
+        btype = raw_col_type.get(bridge_table, {}).get(bcol_name)
+        if etype is not None and btype is not None and etype != btype:
+            if side == "left":
+                msg = (
+                    f"bridge column '{bcol_name}' type {btype.value if btype else 'unknown'}"
+                    f" != left endpoint type {etype.value}"
+                )
+            else:
+                msg = f"bridge column '{bcol_name}' type mismatch"
+            _add_issue(
+                issues,
+                ErrorCode.RELATIONSHIP_TYPE,
+                f"{base}.bridge.{attr}",
+                msg,
+                related=bcol_name,
+            )
+        # Check generator
+        if (
+            getattr(bcol.generator, "kind", None) != "foreign_key"
+            or getattr(bcol.generator, "relationship", None) != rel_name
+            or getattr(bcol.generator, "target_side", None) != side
+        ):
+            _add_issue(
+                issues,
+                ErrorCode.FOREIGN_KEY_SIDE,
+                f"{base}.bridge.{attr}",
+                f"bridge {side} column '{bcol_name}' must be foreign_key targeting {side}",
+                related=bcol_name,
+            )
+
+
+def _report_template_cycle(
+    node: str,
+    template_deps: dict[str, list[str]],
+    visited: dict[str, int],
+    stack: list[str],
+    issues: list[SemanticIssue],
+    base: str,
+) -> bool:
+    state = visited.get(node, 0)
+    if state == 1:
+        cycle = " -> ".join(stack + [node])
+        _add_issue(
+            issues,
+            ErrorCode.TEMPLATE_CYCLE,
+            f"{base}.columns",
+            f"template dependencies have cycle: {cycle}",
+            related=node,
+        )
+        return True
+    if state == 2:
+        return False
+    visited[node] = 1
+    stack.append(node)
+    for dep in template_deps.get(node, []):
+        if dep in template_deps:
+            _report_template_cycle(dep, template_deps, visited, stack, issues, base)
+    stack.pop()
+    visited[node] = 2
+    return False
+
+
 def _infer_expression_type(expr: object, schema: dict[str, DataType]) -> DataType | None:
     """Infer DataType for Expression against schema.
 
@@ -214,8 +733,7 @@ def _infer_expression_type(expr: object, schema: dict[str, DataType]) -> DataTyp
     """
     if expr is None:
         return None
-    if hasattr(expr, "model_dump"):
-        expr = expr.model_dump()  # type: ignore[union-attr]
+    expr = _plain(expr)
     if not isinstance(expr, dict):
         return None
     kind = expr.get("kind")
@@ -280,8 +798,7 @@ def _is_column_unresolved(expr: object, schema: dict[str, DataType]) -> bool:
     """Check if expression contains an unresolved column (already reported as missing)."""
     if expr is None:
         return False
-    if hasattr(expr, "model_dump"):
-        expr = expr.model_dump()  # type: ignore[union-attr]
+    expr = _plain(expr)
     if not isinstance(expr, dict):
         return False
     kind = expr.get("kind")
@@ -289,7 +806,9 @@ def _is_column_unresolved(expr: object, schema: dict[str, DataType]) -> bool:
         col = expr.get("column")
         return isinstance(col, str) and col not in schema
     if kind == "binary":
-        return _is_column_unresolved(expr.get("left"), schema) or _is_column_unresolved(expr.get("right"), schema)
+        return _is_column_unresolved(expr.get("left"), schema) or _is_column_unresolved(
+            expr.get("right"), schema
+        )
     if kind == "date_part":
         return _is_column_unresolved(expr.get("value"), schema)
     if kind == "coalesce":
@@ -303,8 +822,7 @@ def _check_expression_columns(
     """Check that all ColumnExpression refs exist in schema."""
     if expr is None:
         return
-    if hasattr(expr, "model_dump"):
-        expr = expr.model_dump()  # type: ignore[union-attr]
+    expr = _plain(expr)
     if not isinstance(expr, dict):
         return
     kind = expr.get("kind")
@@ -333,8 +851,7 @@ def _check_condition(
 ) -> None:
     if cond is None:
         return
-    if hasattr(cond, "model_dump"):
-        cond = cond.model_dump()  # type: ignore[union-attr]
+    cond = _plain(cond)
     if not isinstance(cond, dict):
         return
     kind = cond.get("kind")
@@ -386,8 +903,7 @@ def _collect_expression_columns(expr: object) -> list[str]:
     """Collect all column names referenced in an Expression."""
     if expr is None:
         return []
-    if hasattr(expr, "model_dump"):
-        expr = expr.model_dump()  # type: ignore[union-attr]
+    expr = _plain(expr)
     if not isinstance(expr, dict):
         return []
     kind = expr.get("kind")
@@ -412,8 +928,7 @@ def _collect_condition_columns(cond: object) -> list[str]:
     """Collect all column names referenced in a Condition."""
     if cond is None:
         return []
-    if hasattr(cond, "model_dump"):
-        cond = cond.model_dump()  # type: ignore[union-attr]
+    cond = _plain(cond)
     if not isinstance(cond, dict):
         return []
     kind = cond.get("kind")
@@ -454,7 +969,7 @@ def _raw_lineage_for_column(
 # ---------------------------------------------------------------------------
 
 
-def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore[no-untyped-def]
+def validate_semantics(scenario: Scenario) -> ValidatedScenario:
     """Validate ``scenario`` semantically and return ``ValidatedScenario`` or raise."""
     issues: list[SemanticIssue] = []
 
@@ -581,8 +1096,8 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             seen_assert.add(a.name)
             assertion_by_name[a.name] = a
 
-    # Resolve relationships into internal immutable records (§13) – reused for validation and derived
-    resolved_rels = _resolve_relationships(list(scenario.relationships), raw_by_name)  # noqa: F841 – reserved for T15 join validation
+    # Resolve relationships into internal immutable records (§13) – reused for join validation and derived assertions
+    resolved_rels = _resolve_relationships(list(scenario.relationships), raw_by_name)
 
     # Build raw column maps
     raw_col_map: dict[str, dict[str, object]] = {}
@@ -596,71 +1111,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
         raw_col_map[tbl.name] = col_map
         raw_col_type[tbl.name] = type_map
 
-    # Pure helper returning exact finite capacity or None when DSL does not prove one (§14)
-    def _generator_capacity(col: object) -> int | None:
-        gen = getattr(col, "generator", None)
-        if gen is None:
-            return None
-        kind = getattr(gen, "kind", None)
-        if kind == "formatted_id":
-            digits = getattr(gen, "digits", 0)
-            start = getattr(gen, "start", 1)
-            try:
-                max_num = 10**digits - 1
-                if start > max_num:
-                    return 0
-                # Correct width-implied maximum: 10**digits -1, capacity = max_num - start +1
-                return int(max_num - start + 1)
-            except Exception:
-                return None
-        if kind == "integer_range":
-            try:
-                return int(getattr(gen, "max") - getattr(gen, "min") + 1)
-            except Exception:
-                return None
-        if kind == "categorical":
-            vals = getattr(gen, "values", ())
-            # Number of distinct values – already unique per local validator
-            return len(vals)
-        if kind == "random_string":
-            try:
-                alphabet = getattr(gen, "alphabet", "")
-                min_len = getattr(gen, "min_length", 0)
-                max_len = getattr(gen, "max_length", 0)
-                k = len(set(alphabet))
-                if k == 0 or min_len > max_len:
-                    return None
-                # Compute sum_{l=min}^{max} k^l with safe saturation to avoid overflow
-                # Use a large threshold (1e12) rather than arbitrary constants per T14
-                total = 0
-                threshold = 10**12
-                for length in range(min_len, max_len + 1):
-                    try:
-                        term = pow(k, length)
-                    except Exception:
-                        return None
-                    total += term
-                    if total >= threshold:
-                        return threshold
-                return total
-            except Exception:
-                return None
-        if kind == "boolean":
-            return 2
-        # Faker-backed and deferred semantics: no finite capacity proven
-        if kind in (
-            "person_name",
-            "email",
-            "city",
-            "street_address",
-            "company_name",
-            "phone_number",
-        ):
-            return None
-        # float_range, date_range, timestamp_range, template_string, foreign_key – deferred
-        return None
-
-    # §17.3 Raw/keys/generators
+    # §17.3 Raw/keys/generators (capacity via module-level _generator_capacity, §14)
     for idx, tbl in enumerate(scenario.raw_tables):
         base = f"raw_tables[{idx}]"
         # PK members exist & non-nullable
@@ -764,47 +1215,18 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     related=gen_kind,
                 )
             if gen_kind == "categorical":
-                values = getattr(col.generator, "values", ())
-                expected_py: dict[DataType, tuple[str, ...]] = {
-                    DataType.string: ("str",),
-                    DataType.integer: ("int",),
-                    DataType.float: ("float",),
-                    DataType.boolean: ("bool",),
-                    DataType.date: ("date",),
-                    DataType.timestamp: ("datetime",),
-                }
-                exp = expected_py.get(col.type)
-                if exp is not None:
-                    for v in values:
-                        actual = type(v).__name__
-                        if col.type == DataType.string and actual != "str":
-                            _add_issue(
-                                issues,
-                                ErrorCode.CATEGORICAL_HOMOGENEOUS,
-                                f"{cpath}.generator.values",
-                                f"categorical values must be homogeneous for column type '{col.type.value}'",
-                                related=str(v),
-                            )
-                            break
-                        if col.type == DataType.integer and actual != "int":
-                            _add_issue(
-                                issues,
-                                ErrorCode.CATEGORICAL_HOMOGENEOUS,
-                                f"{cpath}.generator.values",
-                                f"categorical values must be homogeneous for column type '{col.type.value}'",
-                                related=str(v),
-                            )
-                            break
-                        if col.type == DataType.float and actual != "float":
-                            _add_issue(
-                                issues,
-                                ErrorCode.CATEGORICAL_HOMOGENEOUS,
-                                f"{cpath}.generator.values",
-                                f"categorical values must be homogeneous for column type '{col.type.value}'",
-                                related=str(v),
-                            )
-                            break
-                        if col.type == DataType.boolean and actual != "bool":
+                # Homogeneity via the single scalar helper; date/timestamp columns are
+                # intentionally unchecked here (as before) – GENERATOR_TYPE_MISMATCH
+                # already rejects categorical on those types.
+                if col.type in (
+                    DataType.string,
+                    DataType.integer,
+                    DataType.float,
+                    DataType.boolean,
+                ):
+                    for v in getattr(col.generator, "values", ()):
+                        actual = _scalar_to_datatype(v)
+                        if actual is not None and actual != col.type:
                             _add_issue(
                                 issues,
                                 ErrorCode.CATEGORICAL_HOMOGENEOUS,
@@ -815,7 +1237,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             break
             if gen_kind == "template_string":
                 template = getattr(col.generator, "template", "")
-                placeholders = re.findall(r"\{([a-z][a-z0-9_]*)\}", template)
+                placeholders = _template_placeholders(template)
                 for ph in placeholders:
                     if ph not in raw_col_map.get(tbl.name, {}):
                         _add_issue(
@@ -843,41 +1265,17 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         f"relationship '{rel_name}' does not exist",
                         related=rel_name,
                     )
-        # template cycle detection per table
+        # template cycle detection per table (single placeholder pass, reused above)
         template_deps: dict[str, list[str]] = {}
         for col in tbl.columns:
             if getattr(col.generator, "kind", None) == "template_string":
                 tmpl = getattr(col.generator, "template", "")
-                deps = re.findall(r"\{([a-z][a-z0-9_]*)\}", tmpl)
-                template_deps[col.name] = deps
+                template_deps[col.name] = _template_placeholders(tmpl)
         visited: dict[str, int] = {}
-
-        def _dfs(node: str, stack: list[str]) -> bool:
-            state = visited.get(node, 0)
-            if state == 1:
-                cycle = " -> ".join(stack + [node])
-                _add_issue(
-                    issues,
-                    ErrorCode.TEMPLATE_CYCLE,
-                    f"{base}.columns",
-                    f"template dependencies have cycle: {cycle}",
-                    related=node,
-                )
-                return True
-            if state == 2:
-                return False
-            visited[node] = 1
-            stack.append(node)
-            for dep in template_deps.get(node, []):
-                if dep in template_deps:
-                    _dfs(dep, stack)
-            stack.pop()
-            visited[node] = 2
-            return False
 
         for n in list(template_deps.keys()):
             if visited.get(n, 0) == 0:
-                _dfs(n, [])
+                _report_template_cycle(n, template_deps, visited, [], issues, base)
         # foreign_key generators – check all components for composite FK atomicity
         # Group FK columns by relationship
         fk_by_rel: dict[str, list[object]] = {}
@@ -964,19 +1362,13 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             related=rel.name,
                         )
 
-            def _is_unique_side(table: str, cols: tuple) -> bool:
-                tbl = raw_by_name.get(table)
-                if tbl is None:
-                    return False
-                if tuple(cols) == tuple(tbl.primary_key):
-                    return True
-                col_objs = [raw_col_map.get(table, {}).get(c) for c in cols]
-                if all(getattr(c, "unique", False) for c in col_objs if c is not None):
-                    return True
-                return False
-
             if rel.cardinality == "one_to_many":
-                if not _is_unique_side(rel.left.table, rel.left.columns):
+                if not _is_unique_side(
+                    rel.left.table,
+                    rel.left.columns,
+                    raw_by_name=raw_by_name,
+                    raw_col_map=raw_col_map,
+                ):
                     _add_issue(
                         issues,
                         ErrorCode.UNIQUE_SIDE,
@@ -985,7 +1377,12 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
             elif rel.cardinality == "many_to_one":
-                if not _is_unique_side(rel.right.table, rel.right.columns):
+                if not _is_unique_side(
+                    rel.right.table,
+                    rel.right.columns,
+                    raw_by_name=raw_by_name,
+                    raw_col_map=raw_col_map,
+                ):
                     _add_issue(
                         issues,
                         ErrorCode.UNIQUE_SIDE,
@@ -994,8 +1391,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
             elif rel.cardinality == "one_to_one":
-                if not _is_unique_side(rel.left.table, rel.left.columns) or not _is_unique_side(
-                    rel.right.table, rel.right.columns
+                if not _is_unique_side(
+                    rel.left.table,
+                    rel.left.columns,
+                    raw_by_name=raw_by_name,
+                    raw_col_map=raw_col_map,
+                ) or not _is_unique_side(
+                    rel.right.table,
+                    rel.right.columns,
+                    raw_by_name=raw_by_name,
+                    raw_col_map=raw_col_map,
                 ):
                     _add_issue(
                         issues,
@@ -1005,71 +1410,21 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
 
-            def _has_exact_fk(table: str, cols: tuple[str, ...], target_side: str) -> bool:
-                """Require every dependent endpoint component to have correct FK, and only those."""
-                cmap = raw_col_map.get(table, {})
-                # Check that every dependent column has FK with correct relationship and target_side
-                for cname in cols:
-                    col = cmap.get(cname)
-                    if col is None:
-                        return False
-                    gen = getattr(col, "generator", None)
-                    if getattr(gen, "kind", None) != "foreign_key":
-                        return False
-                    if getattr(gen, "relationship", None) != rel.name:
-                        return False
-                    if getattr(gen, "target_side", None) != target_side:
-                        return False
-                # Check that no non-dependent column in the same table claims this relationship
-                for cname, col in cmap.items():
-                    if cname in cols:
-                        continue
-                    gen = getattr(col, "generator", None)
-                    if getattr(gen, "kind", None) == "foreign_key" and getattr(gen, "relationship", None) == rel.name:
-                        # Non-endpoint column incorrectly claims this relationship
-                        _add_issue(
-                            issues,
-                            ErrorCode.FOREIGN_KEY_SIDE,
-                            f"{base}",
-                            f"column '{cname}' in table '{table}' incorrectly claims relationship '{rel.name}' but is not dependent endpoint",
-                            related=cname,
-                        )
-                        return False
-                return True
-
-            def _check_composite_nullability(table: str, cols: tuple[str, ...]) -> None:
-                """Atomic composite FK must not have mixed nullability."""
-                cmap = raw_col_map.get(table, {})
-                nullables = []
-                for cname in cols:
-                    col = cmap.get(cname)
-                    if col is not None:
-                        nullables.append(getattr(col, "nullable", False))
-                # If any is nullable and any is not, it's partial-null risk
-                if len(set(nullables)) > 1:
-                    _add_issue(
-                        issues,
-                        ErrorCode.FOREIGN_KEY_SIDE,
-                        f"{base}",
-                        f"composite FK '{rel.name}' has incompatible partial-null nullability {nullables}",
-                        related=rel.name,
-                    )
-
             # Check FK and also detect conflicting ownership – exact tuples
             if rel.cardinality == "one_to_many":
                 for cname in rel.right.columns:
-                    key = (rel.right.table, cname)
-                    if key in fk_owner and fk_owner[key] != rel.name:
-                        _add_issue(
-                            issues,
-                            ErrorCode.FOREIGN_KEY_SIDE,
-                            f"{base}.right",
-                            f"column '{cname}' already owned by relationship '{fk_owner[key]}'",
-                            related=cname,
-                        )
-                    else:
-                        fk_owner[key] = rel.name
-                if not _has_exact_fk(rel.right.table, rel.right.columns, "left"):
+                    _claim_fk_owner(
+                        fk_owner, rel.right.table, cname, rel.name, issues, f"{base}.right"
+                    )
+                if not _has_exact_fk(
+                    rel.right.table,
+                    rel.right.columns,
+                    "left",
+                    rel_name=rel.name,
+                    raw_col_map=raw_col_map,
+                    issues=issues,
+                    base=base,
+                ):
                     _add_issue(
                         issues,
                         ErrorCode.FOREIGN_KEY_SIDE,
@@ -1078,21 +1433,28 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
                 else:
-                    _check_composite_nullability(rel.right.table, rel.right.columns)
+                    _check_composite_nullability(
+                        rel.right.table,
+                        rel.right.columns,
+                        rel_name=rel.name,
+                        raw_col_map=raw_col_map,
+                        issues=issues,
+                        base=base,
+                    )
             elif rel.cardinality == "many_to_one":
                 for cname in rel.left.columns:
-                    key = (rel.left.table, cname)
-                    if key in fk_owner and fk_owner[key] != rel.name:
-                        _add_issue(
-                            issues,
-                            ErrorCode.FOREIGN_KEY_SIDE,
-                            f"{base}.left",
-                            f"column '{cname}' already owned by relationship '{fk_owner[key]}'",
-                            related=cname,
-                        )
-                    else:
-                        fk_owner[key] = rel.name
-                if not _has_exact_fk(rel.left.table, rel.left.columns, "right"):
+                    _claim_fk_owner(
+                        fk_owner, rel.left.table, cname, rel.name, issues, f"{base}.left"
+                    )
+                if not _has_exact_fk(
+                    rel.left.table,
+                    rel.left.columns,
+                    "right",
+                    rel_name=rel.name,
+                    raw_col_map=raw_col_map,
+                    issues=issues,
+                    base=base,
+                ):
                     _add_issue(
                         issues,
                         ErrorCode.FOREIGN_KEY_SIDE,
@@ -1101,10 +1463,23 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
                 else:
-                    _check_composite_nullability(rel.left.table, rel.left.columns)
+                    _check_composite_nullability(
+                        rel.left.table,
+                        rel.left.columns,
+                        rel_name=rel.name,
+                        raw_col_map=raw_col_map,
+                        issues=issues,
+                        base=base,
+                    )
             elif rel.cardinality == "one_to_one":
-                has_left = _has_exact_fk(rel.left.table, rel.left.columns, "right")
-                has_right = _has_exact_fk(rel.right.table, rel.right.columns, "left")
+                _fk_kwargs = {
+                    "rel_name": rel.name,
+                    "raw_col_map": raw_col_map,
+                    "issues": issues,
+                    "base": base,
+                }
+                has_left = _has_exact_fk(rel.left.table, rel.left.columns, "right", **_fk_kwargs)
+                has_right = _has_exact_fk(rel.right.table, rel.right.columns, "left", **_fk_kwargs)
                 if not (has_left ^ has_right):
                     _add_issue(
                         issues,
@@ -1122,17 +1497,15 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 )
                 if fk_side_table:
                     for cname in fk_side_cols:
-                        key = (fk_side_table, cname)
-                        if key in fk_owner and fk_owner[key] != rel.name:
-                            _add_issue(
-                                issues,
-                                ErrorCode.FOREIGN_KEY_SIDE,
-                                f"{base}",
-                                f"column '{cname}' already owned by '{fk_owner[key]}'",
-                                related=cname,
-                            )
-                        else:
-                            fk_owner[key] = rel.name
+                        _claim_fk_owner(
+                            fk_owner,
+                            fk_side_table,
+                            cname,
+                            rel.name,
+                            issues,
+                            f"{base}",
+                            owner_prefix="",
+                        )
         else:  # many_to_many
             bridge_table = getattr(rel, "bridge", None)
             if bridge_table is not None:
@@ -1173,67 +1546,41 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                                 f"bridge right column '{rc}' does not exist in table '{btbl}'",
                                 related=rc,
                             )
-                    # Check bridge column types match endpoint types
-                    for lc, lcol in zip(bridge_table.left_columns, rel.left.columns):
-                        bcol = raw_col_map.get(btbl, {}).get(lc)
-                        if bcol is None:
-                            continue
-                        ltype = raw_col_type.get(rel.left.table, {}).get(lcol)
-                        btype = raw_col_type.get(btbl, {}).get(lc)
-                        if ltype is not None and btype is not None and ltype != btype:
-                            _add_issue(
-                                issues,
-                                ErrorCode.RELATIONSHIP_TYPE,
-                                f"{base}.bridge.left_columns",
-                                f"bridge column '{lc}' type {btype.value if btype else 'unknown'} != left endpoint type {ltype.value}",
-                                related=lc,
-                            )
-                        # Check generator
-                        if (
-                            getattr(bcol.generator, "kind", None) != "foreign_key"
-                            or getattr(bcol.generator, "relationship", None) != rel.name
-                            or getattr(bcol.generator, "target_side", None) != "left"
-                        ):
-                            _add_issue(
-                                issues,
-                                ErrorCode.FOREIGN_KEY_SIDE,
-                                f"{base}.bridge.left_columns",
-                                f"bridge left column '{lc}' must be foreign_key targeting left",
-                                related=lc,
-                            )
-                    for rc, rcol in zip(bridge_table.right_columns, rel.right.columns):
-                        bcol = raw_col_map.get(btbl, {}).get(rc)
-                        if bcol is None:
-                            continue
-                        rtype = raw_col_type.get(rel.right.table, {}).get(rcol)
-                        btype = raw_col_type.get(btbl, {}).get(rc)
-                        if rtype is not None and btype is not None and rtype != btype:
-                            _add_issue(
-                                issues,
-                                ErrorCode.RELATIONSHIP_TYPE,
-                                f"{base}.bridge.right_columns",
-                                f"bridge column '{rc}' type mismatch",
-                                related=rc,
-                            )
-                        if (
-                            getattr(bcol.generator, "kind", None) != "foreign_key"
-                            or getattr(bcol.generator, "relationship", None) != rel.name
-                            or getattr(bcol.generator, "target_side", None) != "right"
-                        ):
-                            _add_issue(
-                                issues,
-                                ErrorCode.FOREIGN_KEY_SIDE,
-                                f"{base}.bridge.right_columns",
-                                f"bridge right column '{rc}' must be foreign_key targeting right",
-                                related=rc,
-                            )
+                    # Check bridge column types match endpoint types (one helper per side)
+                    _bridge_kwargs = {
+                        "rel_name": rel.name,
+                        "base": base,
+                        "bridge_table": btbl,
+                        "raw_col_map": raw_col_map,
+                        "raw_col_type": raw_col_type,
+                        "issues": issues,
+                    }
+                    _check_bridge_side(
+                        side="left",
+                        bridge_cols=bridge_table.left_columns,
+                        endpoint_cols=rel.left.columns,
+                        endpoint_table=rel.left.table,
+                        **_bridge_kwargs,
+                    )
+                    _check_bridge_side(
+                        side="right",
+                        bridge_cols=bridge_table.right_columns,
+                        endpoint_cols=rel.right.columns,
+                        endpoint_table=rel.right.table,
+                        **_bridge_kwargs,
+                    )
                     # Reject non-bridge columns that claim many-to-many relationship
                     for tbl_name, cmap in raw_col_map.items():
                         for cname, col in cmap.items():
                             gen = getattr(col, "generator", None)
-                            if getattr(gen, "kind", None) == "foreign_key" and getattr(gen, "relationship", None) == rel.name:
+                            if (
+                                getattr(gen, "kind", None) == "foreign_key"
+                                and getattr(gen, "relationship", None) == rel.name
+                            ):
                                 # Check if this column is part of bridge
-                                if tbl_name == btbl and cname in (bridge_table.left_columns + bridge_table.right_columns):
+                                if tbl_name == btbl and cname in (
+                                    bridge_table.left_columns + bridge_table.right_columns
+                                ):
                                     continue
                                 # Also check if it's part of left/right endpoint? For many-to-many, endpoints should not have FK, only bridge should
                                 # So any FK with this relationship that is not in bridge is incorrect
@@ -1246,17 +1593,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                                 )
                     # Track ownership for bridge columns
                     for cname in bridge_table.left_columns + bridge_table.right_columns:
-                        key = (btbl, cname)
-                        if key in fk_owner and fk_owner[key] != rel.name:
-                            _add_issue(
-                                issues,
-                                ErrorCode.FOREIGN_KEY_SIDE,
-                                f"{base}.bridge",
-                                f"bridge column '{cname}' already owned by '{fk_owner[key]}'",
-                                related=cname,
-                            )
-                        else:
-                            fk_owner[key] = rel.name
+                        _claim_fk_owner(
+                            fk_owner,
+                            btbl,
+                            cname,
+                            rel.name,
+                            issues,
+                            f"{base}.bridge",
+                            label="bridge column",
+                            owner_prefix="",
+                        )
                 if len(bridge_table.left_columns) != len(rel.left.columns):
                     _add_issue(
                         issues,
@@ -1274,7 +1620,8 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=rel.name,
                     )
 
-    # §17.5 Staging
+    # §17.5 Staging – single-pass chain finals reused for schemas below (T16).
+    staging_final: dict[str, dict[str, DataType | None]] = {}
     raw_names = {t.name for t in scenario.raw_tables}
     for tbl in scenario.raw_tables:
         cnt = sum(1 for s in scenario.staging_models if s.source == tbl.name)
@@ -1298,7 +1645,9 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             continue
         raw_cols = raw_col_map.get(s.source, {})
         raw_type_map = raw_col_type.get(s.source, {})
-        # Build current type tracking for operation chain
+        # Single-pass column-operation chain (T16): validate once, reuse the final
+        # types for row-operation checks and the final staging schema.
+        col_final: dict[str, DataType | None] = {}
         for col in s.columns:
             if col.source not in raw_cols:
                 _add_issue(
@@ -1308,101 +1657,17 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     f"source column '{col.source}' does not exist in raw table '{s.source}'",
                     related=col.source,
                 )
+                # Pure evolution still applies (matches the former second pass).
+                col_final[col.target] = _resolve_chain_type(None, col.operations)
                 continue
-            cur_type = raw_type_map.get(col.source)
-            for op_idx, op in enumerate(col.operations):
-                op_kind = getattr(op, "op", None)
-                # Check trim/lower/upper/map_values only on string
-                if op_kind in ("trim", "lower", "upper", "replace", "map_values"):
-                    if cur_type != DataType.string:
-                        _add_issue(
-                            issues,
-                            ErrorCode.STAGING_OPERATION_CHAIN,
-                            f"staging_models[{s.name}].columns[{col.source}].operations[{op_idx}]",
-                            f"operation '{op_kind}' only valid on string, got '{cur_type.value if cur_type else 'unknown'}'",
-                            related=col.source,
-                        )
-                    # replace/map_values keep string
-                    if op_kind == "replace":
-                        cur_type = DataType.string
-                    elif op_kind == "map_values":
-                        cur_type = DataType.string
-                elif op_kind == "cast":
-                    target_type = getattr(op, "type", None)
-                    if isinstance(target_type, str):
-                        try:
-                            target_type = DataType(target_type)
-                        except Exception:
-                            pass
-                    # Check format
-                    fmt = getattr(op, "format", None)
-                    if (
-                        target_type in (DataType.date, DataType.timestamp)
-                        and cur_type != DataType.string
-                    ):
-                        _add_issue(
-                            issues,
-                            ErrorCode.STAGING_OPERATION_CHAIN,
-                            f"staging_models[{s.name}].columns[{col.source}].operations[{op_idx}]",
-                            f"cast to {target_type.value} requires string source, got '{cur_type.value if cur_type else 'unknown'}'",
-                            related=col.source,
-                        )
-                    if target_type not in (DataType.date, DataType.timestamp) and fmt is not None:
-                        _add_issue(
-                            issues,
-                            ErrorCode.STAGING_OPERATION_CHAIN,
-                            f"staging_models[{s.name}].columns[{col.source}].operations[{op_idx}]",
-                            "format only allowed for date/timestamp cast",
-                            related=col.source,
-                        )
-                    cur_type = target_type if isinstance(target_type, DataType) else cur_type
-                elif op_kind == "null_if":
-                    vals = getattr(op, "values", ())
-                    for v in vals:
-                        # check type matches cur_type
-                        actual = (
-                            "string"
-                            if isinstance(v, str)
-                            else "integer"
-                            if isinstance(v, int) and not isinstance(v, bool)
-                            else "float"
-                            if isinstance(v, float)
-                            else "boolean"
-                            if isinstance(v, bool)
-                            else "unknown"
-                        )
-                        if cur_type and actual != cur_type.value:
-                            # allow string values for any? But strict check
-                            if actual != "unknown":
-                                _add_issue(
-                                    issues,
-                                    ErrorCode.STAGING_OPERATION_CHAIN,
-                                    f"staging_models[{s.name}].columns[{col.source}].operations[{op_idx}]",
-                                    f"null_if value '{v}' type {actual} != column type {cur_type.value}",
-                                    related=str(v),
-                                )
-                elif op_kind == "coalesce":
-                    v = getattr(op, "value", None)
-                    actual = (
-                        "string"
-                        if isinstance(v, str)
-                        else "integer"
-                        if isinstance(v, int) and not isinstance(v, bool)
-                        else "float"
-                        if isinstance(v, float)
-                        else "boolean"
-                        if isinstance(v, bool)
-                        else "unknown"
-                    )
-                    if cur_type and actual != "unknown" and actual != cur_type.value:
-                        _add_issue(
-                            issues,
-                            ErrorCode.STAGING_OPERATION_CHAIN,
-                            f"staging_models[{s.name}].columns[{col.source}].operations[{op_idx}]",
-                            f"coalesce value type {actual} != column type {cur_type.value}",
-                            related=str(v),
-                        )
-                    # coalesce keeps same type (or maybe string)
+            col_final[col.target] = _check_column_chain(
+                model_name=s.name,
+                col_source=col.source,
+                source_type=raw_type_map.get(col.source),
+                operations=col.operations,
+                issues=issues,
+            )
+        staging_final[s.name] = col_final
         # grain columns exist after transformations
         target_names = {c.target for c in s.columns}
         for g in s.grain:
@@ -1414,26 +1679,10 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     f"grain column '{g}' does not exist after transformations",
                     related=g,
                 )
-        # Build actual schema after column operations for row_operations checks
-        actual_schema: dict[str, DataType] = {}
-        for col in s.columns:
-            cur_type = raw_type_map.get(col.source)
-            for op in col.operations:
-                op_kind = getattr(op, "op", None)
-                if op_kind == "cast":
-                    target_type = getattr(op, "type", None)
-                    if isinstance(target_type, str):
-                        try:
-                            target_type = DataType(target_type)
-                        except Exception:
-                            pass
-                    if isinstance(target_type, DataType):
-                        cur_type = target_type
-                elif op_kind in ("map_values", "replace"):
-                    cur_type = DataType.string
-                # trim/lower/upper keep string, null_if/coalesce keep same type
-            if cur_type is not None:
-                actual_schema[col.target] = cur_type
+        # Row-operation checks resolve against post-column-operation names (T16: reused).
+        actual_schema: dict[str, DataType] = {
+            target: ftype for target, ftype in col_final.items() if ftype is not None
+        }
         # row_operations
         for op_idx, op in enumerate(s.row_operations):
             if getattr(op, "op", None) == "filter":
@@ -1506,11 +1755,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
     all_model_names = set(staging_by_name.keys()) | set(intermediate_by_name.keys())
     for idx, m in enumerate(scenario.intermediate_models):
         base = f"intermediate_models[{idx}]"
-        deps: list[str] = []
-        if hasattr(m, "source"):
-            deps.append(m.source)
-        if hasattr(m, "left"):
-            deps.extend([m.left, m.right])
+        deps = _model_deps(m)
         for dep in deps:
             if dep == m.name:
                 _add_issue(
@@ -1553,11 +1798,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
         graph[m.name] = set()
         in_degree[m.name] = 0
     for m in scenario.intermediate_models:
-        deps: list[str] = []
-        if hasattr(m, "source"):
-            deps.append(m.source)
-        if hasattr(m, "left"):
-            deps.extend([m.left, m.right])
+        deps = _model_deps(m)
         for dep in deps:
             if dep in graph:
                 graph[dep].add(m.name)
@@ -1587,53 +1828,42 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 related=n,
             )
 
-    # Build schemas with proper lineage
+    # Build schemas with proper lineage (T16: chain types reused from staging_final).
     staging_schema: dict[str, dict[str, DataType]] = {}
     staging_lineage: dict[str, dict[str, list[str]]] = {}
     for s in scenario.staging_models:
         schema: dict[str, DataType] = {}
         lineage_map: dict[str, list[str]] = {}
-        raw_types = raw_col_type.get(s.source, {})
+        finals = staging_final.get(s.name, {})
         for col in s.columns:
-            rt = raw_types.get(col.source)
-            cur_type = rt
-            lineage_entry = [f"{s.source}.{col.source}"]
-            cast_type = None
-            for op in col.operations:
-                if getattr(op, "op", None) == "cast":
-                    cast_type = getattr(op, "type", None)
-                    if isinstance(cast_type, str):
-                        try:
-                            cast_type = DataType(cast_type)
-                        except Exception:
-                            cast_type = rt
-                    cur_type = cast_type if isinstance(cast_type, DataType) else rt
-            schema[col.target] = cur_type if cur_type else DataType.string
-            lineage_map[col.target] = lineage_entry
+            final_type = finals.get(col.target)
+            schema[col.target] = final_type if final_type is not None else DataType.string
+            lineage_map[col.target] = [f"{s.source}.{col.source}"]
         staging_schema[s.name] = schema
         staging_lineage[s.name] = lineage_map
 
     intermediate_schema: dict[str, dict[str, DataType]] = {}
     intermediate_lineage: dict[str, dict[str, list[str]]] = {}
 
+    # Upstream lookups shared by all intermediate variants (T16: defined once).
+    def _get_schema(dep: str) -> dict[str, DataType] | None:
+        if dep in staging_schema:
+            return staging_schema[dep]
+        if dep in intermediate_schema:
+            return intermediate_schema[dep]
+        return None
+
+    def _get_lineage(dep: str) -> dict[str, list[str]] | None:
+        if dep in staging_lineage:
+            return staging_lineage[dep]
+        if dep in intermediate_lineage:
+            return intermediate_lineage[dep]
+        return None
+
     for name in topo:
         m = intermediate_by_name.get(name)
         if m is None:
             continue
-
-        def _get_schema(dep: str) -> dict[str, DataType] | None:
-            if dep in staging_schema:
-                return staging_schema[dep]
-            if dep in intermediate_schema:
-                return intermediate_schema[dep]
-            return None
-
-        def _get_lineage(dep: str) -> dict[str, list[str]] | None:
-            if dep in staging_lineage:
-                return staging_lineage[dep]
-            if dep in intermediate_lineage:
-                return intermediate_lineage[dep]
-            return None
 
         if m.operation == "transform":
             src_schema = _get_schema(m.source)
@@ -1657,45 +1887,12 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             for dc in m.derived_columns:
                 # Per §12.3: derived columns evaluated only against projected target names
                 projected_schema = dict(out_schema)  # snapshot of projected only
-                inferred = _infer_expression_type(dc.expression, projected_schema)
-                declared = (
-                    dc.type
-                    if isinstance(dc.type, DataType)
-                    else DataType(dc.type)
-                    if isinstance(dc.type, str)
-                    else None
-                )
-                if inferred is None and not _is_column_unresolved(dc.expression, projected_schema):
-                    _add_issue(
-                        issues,
-                        ErrorCode.INVALID_EXPRESSION_TYPE,
-                        f"intermediate_models[{name}].derived_columns[{dc.name}]",
-                        "invalid expression: statically incompatible types",
-                        related=dc.name,
-                    )
-                elif inferred is not None and declared is not None and inferred != declared:
-                    _add_issue(
-                        issues,
-                        ErrorCode.INVALID_EXPRESSION_TYPE,
-                        f"intermediate_models[{name}].derived_columns[{dc.name}]",
-                        f"declared type '{declared.value}' != inferred '{inferred.value}'",
-                        related=dc.name,
-                    )
-                _check_expression_columns(
-                    dc.expression,
+                out_schema[dc.name] = _check_derived_column(
+                    dc,
                     projected_schema,
                     issues,
                     f"intermediate_models[{name}].derived_columns[{dc.name}]",
                 )
-                if dc.name in out_schema:
-                    _add_issue(
-                        issues,
-                        ErrorCode.UNKNOWN,
-                        f"intermediate_models[{name}].derived_columns",
-                        f"derived column '{dc.name}' collides with projected",
-                        related=dc.name,
-                    )
-                out_schema[dc.name] = declared if declared else DataType.string
                 # Proper raw lineage: combine raw lineage of all columns in expression
                 expr_cols = _collect_expression_columns(dc.expression)
                 raw_lin: list[str] = []
@@ -1862,7 +2059,10 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         for idx in range(len(m.join.on)):
                             exp_left = (resolved.left_table, resolved.left_columns[idx])
                             exp_right = (resolved.right_table, resolved.right_columns[idx])
-                            if exp_left not in left_raw_options[idx] or exp_right not in right_raw_options[idx]:
+                            if (
+                                exp_left not in left_raw_options[idx]
+                                or exp_right not in right_raw_options[idx]
+                            ):
                                 forward_ok = False
                                 break
                         if forward_ok:
@@ -1872,7 +2072,10 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                             for idx in range(len(m.join.on)):
                                 exp_left_rev = (resolved.right_table, resolved.right_columns[idx])
                                 exp_right_rev = (resolved.left_table, resolved.left_columns[idx])
-                                if exp_left_rev not in left_raw_options[idx] or exp_right_rev not in right_raw_options[idx]:
+                                if (
+                                    exp_left_rev not in left_raw_options[idx]
+                                    or exp_right_rev not in right_raw_options[idx]
+                                ):
                                     reverse_ok = False
                                     break
                             orientation_ok = "reverse" if reverse_ok else None
@@ -1893,17 +2096,48 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         if resolved.bridge_table is None:
                             continue
                         bridge_patterns = [
-                            ("bridge-left-forward", [(resolved.bridge_table, c) for c in (resolved.bridge_left_columns or ())], [(resolved.left_table, c) for c in resolved.left_columns]),
-                            ("bridge-left-reverse", [(resolved.left_table, c) for c in resolved.left_columns], [(resolved.bridge_table, c) for c in (resolved.bridge_left_columns or ())]),
-                            ("bridge-right-forward", [(resolved.bridge_table, c) for c in (resolved.bridge_right_columns or ())], [(resolved.right_table, c) for c in resolved.right_columns]),
-                            ("bridge-right-reverse", [(resolved.right_table, c) for c in resolved.right_columns], [(resolved.bridge_table, c) for c in (resolved.bridge_right_columns or ())]),
+                            (
+                                "bridge-left-forward",
+                                [
+                                    (resolved.bridge_table, c)
+                                    for c in (resolved.bridge_left_columns or ())
+                                ],
+                                [(resolved.left_table, c) for c in resolved.left_columns],
+                            ),
+                            (
+                                "bridge-left-reverse",
+                                [(resolved.left_table, c) for c in resolved.left_columns],
+                                [
+                                    (resolved.bridge_table, c)
+                                    for c in (resolved.bridge_left_columns or ())
+                                ],
+                            ),
+                            (
+                                "bridge-right-forward",
+                                [
+                                    (resolved.bridge_table, c)
+                                    for c in (resolved.bridge_right_columns or ())
+                                ],
+                                [(resolved.right_table, c) for c in resolved.right_columns],
+                            ),
+                            (
+                                "bridge-right-reverse",
+                                [(resolved.right_table, c) for c in resolved.right_columns],
+                                [
+                                    (resolved.bridge_table, c)
+                                    for c in (resolved.bridge_right_columns or ())
+                                ],
+                            ),
                         ]
                         for pattern_name, exp_left_seq, exp_right_seq in bridge_patterns:
                             if len(m.join.on) != len(exp_left_seq):
                                 continue
                             ok = True
                             for idx in range(len(m.join.on)):
-                                if exp_left_seq[idx] not in left_raw_options[idx] or exp_right_seq[idx] not in right_raw_options[idx]:
+                                if (
+                                    exp_left_seq[idx] not in left_raw_options[idx]
+                                    or exp_right_seq[idx] not in right_raw_options[idx]
+                                ):
                                     ok = False
                                     break
                             if ok:
@@ -1936,12 +2170,28 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     resolved = resolved_rels.get(found_rel.name)
                     if resolved is not None:
                         # Input grains (declared) mapped to output targets.
-                        left_grain_src = tuple(staging_by_name[m.left].grain) if m.left in staging_by_name else tuple(intermediate_by_name[m.left].grain) if m.left in intermediate_by_name else ()
-                        right_grain_src = tuple(staging_by_name[m.right].grain) if m.right in staging_by_name else tuple(intermediate_by_name[m.right].grain) if m.right in intermediate_by_name else ()
+                        left_grain_src = (
+                            tuple(staging_by_name[m.left].grain)
+                            if m.left in staging_by_name
+                            else tuple(intermediate_by_name[m.left].grain)
+                            if m.left in intermediate_by_name
+                            else ()
+                        )
+                        right_grain_src = (
+                            tuple(staging_by_name[m.right].grain)
+                            if m.right in staging_by_name
+                            else tuple(intermediate_by_name[m.right].grain)
+                            if m.right in intermediate_by_name
+                            else ()
+                        )
                         proj_left = {jc.source: jc.target for jc in m.columns if jc.side == "left"}
-                        proj_right = {jc.source: jc.target for jc in m.columns if jc.side == "right"}
+                        proj_right = {
+                            jc.source: jc.target for jc in m.columns if jc.side == "right"
+                        }
                         left_image = tuple(proj_left[c] for c in left_grain_src if c in proj_left)
-                        right_image = tuple(proj_right[c] for c in right_grain_src if c in proj_right)
+                        right_image = tuple(
+                            proj_right[c] for c in right_grain_src if c in proj_right
+                        )
                         # Combined is structurally sufficient only when both sides projected
                         # their grains; otherwise it degenerates to a single side.
                         _combined_valid = bool(left_image) and bool(right_image)
@@ -2019,7 +2269,11 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         elif not any(_covers(a) for a in allowed):
                             # Describe expected preservation for actionable message.
                             if card == "one_to_one":
-                                expected = "left, right, or combined projected grain" if join_type == "inner" else "left or combined projected grain"
+                                expected = (
+                                    "left, right, or combined projected grain"
+                                    if join_type == "inner"
+                                    else "left or combined projected grain"
+                                )
                             elif join_type == "left" and allowed == [combined]:
                                 expected = "combined projected grain (left-only fan-out and right-only nulls not preserved)"
                             else:
@@ -2045,58 +2299,20 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=jc.source,
                     )
                 else:
-                    if jc.target in out_schema:
-                        _add_issue(
-                            issues,
-                            ErrorCode.UNKNOWN,
-                            f"intermediate_models[{name}].columns",
-                            f"duplicate output name '{jc.target}'",
-                            related=jc.target,
-                        )
+                    # NOTE (T16): join projection output-name collisions are owned by
+                    # Pydantic (JoinIntermediateModel._unique_output_names); proven by
+                    # test_duplicate_output_names_join, so no semantic check here.
                     out_schema[jc.target] = src_schema[jc.source]
                     out_lineage[jc.target] = src_lineage.get(
                         jc.source, [f"{getattr(m, jc.side)}.{jc.source}"]
                     )
             for dc in m.derived_columns:
-                inferred = _infer_expression_type(dc.expression, out_schema)
-                declared = (
-                    dc.type
-                    if isinstance(dc.type, DataType)
-                    else DataType(dc.type)
-                    if isinstance(dc.type, str)
-                    else None
-                )
-                if inferred is None and not _is_column_unresolved(dc.expression, out_schema):
-                    _add_issue(
-                        issues,
-                        ErrorCode.INVALID_EXPRESSION_TYPE,
-                        f"intermediate_models[{name}].derived_columns[{dc.name}]",
-                        "invalid expression: statically incompatible types",
-                        related=dc.name,
-                    )
-                elif inferred is not None and declared is not None and inferred != declared:
-                    _add_issue(
-                        issues,
-                        ErrorCode.INVALID_EXPRESSION_TYPE,
-                        f"intermediate_models[{name}].derived_columns[{dc.name}]",
-                        f"declared type '{declared.value}' != inferred '{inferred.value}'",
-                        related=dc.name,
-                    )
-                _check_expression_columns(
-                    dc.expression,
+                out_schema[dc.name] = _check_derived_column(
+                    dc,
                     out_schema,
                     issues,
                     f"intermediate_models[{name}].derived_columns[{dc.name}]",
                 )
-                if dc.name in out_schema:
-                    _add_issue(
-                        issues,
-                        ErrorCode.UNKNOWN,
-                        f"intermediate_models[{name}].derived_columns",
-                        f"collision '{dc.name}'",
-                        related=dc.name,
-                    )
-                out_schema[dc.name] = declared if declared else DataType.string
                 # Proper raw lineage for derived
                 expr_cols = _collect_expression_columns(dc.expression)
                 raw_lin: list[str] = []
@@ -2143,47 +2359,43 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             for f in getattr(m, "filters", []):
                 _check_condition(f, src_schema, issues, f"intermediate_models[{name}].filters")
             for met in m.metrics:
-                if hasattr(met, "column"):
-                    col_name = getattr(met, "column", None)
-                    if col_name is not None and col_name not in src_schema:
+                col_name, ctype = _metric_column(met, src_schema)
+                if col_name is not None and col_name not in src_schema:
+                    _add_issue(
+                        issues,
+                        ErrorCode.METRIC_TYPE,
+                        f"intermediate_models[{name}].metrics",
+                        f"metric column '{col_name}' not in source",
+                        related=col_name,
+                    )
+                elif col_name is not None:
+                    if met.function in ("sum", "avg", "conditional_sum") and ctype not in (
+                        DataType.integer,
+                        DataType.float,
+                    ):
                         _add_issue(
                             issues,
                             ErrorCode.METRIC_TYPE,
                             f"intermediate_models[{name}].metrics",
-                            f"metric column '{col_name}' not in source",
-                            related=col_name,
+                            f"metric '{met.function}' requires numeric column, got '{ctype.value if ctype else 'unknown'}'",
+                            related=met.name,
                         )
-                    elif col_name is not None:
-                        ctype = src_schema.get(col_name)
-                        if met.function in ("sum", "avg", "conditional_sum") and ctype not in (
-                            DataType.integer,
-                            DataType.float,
-                        ):
-                            _add_issue(
-                                issues,
-                                ErrorCode.METRIC_TYPE,
-                                f"intermediate_models[{name}].metrics",
-                                f"metric '{met.function}' requires numeric column, got '{ctype.value if ctype else 'unknown'}'",
-                                related=met.name,
-                            )
-                        if met.function in ("min", "max") and ctype not in (
-                            DataType.integer,
-                            DataType.float,
-                            DataType.date,
-                            DataType.timestamp,
-                        ):
-                            _add_issue(
-                                issues,
-                                ErrorCode.METRIC_TYPE,
-                                f"intermediate_models[{name}].metrics",
-                                f"metric '{met.function}' requires numeric/date/timestamp",
-                                related=met.name,
-                            )
-                if hasattr(met, "condition"):
-                    cond = getattr(met, "condition", None)
-                    _check_condition(
-                        cond, src_schema, issues, f"intermediate_models[{name}].metrics[{met.name}]"
-                    )
+                    if met.function in ("min", "max") and ctype not in (
+                        DataType.integer,
+                        DataType.float,
+                        DataType.date,
+                        DataType.timestamp,
+                    ):
+                        _add_issue(
+                            issues,
+                            ErrorCode.METRIC_TYPE,
+                            f"intermediate_models[{name}].metrics",
+                            f"metric '{met.function}' requires numeric/date/timestamp",
+                            related=met.name,
+                        )
+                _check_metric_condition(
+                    met, src_schema, issues, f"intermediate_models[{name}].metrics[{met.name}]"
+                )
             out_schema = {}
             out_lineage = {}
             for pc in m.group_by:
@@ -2192,29 +2404,9 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     out_schema[pc.target] = src_type
                     out_lineage[pc.target] = src_lineage.get(pc.source, [f"{m.source}.{pc.source}"])
             for met in m.metrics:
-                if met.function in ("count_rows", "count", "count_distinct", "conditional_count"):
-                    out_schema[met.name] = DataType.integer
-                elif met.function in ("sum", "avg", "conditional_sum"):
-                    out_schema[met.name] = DataType.float
-                elif met.function in ("min", "max"):
-                    col_name = getattr(met, "column", None)
-                    ctype = src_schema.get(col_name) if col_name else DataType.string
-                    out_schema[met.name] = ctype if ctype else DataType.string
-                else:
-                    out_schema[met.name] = DataType.string
+                out_schema[met.name] = _metric_output_type(met, src_schema)
                 # Proper raw lineage for metric: column + condition columns
-                raw_lin: list[str] = []
-                if hasattr(met, "column"):
-                    col = getattr(met, "column", None)
-                    if col and col in src_lineage:
-                        raw_lin.extend(src_lineage[col])
-                if hasattr(met, "condition"):
-                    cond = getattr(met, "condition", None)
-                    for cc in _collect_condition_columns(cond):
-                        if cc in src_lineage:
-                            raw_lin.extend(src_lineage[cc])
-                        elif cc in src_schema:
-                            raw_lin.append(f"{m.source}.{cc}")
+                raw_lin = _metric_raw_lineage(met, src_schema, src_lineage, m.source)
                 out_lineage[met.name] = (
                     sorted(set(raw_lin)) if raw_lin else [f"{m.name}.{met.name}"]
                 )
@@ -2256,7 +2448,9 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     )
             # Deterministic tie-breaking: keys + order_by must contain a source
             # uniqueness key (source grain or raw PK via lineage). Rename-aware.
-            if all(k in src_schema for k in m.keys) and all(sk.column in src_schema for sk in m.order_by):
+            if all(k in src_schema for k in m.keys) and all(
+                sk.column in src_schema for sk in m.order_by
+            ):
                 _combined: list[str] = []
                 for _c in (*m.keys, *(sk.column for sk in m.order_by)):
                     if _c not in _combined:
@@ -2284,7 +2478,10 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         if not _proven_dedup:
                             for _rc in getattr(_tbl, "columns", []):
                                 if getattr(_rc, "unique", False):
-                                    if f"{_tbl.name}.{getattr(_rc, 'name', '')}" in _union_raw_dedup:
+                                    if (
+                                        f"{_tbl.name}.{getattr(_rc, 'name', '')}"
+                                        in _union_raw_dedup
+                                    ):
                                         _proven_dedup = True
                                         break
                             if _proven_dedup:
@@ -2358,32 +2555,28 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     related=d,
                 )
         for met in out.metrics:
-            if hasattr(met, "column"):
-                col_name = getattr(met, "column", None)
-                if col_name is not None and col_name not in src_schema:
+            col_name, ctype = _metric_column(met, src_schema)
+            if col_name is not None and col_name not in src_schema:
+                _add_issue(
+                    issues,
+                    ErrorCode.METRIC_TYPE,
+                    f"{base}.metrics",
+                    f"metric column '{col_name}' not in source",
+                    related=col_name,
+                )
+            elif col_name is not None:
+                if met.function in ("sum", "avg", "conditional_sum") and ctype not in (
+                    DataType.integer,
+                    DataType.float,
+                ):
                     _add_issue(
                         issues,
                         ErrorCode.METRIC_TYPE,
                         f"{base}.metrics",
-                        f"metric column '{col_name}' not in source",
-                        related=col_name,
+                        f"metric '{met.function}' requires numeric",
+                        related=met.name,
                     )
-                elif col_name is not None:
-                    ctype = src_schema.get(col_name)
-                    if met.function in ("sum", "avg", "conditional_sum") and ctype not in (
-                        DataType.integer,
-                        DataType.float,
-                    ):
-                        _add_issue(
-                            issues,
-                            ErrorCode.METRIC_TYPE,
-                            f"{base}.metrics",
-                            f"metric '{met.function}' requires numeric",
-                            related=met.name,
-                        )
-            if hasattr(met, "condition"):
-                cond = getattr(met, "condition", None)
-                _check_condition(cond, src_schema, issues, f"{base}.metrics[{met.name}]")
+            _check_metric_condition(met, src_schema, issues, f"{base}.metrics[{met.name}]")
         for f in getattr(out, "filters", []):
             _check_condition(f, src_schema, issues, f"{base}.filters")
         # Build output schema
@@ -2395,29 +2588,9 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                 out_schema[pc.target] = src_type
                 out_line[pc.target] = src_lineage.get(pc.source, [f"{out.source}.{pc.source}"])
         for met in out.metrics:
-            if met.function in ("count_rows", "count", "count_distinct", "conditional_count"):
-                out_schema[met.name] = DataType.integer
-            elif met.function in ("sum", "avg", "conditional_sum"):
-                out_schema[met.name] = DataType.float
-            elif met.function in ("min", "max"):
-                col_name = getattr(met, "column", None)
-                ctype = src_schema.get(col_name) if col_name else DataType.string
-                out_schema[met.name] = ctype if ctype else DataType.string
-            else:
-                out_schema[met.name] = DataType.string
+            out_schema[met.name] = _metric_output_type(met, src_schema)
             # Proper raw lineage for output metrics
-            raw_lin: list[str] = []
-            if hasattr(met, "column"):
-                col = getattr(met, "column", None)
-                if col and col in src_lineage:
-                    raw_lin.extend(src_lineage[col])
-            if hasattr(met, "condition"):
-                cond = getattr(met, "condition", None)
-                for cc in _collect_condition_columns(cond):
-                    if cc in src_lineage:
-                        raw_lin.extend(src_lineage[cc])
-                    elif cc in src_schema:
-                        raw_lin.append(f"{out.source}.{cc}")
+            raw_lin = _metric_raw_lineage(met, src_schema, src_lineage, out.source)
             if raw_lin:
                 out_line[met.name] = sorted(set(raw_lin))
             else:
@@ -2440,11 +2613,8 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
     # Assertions
     for idx, a in enumerate(scenario.tests):
         base = f"tests[{idx}]"
-        if (
-            a.model not in raw_by_name
-            and a.model not in staging_by_name
-            and a.model not in intermediate_by_name
-            and a.model not in output_by_name
+        if not _model_exists(
+            a.model, raw_by_name, staging_by_name, intermediate_by_name, output_by_name
         ):
             _add_issue(
                 issues,
@@ -2455,22 +2625,16 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
             )
             continue
         # Check columns existence against model's schema
-        model_schema = None
-        if a.model in raw_col_type:
-            model_schema = raw_col_type[a.model]
-        elif a.model in staging_schema:
-            model_schema = staging_schema[a.model]
-        elif a.model in intermediate_schema:
-            model_schema = intermediate_schema[a.model]
-        elif a.model in output_schemas:
-            model_schema = output_schemas[a.model]
+        model_schema = _lookup_schema(
+            a.model, raw_col_type, staging_schema, intermediate_schema, output_schemas
+        )
         if model_schema is not None:
             # For not_null, unique, accepted_values, relationships, column_range
             cols_to_check: list[str] = []
-            if hasattr(a, "columns"):
-                cols_to_check.extend(getattr(a, "columns", []))
-            if hasattr(a, "column"):
-                cols_to_check.append(getattr(a, "column"))
+            cols_to_check.extend(getattr(a, "columns", []))
+            column = getattr(a, "column", None)
+            if column is not None:
+                cols_to_check.append(column)
             for c in cols_to_check:
                 if c not in model_schema:
                     _add_issue(
@@ -2481,44 +2645,24 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         related=c,
                     )
             # For relationships to_columns and to_model
-            if hasattr(a, "to_columns"):
+            if getattr(a, "to_columns", None) is not None:
                 to_model = getattr(a, "to_model", None)
                 # Check to_model exists (including raw)
-                if (
-                    to_model not in raw_by_name
-                    and to_model not in staging_by_name
-                    and to_model not in intermediate_by_name
-                    and to_model not in output_by_name
-                    and to_model not in raw_col_type
-                    and to_model not in staging_schema
-                    and to_model not in intermediate_schema
-                    and to_model not in output_schemas
+                if not _model_exists(
+                    to_model, raw_by_name, staging_by_name, intermediate_by_name, output_by_name
                 ):
-                    # Check raw, staging, intermediate, output – if not found, report
-                    if (
-                        to_model not in raw_by_name
-                        and to_model not in staging_schema
-                        and to_model not in intermediate_schema
-                        and to_model not in output_schemas
-                    ):
-                        _add_issue(
-                            issues,
-                            ErrorCode.MISSING_REF,
-                            f"{base}.to_model",
-                            f"to_model '{to_model}' does not exist",
-                            related=to_model,
-                        )
+                    _add_issue(
+                        issues,
+                        ErrorCode.MISSING_REF,
+                        f"{base}.to_model",
+                        f"to_model '{to_model}' does not exist",
+                        related=to_model,
+                    )
                     to_schema = None
                 else:
-                    to_schema = None
-                    if to_model in raw_col_type:
-                        to_schema = raw_col_type[to_model]
-                    elif to_model in staging_schema:
-                        to_schema = staging_schema[to_model]
-                    elif to_model in intermediate_schema:
-                        to_schema = intermediate_schema[to_model]
-                    elif to_model in output_schemas:
-                        to_schema = output_schemas[to_model]
+                    to_schema = _lookup_schema(
+                        to_model, raw_col_type, staging_schema, intermediate_schema, output_schemas
+                    )
                     if to_schema is not None:
                         for c in getattr(a, "to_columns", []):
                             if c not in to_schema:
@@ -2552,29 +2696,18 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     col_type = model_schema.get(col)
                     if col_type is not None:
                         for v in getattr(a, "values", []):
-                            actual = (
-                                "string"
-                                if isinstance(v, str)
-                                else "integer"
-                                if isinstance(v, int) and not isinstance(v, bool)
-                                else "float"
-                                if isinstance(v, float)
-                                else "boolean"
-                                if isinstance(v, bool)
-                                else "unknown"
-                            )
-                            if actual != "unknown" and col_type.value != actual:
-                                # For string column, actual must be string, etc.
-                                # Allow numeric promotion? For now strict
-                                if col_type.value != actual:
-                                    _add_issue(
-                                        issues,
-                                        ErrorCode.CATEGORICAL_HOMOGENEOUS,
-                                        f"{base}.values",
-                                        f"accepted_values value '{v}' type {actual} != column '{col}' type {col_type.value}",
-                                        related=str(v),
-                                    )
-                                    break
+                            actual = _scalar_to_datatype(v)
+                            # For string column, actual must be string, etc.
+                            # Allow numeric promotion? For now strict
+                            if actual is not None and col_type != actual:
+                                _add_issue(
+                                    issues,
+                                    ErrorCode.CATEGORICAL_HOMOGENEOUS,
+                                    f"{base}.values",
+                                    f"accepted_values value '{v}' type {actual.value} != column '{col}' type {col_type.value}",
+                                    related=str(v),
+                                )
+                                break
             if getattr(a, "type", None) == "column_range":
                 col = getattr(a, "column", None)
                 if col is not None and model_schema is not None:
@@ -2583,23 +2716,13 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                         for bound_name in ("min", "max"):
                             bound_val = getattr(a, bound_name, None)
                             if bound_val is not None:
-                                actual = (
-                                    "string"
-                                    if isinstance(bound_val, str)
-                                    else "integer"
-                                    if isinstance(bound_val, int) and not isinstance(bound_val, bool)
-                                    else "float"
-                                    if isinstance(bound_val, float)
-                                    else "boolean"
-                                    if isinstance(bound_val, bool)
-                                    else "unknown"
-                                )
-                                if actual != "unknown" and col_type.value != actual:
+                                actual = _scalar_to_datatype(bound_val)
+                                if actual is not None and col_type.value != actual.value:
                                     _add_issue(
                                         issues,
                                         ErrorCode.UNKNOWN,
                                         f"{base}.{bound_name}",
-                                        f"column_range {bound_name} type {actual} != column '{col}' type {col_type.value}",
+                                        f"column_range {bound_name} type {actual.value} != column '{col}' type {col_type.value}",
                                         related=str(bound_val),
                                     )
     # Check duplicate/contradictory assertions
@@ -2639,12 +2762,7 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
     for s in scenario.staging_models:
         dep_map[s.name] = [s.source]
     for m in scenario.intermediate_models:
-        deps: list[str] = []
-        if hasattr(m, "source"):
-            deps.append(m.source)
-        if hasattr(m, "left"):
-            deps.extend([m.left, m.right])
-        dep_map[m.name] = deps
+        dep_map[m.name] = _model_deps(m)
     for o in scenario.output_models:
         dep_map[o.name] = [o.source]
     reachable: set[str] = set()
@@ -2806,88 +2924,80 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:  # type: ignore
                     "columns": (gcol,),
                 }
             )
-    # relationships
+    # relationships – derived directly from the resolved records (T13/T16, no re-scan)
     for rel in scenario.relationships:
+        resolved = resolved_rels.get(rel.name)
         # For each relationship, derive relationships assertion for dependent side
         if rel.cardinality == "one_to_many":
+            if resolved is not None and resolved.dependent_table is not None:
+                model = resolved.dependent_table
+                columns = tuple(resolved.dependent_columns or ())
+                to_model = resolved.target_table
+                to_columns = tuple(resolved.target_columns or ())
+            else:  # unreachable after successful validation; historical fallback
+                model = rel.right.table
+                columns = tuple(rel.right.columns)
+                to_model = rel.left.table
+                to_columns = tuple(rel.left.columns)
             derived.append(
                 {
                     "name": f"derived_rel_{rel.name}",
-                    "model": rel.right.table,
+                    "model": model,
                     "type": "relationships",
-                    "columns": rel.right.columns,
-                    "to_model": rel.left.table,
-                    "to_columns": rel.left.columns,
+                    "columns": columns,
+                    "to_model": to_model,
+                    "to_columns": to_columns,
                 }
             )
         elif rel.cardinality == "many_to_one":
+            if resolved is not None and resolved.dependent_table is not None:
+                model = resolved.dependent_table
+                columns = tuple(resolved.dependent_columns or ())
+                to_model = resolved.target_table
+                to_columns = tuple(resolved.target_columns or ())
+            else:  # unreachable after successful validation; historical fallback
+                model = rel.left.table
+                columns = tuple(rel.left.columns)
+                to_model = rel.right.table
+                to_columns = tuple(rel.right.columns)
             derived.append(
                 {
                     "name": f"derived_rel_{rel.name}",
-                    "model": rel.left.table,
+                    "model": model,
                     "type": "relationships",
-                    "columns": rel.left.columns,
-                    "to_model": rel.right.table,
-                    "to_columns": rel.right.columns,
+                    "columns": columns,
+                    "to_model": to_model,
+                    "to_columns": to_columns,
                 }
             )
         elif rel.cardinality == "one_to_one":
-            # Find FK side and collect all FK columns for composite keys
+            # Dependent side comes from the resolved record; column order follows
+            # the dependent endpoint declaration (as before).
             fk_side = None
             to_table = None
             to_cols = None
-            fk_cols_list: list[str] = []
-            for tbl in scenario.raw_tables:
-                # Determine which side this table is on
-                side_cols = None
-                target_table = None
-                target_cols = None
-                if tbl.name == rel.left.table:
-                    side_cols = rel.left.columns
-                    target_table = rel.right.table
-                    target_cols = rel.right.columns
-                elif tbl.name == rel.right.table:
-                    side_cols = rel.right.columns
-                    target_table = rel.left.table
-                    target_cols = rel.left.columns
+            ordered: tuple[str, ...] = ()
+            if resolved is not None and resolved.dependent_table is not None:
+                fk_side = resolved.dependent_table
+                dep_cols = set(resolved.dependent_columns or ())
+                if fk_side == rel.left.table:
+                    side_order = tuple(rel.left.columns)
+                    to_table = rel.right.table
+                    to_cols = tuple(rel.right.columns)
                 else:
-                    continue
-                # Collect all FK cols for this relationship on this table
-                cols_for_rel = [
-                    c.name
-                    for c in tbl.columns
-                    if getattr(getattr(c, "generator", None), "kind", None) == "foreign_key"
-                    and getattr(c.generator, "relationship", None) == rel.name
-                ]
-                # Check if this table's FK cols match the side's columns (for composite, all must match)
-                if set(cols_for_rel) == set(side_cols) and cols_for_rel:
-                    fk_side = tbl.name
-                    fk_cols_list = cols_for_rel
-                    to_table = target_table
-                    to_cols = target_cols
-                    break
-                # Also handle case where FK cols are subset but we still want to capture all
-                if cols_for_rel:
-                    # If any FK found on this side, consider it the FK side
-                    if fk_side is None:
-                        fk_side = tbl.name
-                        fk_cols_list = cols_for_rel
-                        to_table = target_table
-                        to_cols = target_cols
-            if fk_side and fk_cols_list:
-                # Ensure order follows side_cols order
-                # Sort fk_cols_list to match side_cols order if composite
-                side_order = rel.left.columns if fk_side == rel.left.table else rel.right.columns
-                # Reorder fk_cols_list to match side_order where possible
-                ordered = [c for c in side_order if c in fk_cols_list]
-                if set(ordered) != set(fk_cols_list):
-                    ordered = fk_cols_list
+                    side_order = tuple(rel.right.columns)
+                    to_table = rel.left.table
+                    to_cols = tuple(rel.left.columns)
+                ordered = tuple(c for c in side_order if c in dep_cols)
+                if set(ordered) != dep_cols:
+                    ordered = tuple(resolved.dependent_columns or ())
+            if fk_side and ordered:
                 derived.append(
                     {
                         "name": f"derived_rel_{rel.name}",
                         "model": fk_side,
                         "type": "relationships",
-                        "columns": tuple(ordered),
+                        "columns": ordered,
                         "to_model": to_table,
                         "to_columns": to_cols,
                     }

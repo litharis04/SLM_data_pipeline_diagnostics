@@ -43,6 +43,10 @@ Faults may affect:
 - staging logic;
 - output logic;
 
+Fault applicability is evaluated against `ValidatedScenario` before assignment. The fault
+specifications define applicability targets and data-seed sensitivity for each fault subtype or
+context. Applicability deficits extend the scenario coverage plan and reopen scenario authoring.
+
 Important rule: The fault generator may know the hidden fault label. The diagnostic model and tool outputs must not receive that hidden label directly.
 
 Detailed fault types and injection mechanics are described in `docs/FAULT_CATALOG.md` and `docs/FAULT_INJECTION.md`.
@@ -94,6 +98,12 @@ It includes:
 - evaluation;
 - baseline comparison.
 
+SFT allocation is balanced first by fault family, subtype, injection site or layer, and observed
+symptom class, then by scenario context and `data_seed`. Seed variants are selected according to
+whether they materially vary diagnostic evidence. All trajectories derived from one
+`scenario_id` remain in the same dataset partition. Dataset size is selected through learning
+curves over nested balanced subsets and a fixed held-out scenario partition.
+
 Detailed training and evaluation rules are described in `docs/TRAINING.md` and `docs/EVALUATION.md`.
 
 ### 2.6. End-to-end data flow
@@ -132,6 +142,7 @@ healthy pipeline
 - `STATE.md` - concise record of the current implementation state; not a specification.
 - `tasks/` - task definitions.
 - `docs/` - detailed specifications.
+- `scenarios/` - authored scenario corpus and its coverage plan.
 - `data/` - generated raw data.
 - `dbt/` - dbt project.
 - `artifacts/` - logs, trajectories, evaluation outputs.

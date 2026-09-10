@@ -330,6 +330,20 @@ def test_duplicate_output_names_join():
             ),
             grain=("x",),
         )
+    # Derived column colliding with a projected target is also owned by Pydantic,
+    # so the semantic validator must never see it (T16 removal proof).
+    with pytest.raises(ValidationError, match="output names must be unique"):
+        JoinIntermediateModel(
+            name="j",
+            left="s1",
+            right="s2",
+            join={"type": "inner", "on": ({"left": "id", "right": "id"},)},
+            columns=(JoinProjectionColumn(side="left", source="a", target="x"),),
+            derived_columns=(
+                {"name": "x", "type": "integer", "expression": {"kind": "column", "column": "x"}},
+            ),
+            grain=("x",),
+        )
 
 
 def test_join_duplicate_key_pairs():

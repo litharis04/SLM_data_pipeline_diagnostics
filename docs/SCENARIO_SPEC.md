@@ -4,7 +4,7 @@ Status: draft.
 
 ## 1. Purpose
 
-This document defines version 1 of the declarative scenario language used to describe a healthy synthetic data pipeline. It is the normative specification for:
+This document defines version 1 of the declarative scenario language used to describe a clean synthetic data pipeline. It is the normative specification for:
 
 - the Pydantic model hierarchy;
 - the source-file topology of the scenario package;
@@ -53,7 +53,7 @@ Those responsibilities belong to `SCENARIO_AUTHORING.md`, `GENERATOR_SPEC.md`, a
 
 The implementation MUST use Pydantic 2.x models as the executable scenario contract. A JSON Schema MAY be published for editors, LLM tooling, or authoring workflows, but it MUST be generated from the root Pydantic model. A separately maintained handwritten JSON Schema is prohibited.
 
-The public root model MUST be named `Scenario`. The same validated scenario is consumed by the raw-data generator, dbt-project generator, manifest builder, and later infrastructure.
+The public root model MUST be named `Scenario`. The same validated scenario is consumed by the raw-data generator, dbt-project generator, pipeline-instance record builder, and later infrastructure.
 
 ### 3.2. Strict, closed, immutable input
 
@@ -109,10 +109,20 @@ No model may contain fields named or interpreted as `sql`, `jinja`, `python`, `c
 `data_seed` MUST NOT be a field of `Scenario`. The identity relation is:
 
 ```text
-scenario.json + data_seed + compiler/runtime versions = pipeline instance
+canonical scenario content + data_seed + compiler/generator versions + runtime compatibility identity = pipeline instance
 ```
 
 Changing only `data_seed` creates a new instance of the same scenario, not a new scenario.
+
+### 3.6. Scenario validity is static
+
+A candidate becomes structurally valid after strict Pydantic parsing and becomes a valid
+scenario after semantic validation returns `ValidatedScenario`. These two stages are the
+complete scenario-validity boundary.
+
+Compilation and execution apply to a concrete pipeline instance, not to the validity of the
+scenario. A clean-control failure is a pipeline-instance failure handled according to
+`PIPELINE_SPEC.md`; the scenario-validity boundary remains the two validation stages above.
 
 ## 4. Implementation topology
 
@@ -541,7 +551,7 @@ Bridge-column tuples MUST be disjoint. Their arity MUST match their respective e
 
 ### 9.4. Referential integrity
 
-Relationships describe healthy referential structure. Version 1 does not allow an orphan-rate or referential-integrity violation in a healthy scenario. Optional foreign keys are represented with a nullable dependent column and `null_probability`; every non-null generated foreign key MUST match its target key.
+Relationships describe clean referential structure. Version 1 does not allow an orphan-rate or referential-integrity violation in a valid scenario. Optional foreign keys are represented with a nullable dependent column and `null_probability`; every non-null generated foreign key MUST match its target key.
 
 Target participation or coverage distributions MAY be added in a later language version after their execution semantics are specified. An ambiguous `coverage` or `completeness` field MUST NOT be accepted in version 1.
 
@@ -810,7 +820,7 @@ Semantic validation MUST require:
 - the declared grain to be consistent with grouping and lineage; and
 - the output source to be an intermediate model.
 
-`grain` and `group_by` are distinct concepts. `group_by` lists physical aggregation keys; `grain` states the minimal declared business key expected to identify a row. `group_by` may include dimensions functionally dependent on the grain, but healthy execution MUST confirm that the grain is unique.
+`grain` and `group_by` are distinct concepts. `group_by` lists physical aggregation keys; `grain` states the minimal declared business key expected to identify a row. `group_by` may include dimensions functionally dependent on the grain. The dbt-project generator MUST emit the derived uniqueness assertion for the grain, and clean control MUST verify it for each materialized instance.
 
 ## 15. Healthy assertion models
 
@@ -839,7 +849,10 @@ Every assertion has `name: Identifier`, a target `model: Identifier`, and option
 | `row_count` | optional non-negative integer `min`, optional non-negative integer `max` | At least one bound; `min <= max` when both exist. |
 | `column_range` | `column`, optional `min`, optional `max`, `inclusive: bool = true` | At least one bound. |
 
-All assertion references and contextual value types are semantic checks. All healthy assertions are blocking; warning severity is not part of the version-1 contract.
+All assertion references and contextual value types are semantic checks. All healthy assertions are blocking during clean control; warning severity is not part of the version-1 contract. A downstream fault variant may intentionally cause one or more of these assertions to fail.
+
+Neither explicit nor derived assertions inspect realized data during scenario validation. They
+are runtime postconditions compiled into the clean pipeline and evaluated by clean control.
 
 Free-form expression tests are prohibited. A required invariant not expressible by this union must be added as a typed assertion model or derived test, not inserted as SQL text.
 
@@ -879,7 +892,7 @@ Pydantic validators MUST NOT:
 - infer an undeclared default from `domain` or a naming convention;
 - mutate the input to make it valid;
 - generate values or SQL; or
-- perform compiler or healthy-run checks.
+- perform compilation, materialization, or runtime checks.
 
 An input may therefore pass Pydantic validation and fail semantic validation. This is intentional and MUST be covered by tests.
 
@@ -1017,7 +1030,16 @@ The validator MUST verify that:
 - the model graph has no disconnected component; and
 - every significant projected or metric column has traceable raw lineage.
 
-Semantic validation can prove structural reachability, not runtime row counts. Empty outputs, actual key uniqueness, actual relationship integrity, and actual grain uniqueness remain healthy-run acceptance gates.
+Semantic validation proves structural reachability and derives the assertions required at
+runtime; it does not observe realized row counts or data values. Non-empty outputs, actual key
+uniqueness, actual relationship integrity, and actual grain uniqueness are clean-instance
+postconditions.
+
+When a concrete `(ValidatedScenario, data_seed)` instance is first needed, the clean control
+defined in `PIPELINE_SPEC.md` checks these postconditions once and caches the successful baseline.
+Failure aborts the current downstream dataset build and exposes a specification, validation,
+generation, compilation, or runtime-integration defect. The system MUST NOT silently reject the
+scenario, substitute another seed, or weaken an assertion.
 
 ## 18. Parsing, serialization, and JSON Schema
 
@@ -1046,7 +1068,7 @@ Canonical scenario serialization MUST:
 - use stable compact separators for content hashing; and
 - never include computed semantic indexes or compiler/runtime state.
 
-Pretty-printed authoring JSON MAY differ in whitespace only. Scenario content identity in the healthy manifest MUST be computed from the canonical representation, not the original file bytes.
+Pretty-printed authoring JSON MAY differ in whitespace only. Scenario content identity in the pipeline-instance record MUST be computed from the canonical representation, not the original file bytes.
 
 ### 18.3. JSON Schema export
 
@@ -1152,4 +1174,8 @@ The scenario-contract implementation is complete only when:
 - lint and type checks configured by the project pass; and
 - at least one complete scenario can proceed from JSON parsing through semantic validation to the compiler boundary.
 
-Passing Pydantic validation alone MUST never be described as a valid or healthy scenario. A scenario becomes structurally valid after Pydantic parsing, semantically valid after the separate validation pass, and healthy only after all execution gates in `PIPELINE_SPEC.md` succeed.
+Passing Pydantic validation alone MUST never be described as a valid scenario. A candidate
+becomes structurally valid after Pydantic parsing and becomes a valid scenario only after the
+separate semantic validation pass returns `ValidatedScenario`. The terms clean and healthy apply
+to materialized pipeline instances.
+Instance preparation and cached clean control are defined in `PIPELINE_SPEC.md`.

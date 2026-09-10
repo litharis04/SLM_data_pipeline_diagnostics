@@ -14,3 +14,9 @@ wheels/
 
 # macOS
 .DS_Store
+
+# OpenCode
+.opencode
+
+# Tasks
+/tasks
