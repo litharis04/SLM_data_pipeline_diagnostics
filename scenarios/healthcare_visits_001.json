@@ -1,0 +1,836 @@
+{
+ "domain": "healthcare",
+ "description": "Healthcare visits pipeline: unique weighted specialties, left-joined prescriptions, specialty and blood-type outputs.",
+ "intermediate_models": [
+  {
+   "columns": [
+    {
+     "side": "left",
+     "source": "visit_id",
+     "target": "visit_id"
+    },
+    {
+     "side": "left",
+     "source": "cost",
+     "target": "cost"
+    },
+    {
+     "side": "left",
+     "source": "visit_ts",
+     "target": "visit_ts"
+    },
+    {
+     "side": "left",
+     "source": "is_followup",
+     "target": "is_followup"
+    },
+    {
+     "side": "left",
+     "source": "visit_code",
+     "target": "visit_code"
+    },
+    {
+     "side": "right",
+     "source": "patient_id",
+     "target": "patient_id"
+    },
+    {
+     "side": "right",
+     "source": "blood_type",
+     "target": "blood_type"
+    }
+   ],
+   "derived_columns": [],
+   "filters": [],
+   "grain": [
+    "visit_id"
+   ],
+   "join": {
+    "on": [
+     {
+      "left": "patient_id",
+      "right": "patient_id"
+     }
+    ],
+    "type": "inner"
+   },
+   "left": "stg_visits",
+   "name": "j_visits_patients",
+   "operation": "join",
+   "right": "stg_patients"
+  },
+  {
+   "columns": [
+    {
+     "side": "left",
+     "source": "visit_id",
+     "target": "visit_id"
+    },
+    {
+     "side": "left",
+     "source": "doctor_id",
+     "target": "doctor_id"
+    },
+    {
+     "side": "left",
+     "source": "cost",
+     "target": "cost"
+    },
+    {
+     "side": "left",
+     "source": "visit_ts",
+     "target": "visit_ts"
+    },
+    {
+     "side": "left",
+     "source": "is_followup",
+     "target": "is_followup"
+    },
+    {
+     "side": "right",
+     "source": "rx_id",
+     "target": "rx_id"
+    },
+    {
+     "side": "right",
+     "source": "medicine",
+     "target": "medicine"
+    },
+    {
+     "side": "right",
+     "source": "days_supply",
+     "target": "days_supply"
+    }
+   ],
+   "derived_columns": [],
+   "filters": [],
+   "grain": [
+    "visit_id",
+    "rx_id"
+   ],
+   "join": {
+    "on": [
+     {
+      "left": "visit_id",
+      "right": "visit_id"
+     }
+    ],
+    "type": "left"
+   },
+   "left": "stg_visits",
+   "name": "j_visits_rx",
+   "operation": "join",
+   "right": "stg_rx"
+  },
+  {
+   "columns": [
+    {
+     "side": "left",
+     "source": "visit_id",
+     "target": "visit_id"
+    },
+    {
+     "side": "left",
+     "source": "cost",
+     "target": "cost"
+    },
+    {
+     "side": "left",
+     "source": "medicine",
+     "target": "medicine"
+    },
+    {
+     "side": "left",
+     "source": "rx_id",
+     "target": "rx_id"
+    },
+    {
+     "side": "right",
+     "source": "specialty",
+     "target": "specialty"
+    },
+    {
+     "side": "right",
+     "source": "license_no",
+     "target": "license_no"
+    }
+   ],
+   "derived_columns": [],
+   "filters": [],
+   "grain": [
+    "visit_id",
+    "rx_id"
+   ],
+   "join": {
+    "on": [
+     {
+      "left": "doctor_id",
+      "right": "doctor_id"
+     }
+    ],
+    "type": "inner"
+   },
+   "left": "j_visits_rx",
+   "name": "j_all_doctors",
+   "operation": "join",
+   "right": "stg_doctors"
+  }
+ ],
+ "output_models": [
+  {
+   "dimensions": [],
+   "filters": [],
+   "grain": [
+    "specialty"
+   ],
+   "group_by": [
+    {
+     "source": "specialty",
+     "target": "specialty"
+    }
+   ],
+   "metrics": [
+    {
+     "column": "cost",
+     "function": "avg",
+     "name": "avg_cost"
+    },
+    {
+     "function": "count_rows",
+     "name": "n_visits"
+    },
+    {
+     "column": "medicine",
+     "function": "count",
+     "name": "n_meds"
+    }
+   ],
+   "name": "o_by_specialty",
+   "source": "j_all_doctors"
+  },
+  {
+   "dimensions": [],
+   "filters": [],
+   "grain": [
+    "blood_type"
+   ],
+   "group_by": [
+    {
+     "source": "blood_type",
+     "target": "blood_type"
+    }
+   ],
+   "metrics": [
+    {
+     "function": "count_rows",
+     "name": "n_visits"
+    },
+    {
+     "column": "patient_id",
+     "function": "count_distinct",
+     "name": "n_patients"
+    }
+   ],
+   "name": "o_by_blood_type",
+   "source": "j_visits_patients"
+  }
+ ],
+ "raw_tables": [
+  {
+   "columns": [
+    {
+     "generator": {
+      "digits": 3,
+      "kind": "formatted_id",
+      "prefix": "PAT-"
+     },
+     "name": "patient_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "person_name"
+     },
+     "name": "full_name",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "date_range",
+      "max": "2005-12-31",
+      "min": "1940-01-01"
+     },
+     "name": "birth_date",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "date",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "categorical",
+      "values": [
+       "A",
+       "B",
+       "AB",
+       "O"
+      ]
+     },
+     "name": "blood_type",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "categorical",
+      "values": [
+       "F",
+       "M"
+      ]
+     },
+     "name": "gender",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    }
+   ],
+   "name": "raw_patients",
+   "primary_key": [
+    "patient_id"
+   ],
+   "rows": {
+    "max": 40,
+    "min": 40
+   }
+  },
+  {
+   "columns": [
+    {
+     "generator": {
+      "digits": 2,
+      "kind": "formatted_id",
+      "prefix": "DR-"
+     },
+     "name": "doctor_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": true
+    },
+    {
+     "generator": {
+      "kind": "person_name"
+     },
+     "name": "full_name",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "categorical",
+      "values": [
+       "cardiology",
+       "dermatology",
+       "neurology",
+       "oncology",
+       "orthopedics",
+       "pediatrics"
+      ],
+      "weights": [
+       5.0,
+       1.0,
+       4.0,
+       2.0,
+       3.0,
+       3.0
+      ]
+     },
+     "name": "specialty",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": true
+    },
+    {
+     "generator": {
+      "kind": "random_string",
+      "max_length": 8,
+      "min_length": 8
+     },
+     "name": "license_no",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    }
+   ],
+   "name": "raw_doctors",
+   "primary_key": [
+    "doctor_id"
+   ],
+   "rows": {
+    "max": 6,
+    "min": 6
+   }
+  },
+  {
+   "columns": [
+    {
+     "generator": {
+      "digits": 5,
+      "kind": "formatted_id",
+      "prefix": "VST-"
+     },
+     "name": "visit_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "foreign_key",
+      "relationship": "rel_patient_visits",
+      "target_side": "left"
+     },
+     "name": "patient_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "foreign_key",
+      "relationship": "rel_doctor_visits",
+      "target_side": "right"
+     },
+     "name": "doctor_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "timestamp_range",
+      "max": "2024-12-31T23:59:59+00:00",
+      "min": "2023-01-01T00:00:00+00:00"
+     },
+     "name": "visit_ts",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "timestamp",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "float_range",
+      "max": 900.0,
+      "min": 5.0
+     },
+     "name": "cost",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "float",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "boolean",
+      "true_probability": 0.3
+     },
+     "name": "is_followup",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "boolean",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "boolean"
+     },
+     "name": "is_emergency",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "boolean",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "template_string",
+      "template": "{visit_id}-V"
+     },
+     "name": "visit_code",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    }
+   ],
+   "name": "raw_visits",
+   "primary_key": [
+    "visit_id"
+   ],
+   "rows": {
+    "max": 200,
+    "min": 50
+   }
+  },
+  {
+   "columns": [
+    {
+     "generator": {
+      "digits": 5,
+      "kind": "formatted_id",
+      "prefix": "RX-"
+     },
+     "name": "rx_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "foreign_key",
+      "relationship": "rel_visit_rx",
+      "target_side": "left"
+     },
+     "name": "visit_id",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "categorical",
+      "values": [
+       "amoxicillin",
+       "ibuprofen",
+       "metformin"
+      ]
+     },
+     "name": "medicine",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "string",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "integer_range",
+      "max": 30,
+      "min": 1
+     },
+     "name": "days_supply",
+     "nullable": false,
+     "null_probability": 0.0,
+     "type": "integer",
+     "unique": false
+    },
+    {
+     "generator": {
+      "kind": "random_string",
+      "max_length": 20,
+      "min_length": 5
+     },
+     "name": "notes",
+     "nullable": true,
+     "null_probability": 0.3,
+     "type": "string",
+     "unique": false
+    }
+   ],
+   "name": "raw_rx",
+   "primary_key": [
+    "rx_id"
+   ],
+   "rows": {
+    "max": 300,
+    "min": 20
+   }
+  }
+ ],
+ "relationships": [
+  {
+   "cardinality": "one_to_many",
+   "left": {
+    "columns": [
+     "patient_id"
+    ],
+    "table": "raw_patients"
+   },
+   "name": "rel_patient_visits",
+   "right": {
+    "columns": [
+     "patient_id"
+    ],
+    "table": "raw_visits"
+   }
+  },
+  {
+   "cardinality": "many_to_one",
+   "left": {
+    "columns": [
+     "doctor_id"
+    ],
+    "table": "raw_visits"
+   },
+   "name": "rel_doctor_visits",
+   "right": {
+    "columns": [
+     "doctor_id"
+    ],
+    "table": "raw_doctors"
+   }
+  },
+  {
+   "cardinality": "one_to_many",
+   "left": {
+    "columns": [
+     "visit_id"
+    ],
+    "table": "raw_visits"
+   },
+   "name": "rel_visit_rx",
+   "right": {
+    "columns": [
+     "visit_id"
+    ],
+    "table": "raw_rx"
+   }
+  }
+ ],
+ "scenario_id": "healthcare_visits_001",
+ "schema_version": "1.0",
+ "staging_models": [
+  {
+   "columns": [
+    {
+     "operations": [],
+     "source": "patient_id",
+     "target": "patient_id"
+    },
+    {
+     "operations": [],
+     "source": "full_name",
+     "target": "full_name"
+    },
+    {
+     "operations": [],
+     "source": "birth_date",
+     "target": "birth_date"
+    },
+    {
+     "operations": [],
+     "source": "blood_type",
+     "target": "blood_type"
+    },
+    {
+     "operations": [
+      {
+       "mapping": {
+        "F": "female",
+        "M": "male"
+       },
+       "on_unmapped": "error",
+       "op": "map_values"
+      }
+     ],
+     "source": "gender",
+     "target": "gender"
+    }
+   ],
+   "grain": [
+    "patient_id"
+   ],
+   "name": "stg_patients",
+   "row_operations": [],
+   "source": "raw_patients"
+  },
+  {
+   "columns": [
+    {
+     "operations": [],
+     "source": "doctor_id",
+     "target": "doctor_id"
+    },
+    {
+     "operations": [],
+     "source": "full_name",
+     "target": "full_name"
+    },
+    {
+     "operations": [],
+     "source": "specialty",
+     "target": "specialty"
+    },
+    {
+     "operations": [],
+     "source": "license_no",
+     "target": "license_no"
+    }
+   ],
+   "grain": [
+    "doctor_id"
+   ],
+   "name": "stg_doctors",
+   "row_operations": [],
+   "source": "raw_doctors"
+  },
+  {
+   "columns": [
+    {
+     "operations": [],
+     "source": "visit_id",
+     "target": "visit_id"
+    },
+    {
+     "operations": [],
+     "source": "patient_id",
+     "target": "patient_id"
+    },
+    {
+     "operations": [],
+     "source": "doctor_id",
+     "target": "doctor_id"
+    },
+    {
+     "operations": [],
+     "source": "visit_ts",
+     "target": "visit_ts"
+    },
+    {
+     "operations": [],
+     "source": "cost",
+     "target": "cost"
+    },
+    {
+     "operations": [],
+     "source": "is_followup",
+     "target": "is_followup"
+    },
+    {
+     "operations": [],
+     "source": "is_emergency",
+     "target": "is_emergency"
+    },
+    {
+     "operations": [],
+     "source": "visit_code",
+     "target": "visit_code"
+    }
+   ],
+   "grain": [
+    "visit_id"
+   ],
+   "name": "stg_visits",
+   "row_operations": [
+    {
+     "condition": {
+      "kind": "comparison",
+      "left": {
+       "kind": "column",
+       "column": "cost"
+      },
+      "operator": "gt",
+      "right": {
+       "kind": "literal",
+       "value": 0.0
+      }
+     },
+     "op": "filter"
+    },
+    {
+     "keys": [
+      "visit_id"
+     ],
+     "op": "deduplicate",
+     "order_by": [
+      {
+       "column": "visit_ts",
+       "direction": "desc"
+      }
+     ]
+    }
+   ],
+   "source": "raw_visits"
+  },
+  {
+   "columns": [
+    {
+     "operations": [],
+     "source": "rx_id",
+     "target": "rx_id"
+    },
+    {
+     "operations": [],
+     "source": "visit_id",
+     "target": "visit_id"
+    },
+    {
+     "operations": [],
+     "source": "medicine",
+     "target": "medicine"
+    },
+    {
+     "operations": [],
+     "source": "days_supply",
+     "target": "days_supply"
+    },
+    {
+     "operations": [
+      {
+       "op": "null_if",
+       "values": [
+        "n/a"
+       ]
+      }
+     ],
+     "source": "notes",
+     "target": "notes"
+    }
+   ],
+   "grain": [
+    "rx_id"
+   ],
+   "name": "stg_rx",
+   "row_operations": [],
+   "source": "raw_rx"
+  }
+ ],
+ "tests": [
+  {
+   "column": "blood_type",
+   "model": "stg_patients",
+   "name": "blood_values",
+   "type": "accepted_values",
+   "values": [
+    "A",
+    "AB",
+    "B",
+    "O"
+   ]
+  },
+  {
+   "max": 1000,
+   "min": 1,
+   "model": "o_by_specialty",
+   "name": "specialty_rows",
+   "type": "row_count"
+  }
+ ]
+}
