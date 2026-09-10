@@ -1,0 +1,450 @@
+{
+  "description": "Finance treasury pipeline: placeholder memos nulled in staging, raw currency contract.",
+  "domain": "finance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "pay_id",
+          "target": "pay_id"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "left",
+          "source": "memo",
+          "target": "memo"
+        },
+        {
+          "side": "left",
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "side": "right",
+          "source": "owner",
+          "target": "owner"
+        },
+        {
+          "side": "left",
+          "source": "currency",
+          "target": "currency"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "pay_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "acct_id",
+            "right": "acct_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_payments",
+      "name": "j_pay_accts",
+      "operation": "join",
+      "right": "stg_accounts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "pay_id",
+          "target": "pay_id"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "left",
+          "source": "currency",
+          "target": "currency"
+        },
+        {
+          "side": "right",
+          "source": "cp_name",
+          "target": "cp_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "pay_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "cp_id",
+            "right": "cp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_pay_accts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_counterparties"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "currency"
+      ],
+      "group_by": [
+        {
+          "source": "currency",
+          "target": "currency"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "amount",
+          "function": "sum",
+          "name": "volume"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_payments"
+        }
+      ],
+      "name": "o_volume_by_currency",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TA-"
+          },
+          "name": "acct_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "owner",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_accounts",
+      "primary_key": [
+        "acct_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CP-"
+          },
+          "name": "cp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name"
+          },
+          "name": "cp_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email"
+          },
+          "name": "treasury_email",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_counterparties",
+      "primary_key": [
+        "cp_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PY-"
+          },
+          "name": "pay_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_acct_payments",
+            "target_side": "left"
+          },
+          "name": "acct_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_cp_payments",
+            "target_side": "right"
+          },
+          "name": "cp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 10.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "EUR",
+              "GBP",
+              "USD"
+            ]
+          },
+          "name": "currency",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 25,
+            "min_length": 5
+          },
+          "name": "memo",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_payments",
+      "primary_key": [
+        "pay_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "acct_id"
+        ],
+        "table": "raw_accounts"
+      },
+      "name": "rel_acct_payments",
+      "right": {
+        "columns": [
+          "acct_id"
+        ],
+        "table": "raw_payments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "cp_id"
+        ],
+        "table": "raw_payments"
+      },
+      "name": "rel_cp_payments",
+      "right": {
+        "columns": [
+          "cp_id"
+        ],
+        "table": "raw_counterparties"
+      }
+    }
+  ],
+  "scenario_id": "finance_treasury_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "acct_id",
+          "target": "acct_id"
+        },
+        {
+          "operations": [],
+          "source": "owner",
+          "target": "owner"
+        }
+      ],
+      "grain": [
+        "acct_id"
+      ],
+      "name": "stg_accounts",
+      "row_operations": [],
+      "source": "raw_accounts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "operations": [],
+          "source": "cp_name",
+          "target": "cp_name"
+        },
+        {
+          "operations": [],
+          "source": "treasury_email",
+          "target": "treasury_email"
+        }
+      ],
+      "grain": [
+        "cp_id"
+      ],
+      "name": "stg_counterparties",
+      "row_operations": [],
+      "source": "raw_counterparties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "pay_id",
+          "target": "pay_id"
+        },
+        {
+          "operations": [],
+          "source": "acct_id",
+          "target": "acct_id"
+        },
+        {
+          "operations": [],
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "operations": [],
+          "source": "currency",
+          "target": "currency"
+        },
+        {
+          "operations": [
+            {
+              "op": "null_if",
+              "values": [
+                "-",
+                "n/a"
+              ]
+            }
+          ],
+          "source": "memo",
+          "target": "memo"
+        }
+      ],
+      "grain": [
+        "pay_id"
+      ],
+      "name": "stg_payments",
+      "row_operations": [],
+      "source": "raw_payments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "currency",
+      "model": "raw_payments",
+      "name": "currency_values_raw",
+      "type": "accepted_values",
+      "values": [
+        "EUR",
+        "GBP",
+        "USD"
+      ]
+    },
+    {
+      "column": "currency",
+      "model": "stg_payments",
+      "name": "currency_values",
+      "type": "accepted_values",
+      "values": [
+        "EUR",
+        "GBP",
+        "USD"
+      ]
+    }
+  ]
+}

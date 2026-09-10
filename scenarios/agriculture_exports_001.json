@@ -1,0 +1,631 @@
+{
+  "description": "Agriculture exports pipeline: composite grade linkage asserted at intermediate level, grain-focused filters.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "shipment_id",
+          "target": "shipment_id"
+        },
+        {
+          "side": "left",
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "side": "left",
+          "source": "grade",
+          "target": "grade"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "right",
+          "source": "coop_id",
+          "target": "coop_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "shipment_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "lot_id",
+            "right": "lot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_shipments",
+      "name": "j_ship_lots",
+      "operation": "join",
+      "right": "stg_lots"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "shipment_id",
+          "target": "shipment_id"
+        },
+        {
+          "side": "left",
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "side": "left",
+          "source": "grade",
+          "target": "grade"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "right",
+          "source": "coop_name",
+          "target": "coop_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "shipment_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "coop_id",
+            "right": "coop_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ship_lots",
+      "name": "j_full_coop",
+      "operation": "join",
+      "right": "stg_coops"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "shipment_id",
+          "target": "shipment_id"
+        },
+        {
+          "side": "left",
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "left",
+          "source": "grade",
+          "target": "grade"
+        },
+        {
+          "side": "right",
+          "source": "premium",
+          "target": "premium"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "conditions": [
+            {
+              "kind": "comparison",
+              "left": {
+                "column": "crop",
+                "kind": "column"
+              },
+              "operator": "eq",
+              "right": {
+                "kind": "literal",
+                "value": "wheat"
+              }
+            },
+            {
+              "kind": "comparison",
+              "left": {
+                "column": "crop",
+                "kind": "column"
+              },
+              "operator": "eq",
+              "right": {
+                "kind": "literal",
+                "value": "corn"
+              }
+            }
+          ],
+          "kind": "any"
+        }
+      ],
+      "grain": [
+        "shipment_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "crop",
+            "right": "crop"
+          },
+          {
+            "left": "grade",
+            "right": "grade"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_full_coop",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_grades"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "grade",
+              "kind": "column"
+            },
+            "operator": "eq",
+            "right": {
+              "kind": "literal",
+              "value": "C"
+            }
+          },
+          "kind": "not"
+        }
+      ],
+      "grain": [
+        "grade"
+      ],
+      "group_by": [
+        {
+          "source": "grade",
+          "target": "grade"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "qty",
+          "function": "sum",
+          "name": "total_qty"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_shipments"
+        }
+      ],
+      "name": "o_qty_by_grade",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "CP-"
+          },
+          "name": "coop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name"
+          },
+          "name": "coop_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_coops",
+      "primary_key": [
+        "coop_id"
+      ],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "barley",
+              "corn",
+              "wheat"
+            ]
+          },
+          "name": "crop",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "A",
+              "B",
+              "C"
+            ]
+          },
+          "name": "grade",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2.0,
+            "min": 1.0
+          },
+          "name": "premium",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_grades",
+      "primary_key": [
+        "crop",
+        "grade"
+      ],
+      "rows": {
+        "max": 9,
+        "min": 9
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "LT-"
+          },
+          "name": "lot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_coop_lots",
+            "target_side": "left"
+          },
+          "name": "coop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-09-30",
+            "min": "2024-08-01"
+          },
+          "name": "harvest_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_lots",
+      "primary_key": [
+        "lot_id"
+      ],
+      "rows": {
+        "max": 45,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EX-"
+          },
+          "name": "shipment_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_lot_shipments",
+            "target_side": "left"
+          },
+          "name": "lot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_grade_shipments",
+            "target_side": "right"
+          },
+          "name": "crop",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_grade_shipments",
+            "target_side": "right"
+          },
+          "name": "grade",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 1.0
+          },
+          "name": "qty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 40,
+            "min": 1
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_shipments",
+      "primary_key": [
+        "shipment_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "coop_id"
+        ],
+        "table": "raw_coops"
+      },
+      "name": "rel_coop_lots",
+      "right": {
+        "columns": [
+          "coop_id"
+        ],
+        "table": "raw_lots"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "lot_id"
+        ],
+        "table": "raw_lots"
+      },
+      "name": "rel_lot_shipments",
+      "right": {
+        "columns": [
+          "lot_id"
+        ],
+        "table": "raw_shipments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "crop",
+          "grade"
+        ],
+        "table": "raw_shipments"
+      },
+      "name": "rel_grade_shipments",
+      "right": {
+        "columns": [
+          "crop",
+          "grade"
+        ],
+        "table": "raw_grades"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_exports_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "coop_id",
+          "target": "coop_id"
+        },
+        {
+          "operations": [],
+          "source": "coop_name",
+          "target": "coop_name"
+        }
+      ],
+      "grain": [
+        "coop_id"
+      ],
+      "name": "stg_coops",
+      "row_operations": [],
+      "source": "raw_coops"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "operations": [],
+          "source": "grade",
+          "target": "grade"
+        },
+        {
+          "operations": [],
+          "source": "premium",
+          "target": "premium"
+        }
+      ],
+      "grain": [
+        "crop",
+        "grade"
+      ],
+      "name": "stg_grades",
+      "row_operations": [],
+      "source": "raw_grades"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "lot_id",
+          "target": "lot_id"
+        },
+        {
+          "operations": [],
+          "source": "coop_id",
+          "target": "coop_id"
+        },
+        {
+          "operations": [],
+          "source": "harvest_date",
+          "target": "harvest_date"
+        }
+      ],
+      "grain": [
+        "lot_id"
+      ],
+      "name": "stg_lots",
+      "row_operations": [],
+      "source": "raw_lots"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "shipment_id",
+          "target": "shipment_id"
+        },
+        {
+          "operations": [],
+          "source": "lot_id",
+          "target": "lot_id"
+        },
+        {
+          "operations": [],
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "operations": [],
+          "source": "grade",
+          "target": "grade"
+        },
+        {
+          "operations": [],
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        }
+      ],
+      "grain": [
+        "shipment_id"
+      ],
+      "name": "stg_shipments",
+      "row_operations": [],
+      "source": "raw_shipments"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "crop",
+        "grade"
+      ],
+      "model": "j_full",
+      "name": "grade_link",
+      "to_columns": [
+        "crop",
+        "grade"
+      ],
+      "to_model": "raw_grades",
+      "type": "relationships"
+    }
+  ]
+}

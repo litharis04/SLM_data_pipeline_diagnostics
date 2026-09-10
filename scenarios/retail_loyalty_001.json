@@ -1,0 +1,407 @@
+{
+  "description": "Retail loyalty pipeline: string point balances cast with zero-fill, bounded row-count contracts.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "purchase_id",
+          "target": "purchase_id"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "side": "right",
+          "source": "tier",
+          "target": "tier"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "purchase_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "member_id",
+            "right": "member_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_purchases",
+      "name": "j_pur_members",
+      "operation": "join",
+      "right": "stg_members"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "purchase_id",
+          "target": "purchase_id"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "tier",
+          "target": "tier"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "purchase_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "store_id",
+            "right": "store_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_pur_members",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_stores"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "tier"
+      ],
+      "group_by": [
+        {
+          "source": "tier",
+          "target": "tier"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total",
+          "function": "sum",
+          "name": "revenue"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_purchases"
+        }
+      ],
+      "name": "o_revenue_by_tier",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "MB-"
+          },
+          "name": "member_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5000,
+            "min": 0
+          },
+          "name": "base_points",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "template_string",
+            "template": "{base_points}"
+          },
+          "name": "tier_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_members",
+      "primary_key": [
+        "member_id"
+      ],
+      "rows": {
+        "max": 50,
+        "min": 50
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "store_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_stores",
+      "primary_key": [
+        "store_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PC-"
+          },
+          "name": "purchase_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_member_purchases",
+            "target_side": "left"
+          },
+          "name": "member_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_store_purchases",
+            "target_side": "right"
+          },
+          "name": "store_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 1.0
+          },
+          "name": "total",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_purchases",
+      "primary_key": [
+        "purchase_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "member_id"
+        ],
+        "table": "raw_members"
+      },
+      "name": "rel_member_purchases",
+      "right": {
+        "columns": [
+          "member_id"
+        ],
+        "table": "raw_purchases"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "store_id"
+        ],
+        "table": "raw_purchases"
+      },
+      "name": "rel_store_purchases",
+      "right": {
+        "columns": [
+          "store_id"
+        ],
+        "table": "raw_stores"
+      }
+    }
+  ],
+  "scenario_id": "retail_loyalty_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            },
+            {
+              "op": "coalesce",
+              "value": 0
+            }
+          ],
+          "source": "tier_str",
+          "target": "tier"
+        }
+      ],
+      "grain": [
+        "member_id"
+      ],
+      "name": "stg_members",
+      "row_operations": [],
+      "source": "raw_members"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "store_id"
+      ],
+      "name": "stg_stores",
+      "row_operations": [],
+      "source": "raw_stores"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "purchase_id",
+          "target": "purchase_id"
+        },
+        {
+          "operations": [],
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "operations": [],
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "operations": [],
+          "source": "total",
+          "target": "total"
+        }
+      ],
+      "grain": [
+        "purchase_id"
+      ],
+      "name": "stg_purchases",
+      "row_operations": [],
+      "source": "raw_purchases"
+    }
+  ],
+  "tests": [
+    {
+      "min": 1,
+      "model": "stg_members",
+      "name": "members_present",
+      "type": "row_count"
+    },
+    {
+      "max": 100000,
+      "model": "j_pur_members",
+      "name": "purchases_bounded",
+      "type": "row_count"
+    }
+  ]
+}

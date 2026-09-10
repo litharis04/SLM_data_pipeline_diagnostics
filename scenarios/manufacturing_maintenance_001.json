@@ -1,0 +1,453 @@
+{
+  "description": "Manufacturing maintenance pipeline: one-to-one technician machines, precision calibration offsets, constrained work-order codes.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "side": "left",
+          "source": "downtime_min",
+          "target": "downtime_min"
+        },
+        {
+          "side": "left",
+          "source": "wo_code",
+          "target": "wo_code"
+        },
+        {
+          "side": "right",
+          "source": "machine_id",
+          "target": "machine_id"
+        },
+        {
+          "side": "right",
+          "source": "tech_id",
+          "target": "tech_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "event_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "machine_id",
+            "right": "machine_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_events",
+      "name": "j_ev_machines",
+      "operation": "join",
+      "right": "stg_machines"
+    },
+    {
+      "filters": [],
+      "grain": [
+        "machine_id",
+        "tech_id"
+      ],
+      "group_by": [
+        {
+          "source": "machine_id",
+          "target": "machine_id"
+        },
+        {
+          "source": "tech_id",
+          "target": "tech_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "downtime_min",
+          "function": "sum",
+          "name": "total_downtime"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_events"
+        }
+      ],
+      "name": "a_machine_stats",
+      "operation": "aggregate",
+      "source": "j_ev_machines"
+    },
+    {
+      "columns": [
+        {
+          "side": "right",
+          "source": "tech_id",
+          "target": "tech_id"
+        },
+        {
+          "side": "right",
+          "source": "tech_name",
+          "target": "tech_name"
+        },
+        {
+          "side": "right",
+          "source": "cert",
+          "target": "cert"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "tech_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "tech_id",
+            "right": "tech_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_machine_stats",
+      "name": "j_stats_techs",
+      "operation": "join",
+      "right": "stg_technicians"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "cert"
+      ],
+      "group_by": [
+        {
+          "source": "cert",
+          "target": "cert"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_techs"
+        }
+      ],
+      "name": "o_techs_by_cert",
+      "source": "j_stats_techs"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TC-"
+          },
+          "name": "tech_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "tech_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "L1",
+              "L2",
+              "L3"
+            ]
+          },
+          "name": "cert",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_technicians",
+      "primary_key": [
+        "tech_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "MC-"
+          },
+          "name": "machine_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_tech_machines",
+            "target_side": "right"
+          },
+          "name": "tech_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 10,
+            "min_length": 5
+          },
+          "name": "model",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_machines",
+      "primary_key": [
+        "machine_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EV-"
+          },
+          "name": "event_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_machine_events",
+            "target_side": "left"
+          },
+          "name": "machine_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 480,
+            "min": 5
+          },
+          "name": "downtime_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "decimal_places": 4,
+            "kind": "float_range",
+            "max": 0.5,
+            "min": -0.5
+          },
+          "name": "cal_offset",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "alphabet": "ABCDEFGHJKLMNPQRSTUVWXYZ23456789",
+            "kind": "random_string",
+            "max_length": 8,
+            "min_length": 8
+          },
+          "name": "wo_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_events",
+      "primary_key": [
+        "event_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "tech_id"
+        ],
+        "table": "raw_machines"
+      },
+      "name": "rel_tech_machines",
+      "right": {
+        "columns": [
+          "tech_id"
+        ],
+        "table": "raw_technicians"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "machine_id"
+        ],
+        "table": "raw_machines"
+      },
+      "name": "rel_machine_events",
+      "right": {
+        "columns": [
+          "machine_id"
+        ],
+        "table": "raw_events"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_maintenance_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "tech_id",
+          "target": "tech_id"
+        },
+        {
+          "operations": [],
+          "source": "tech_name",
+          "target": "tech_name"
+        },
+        {
+          "operations": [],
+          "source": "cert",
+          "target": "cert"
+        }
+      ],
+      "grain": [
+        "tech_id"
+      ],
+      "name": "stg_technicians",
+      "row_operations": [],
+      "source": "raw_technicians"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "machine_id",
+          "target": "machine_id"
+        },
+        {
+          "operations": [],
+          "source": "tech_id",
+          "target": "tech_id"
+        },
+        {
+          "operations": [],
+          "source": "model",
+          "target": "model"
+        }
+      ],
+      "grain": [
+        "machine_id"
+      ],
+      "name": "stg_machines",
+      "row_operations": [],
+      "source": "raw_machines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "operations": [],
+          "source": "machine_id",
+          "target": "machine_id"
+        },
+        {
+          "operations": [],
+          "source": "downtime_min",
+          "target": "downtime_min"
+        },
+        {
+          "operations": [],
+          "source": "cal_offset",
+          "target": "cal_offset"
+        },
+        {
+          "operations": [],
+          "source": "wo_code",
+          "target": "wo_code"
+        }
+      ],
+      "grain": [
+        "event_id"
+      ],
+      "name": "stg_events",
+      "row_operations": [],
+      "source": "raw_events"
+    }
+  ],
+  "tests": [
+    {
+      "column": "cert",
+      "model": "stg_technicians",
+      "name": "cert_values",
+      "type": "accepted_values",
+      "values": [
+        "L1",
+        "L2",
+        "L3"
+      ]
+    }
+  ]
+}

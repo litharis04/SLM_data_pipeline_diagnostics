@@ -1,0 +1,501 @@
+{
+  "description": "Transport fleet compliance pipeline: daytime speed and weight guards, per-route aggregates joined to managers.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "run_id",
+          "target": "run_id"
+        },
+        {
+          "side": "left",
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "side": "left",
+          "source": "speed_kmh",
+          "target": "speed_kmh"
+        },
+        {
+          "side": "left",
+          "source": "weight_kg",
+          "target": "weight_kg"
+        },
+        {
+          "side": "left",
+          "source": "shift",
+          "target": "shift"
+        },
+        {
+          "side": "right",
+          "source": "manager_id",
+          "target": "manager_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "run_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "route_id",
+            "right": "route_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_runs",
+      "name": "j_runs_routes",
+      "operation": "join",
+      "right": "stg_routes"
+    },
+    {
+      "filters": [],
+      "grain": [
+        "manager_id",
+        "route_id"
+      ],
+      "group_by": [
+        {
+          "source": "manager_id",
+          "target": "manager_id"
+        },
+        {
+          "source": "route_id",
+          "target": "route_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "speed_kmh",
+          "function": "avg",
+          "name": "avg_speed"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_runs"
+        }
+      ],
+      "name": "a_route_stats",
+      "operation": "aggregate",
+      "source": "j_runs_routes"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "manager_id",
+          "target": "manager_id"
+        },
+        {
+          "side": "left",
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "side": "left",
+          "source": "avg_speed",
+          "target": "avg_speed"
+        },
+        {
+          "side": "left",
+          "source": "n_runs",
+          "target": "n_runs"
+        },
+        {
+          "side": "right",
+          "source": "manager_name",
+          "target": "manager_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "manager_id",
+        "route_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "manager_id",
+            "right": "manager_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_route_stats",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_managers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "manager_name"
+      ],
+      "group_by": [
+        {
+          "source": "manager_name",
+          "target": "manager_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "avg_speed",
+          "function": "avg",
+          "name": "fleet_avg_speed"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_routes"
+        }
+      ],
+      "name": "o_speed_by_manager",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "MG-"
+          },
+          "name": "manager_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "manager_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_managers",
+      "primary_key": [
+        "manager_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RR-"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_manager_routes",
+            "target_side": "right"
+          },
+          "name": "manager_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "origin",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_routes",
+      "primary_key": [
+        "route_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "XX-"
+          },
+          "name": "run_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_route_runs",
+            "target_side": "left"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 140.0,
+            "min": 60.0
+          },
+          "name": "speed_kmh",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 45000.0,
+            "min": 5000.0
+          },
+          "name": "weight_kg",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "day",
+              "night"
+            ]
+          },
+          "name": "shift",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_runs",
+      "primary_key": [
+        "run_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "manager_id"
+        ],
+        "table": "raw_routes"
+      },
+      "name": "rel_manager_routes",
+      "right": {
+        "columns": [
+          "manager_id"
+        ],
+        "table": "raw_managers"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "route_id"
+        ],
+        "table": "raw_routes"
+      },
+      "name": "rel_route_runs",
+      "right": {
+        "columns": [
+          "route_id"
+        ],
+        "table": "raw_runs"
+      }
+    }
+  ],
+  "scenario_id": "transport_fleet_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "manager_id",
+          "target": "manager_id"
+        },
+        {
+          "operations": [],
+          "source": "manager_name",
+          "target": "manager_name"
+        }
+      ],
+      "grain": [
+        "manager_id"
+      ],
+      "name": "stg_managers",
+      "row_operations": [],
+      "source": "raw_managers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "manager_id",
+          "target": "manager_id"
+        },
+        {
+          "operations": [],
+          "source": "origin",
+          "target": "origin"
+        }
+      ],
+      "grain": [
+        "route_id"
+      ],
+      "name": "stg_routes",
+      "row_operations": [],
+      "source": "raw_routes"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "run_id",
+          "target": "run_id"
+        },
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "speed_kmh",
+          "target": "speed_kmh"
+        },
+        {
+          "operations": [],
+          "source": "weight_kg",
+          "target": "weight_kg"
+        },
+        {
+          "operations": [],
+          "source": "shift",
+          "target": "shift"
+        }
+      ],
+      "grain": [
+        "run_id"
+      ],
+      "name": "stg_runs",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "speed_kmh",
+                  "kind": "column"
+                },
+                "operator": "lt",
+                "right": {
+                  "kind": "literal",
+                  "value": 130.0
+                }
+              },
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "weight_kg",
+                  "kind": "column"
+                },
+                "operator": "lte",
+                "right": {
+                  "kind": "literal",
+                  "value": 40000.0
+                }
+              },
+              {
+                "condition": {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "shift",
+                    "kind": "column"
+                  },
+                  "operator": "eq",
+                  "right": {
+                    "kind": "literal",
+                    "value": "night"
+                  }
+                },
+                "kind": "not"
+              }
+            ],
+            "kind": "all"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_runs"
+    }
+  ],
+  "tests": [
+    {
+      "column": "shift",
+      "model": "stg_runs",
+      "name": "shift_values",
+      "type": "accepted_values",
+      "values": [
+        "day",
+        "night"
+      ]
+    }
+  ]
+}

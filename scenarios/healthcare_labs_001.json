@@ -1,0 +1,461 @@
+{
+  "description": "Healthcare labs pipeline: null-mapped pending flags, safe upper value bound, strict positive colony counts.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lab_id",
+          "target": "lab_id"
+        },
+        {
+          "side": "left",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "side": "left",
+          "source": "flag",
+          "target": "flag"
+        },
+        {
+          "side": "left",
+          "source": "colony_count",
+          "target": "colony_count"
+        },
+        {
+          "side": "right",
+          "source": "ordered_date",
+          "target": "ordered_date"
+        },
+        {
+          "side": "right",
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "side": "left",
+          "source": "test_name",
+          "target": "test_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lab_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "order_id",
+            "right": "order_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_labs",
+      "name": "j_labs_orders",
+      "operation": "join",
+      "right": "stg_orders"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lab_id",
+          "target": "lab_id"
+        },
+        {
+          "side": "left",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "side": "left",
+          "source": "flag",
+          "target": "flag"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "side": "left",
+          "source": "test_name",
+          "target": "test_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lab_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "patient_id",
+            "right": "patient_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_labs_orders",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_patients"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "test_name"
+      ],
+      "group_by": [
+        {
+          "source": "test_name",
+          "target": "test_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "value",
+          "function": "avg",
+          "name": "avg_value"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_labs"
+        }
+      ],
+      "name": "o_value_by_test",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PP-"
+          },
+          "name": "patient_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_patients",
+      "primary_key": [
+        "patient_id"
+      ],
+      "rows": {
+        "max": 25,
+        "min": 25
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "LO-"
+          },
+          "name": "order_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_patient_orders",
+            "target_side": "left"
+          },
+          "name": "patient_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "ordered_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_orders",
+      "primary_key": [
+        "order_id"
+      ],
+      "rows": {
+        "max": 150,
+        "min": 50
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LB-"
+          },
+          "name": "lab_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_order_labs",
+            "target_side": "left"
+          },
+          "name": "order_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "cbc",
+              "culture",
+              "metabolic"
+            ]
+          },
+          "name": "test_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 0.0
+          },
+          "name": "value",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "abnormal",
+              "normal",
+              "pending"
+            ]
+          },
+          "name": "flag",
+          "null_probability": 0.1,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000,
+            "min": 1
+          },
+          "name": "colony_count",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_labs",
+      "primary_key": [
+        "lab_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "patient_id"
+        ],
+        "table": "raw_patients"
+      },
+      "name": "rel_patient_orders",
+      "right": {
+        "columns": [
+          "patient_id"
+        ],
+        "table": "raw_orders"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "order_id"
+        ],
+        "table": "raw_orders"
+      },
+      "name": "rel_order_labs",
+      "right": {
+        "columns": [
+          "order_id"
+        ],
+        "table": "raw_labs"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_labs_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "patient_id"
+      ],
+      "name": "stg_patients",
+      "row_operations": [],
+      "source": "raw_patients"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "operations": [],
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "operations": [],
+          "source": "ordered_date",
+          "target": "ordered_date"
+        }
+      ],
+      "grain": [
+        "order_id"
+      ],
+      "name": "stg_orders",
+      "row_operations": [],
+      "source": "raw_orders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "lab_id",
+          "target": "lab_id"
+        },
+        {
+          "operations": [],
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "operations": [],
+          "source": "test_name",
+          "target": "test_name"
+        },
+        {
+          "operations": [],
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "abnormal": "A",
+                "normal": "N"
+              },
+              "on_unmapped": "null",
+              "op": "map_values"
+            }
+          ],
+          "source": "flag",
+          "target": "flag"
+        },
+        {
+          "operations": [],
+          "source": "colony_count",
+          "target": "colony_count"
+        }
+      ],
+      "grain": [
+        "lab_id"
+      ],
+      "name": "stg_labs",
+      "row_operations": [],
+      "source": "raw_labs"
+    }
+  ],
+  "tests": [
+    {
+      "column": "value",
+      "max": 10000.0,
+      "model": "stg_labs",
+      "name": "value_capped",
+      "type": "column_range"
+    },
+    {
+      "column": "colony_count",
+      "inclusive": false,
+      "min": 0,
+      "model": "stg_labs",
+      "name": "colonies_positive",
+      "type": "column_range"
+    }
+  ]
+}

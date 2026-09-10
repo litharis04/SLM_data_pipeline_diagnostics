@@ -1,0 +1,483 @@
+{
+  "description": "Hospitality occupancy pipeline: quarterly derived periods, declared-but-absent guest notes under not-null contract.",
+  "domain": "hospitality",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "stay_id",
+          "target": "stay_id"
+        },
+        {
+          "source": "room_id",
+          "target": "room_id"
+        },
+        {
+          "source": "nights",
+          "target": "nights"
+        },
+        {
+          "source": "checkin",
+          "target": "checkin"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "quarter",
+            "value": {
+              "column": "checkin",
+              "kind": "column"
+            }
+          },
+          "name": "quarter",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "month",
+            "value": {
+              "column": "checkin",
+              "kind": "column"
+            }
+          },
+          "name": "stay_month",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "stay_id"
+      ],
+      "name": "t_stays",
+      "operation": "transform",
+      "source": "stg_stays"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "stay_id",
+          "target": "stay_id"
+        },
+        {
+          "side": "left",
+          "source": "nights",
+          "target": "nights"
+        },
+        {
+          "side": "left",
+          "source": "quarter",
+          "target": "quarter"
+        },
+        {
+          "side": "right",
+          "source": "property_id",
+          "target": "property_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "stay_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "room_id",
+            "right": "room_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_stays",
+      "name": "j_stays_rooms",
+      "operation": "join",
+      "right": "stg_rooms"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "stay_id",
+          "target": "stay_id"
+        },
+        {
+          "side": "left",
+          "source": "nights",
+          "target": "nights"
+        },
+        {
+          "side": "left",
+          "source": "quarter",
+          "target": "quarter"
+        },
+        {
+          "side": "right",
+          "source": "property_name",
+          "target": "property_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "stay_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "property_id",
+            "right": "property_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_stays_rooms",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_properties"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "property_name",
+        "quarter"
+      ],
+      "group_by": [
+        {
+          "source": "property_name",
+          "target": "property_name"
+        },
+        {
+          "source": "quarter",
+          "target": "quarter"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "nights",
+          "function": "sum",
+          "name": "total_nights"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_stays"
+        }
+      ],
+      "name": "o_nights_by_property_quarter",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "property_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "property_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_properties",
+      "primary_key": [
+        "property_id"
+      ],
+      "rows": {
+        "max": 4,
+        "min": 4
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RM-"
+          },
+          "name": "room_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_property_rooms",
+            "target_side": "left"
+          },
+          "name": "property_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "double",
+              "single",
+              "suite"
+            ]
+          },
+          "name": "room_type",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_rooms",
+      "primary_key": [
+        "room_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "stay_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_room_stays",
+            "target_side": "left"
+          },
+          "name": "room_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "checkin",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 21,
+            "min": 1
+          },
+          "name": "nights",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "notes",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "requests",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_stays",
+      "primary_key": [
+        "stay_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "property_id"
+        ],
+        "table": "raw_properties"
+      },
+      "name": "rel_property_rooms",
+      "right": {
+        "columns": [
+          "property_id"
+        ],
+        "table": "raw_rooms"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "room_id"
+        ],
+        "table": "raw_rooms"
+      },
+      "name": "rel_room_stays",
+      "right": {
+        "columns": [
+          "room_id"
+        ],
+        "table": "raw_stays"
+      }
+    }
+  ],
+  "scenario_id": "hospitality_revenue_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "property_id",
+          "target": "property_id"
+        },
+        {
+          "operations": [],
+          "source": "property_name",
+          "target": "property_name"
+        }
+      ],
+      "grain": [
+        "property_id"
+      ],
+      "name": "stg_properties",
+      "row_operations": [],
+      "source": "raw_properties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "room_id",
+          "target": "room_id"
+        },
+        {
+          "operations": [],
+          "source": "property_id",
+          "target": "property_id"
+        },
+        {
+          "operations": [],
+          "source": "room_type",
+          "target": "room_type"
+        }
+      ],
+      "grain": [
+        "room_id"
+      ],
+      "name": "stg_rooms",
+      "row_operations": [],
+      "source": "raw_rooms"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "stay_id",
+          "target": "stay_id"
+        },
+        {
+          "operations": [],
+          "source": "room_id",
+          "target": "room_id"
+        },
+        {
+          "operations": [],
+          "source": "checkin",
+          "target": "checkin"
+        },
+        {
+          "operations": [],
+          "source": "nights",
+          "target": "nights"
+        },
+        {
+          "operations": [],
+          "source": "notes",
+          "target": "notes"
+        },
+        {
+          "operations": [],
+          "source": "requests",
+          "target": "requests"
+        }
+      ],
+      "grain": [
+        "stay_id"
+      ],
+      "name": "stg_stays",
+      "row_operations": [],
+      "source": "raw_stays"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "notes",
+        "requests"
+      ],
+      "model": "stg_stays",
+      "name": "guest_notes_present",
+      "type": "not_null"
+    }
+  ]
+}

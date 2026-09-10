@@ -1,0 +1,460 @@
+{
+  "description": "Sports transfers pipeline: many-to-many player to club-season linkage, star bonus conditionals.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "left",
+          "source": "club_id",
+          "target": "club_id"
+        },
+        {
+          "side": "left",
+          "source": "season",
+          "target": "season"
+        },
+        {
+          "side": "left",
+          "source": "salary",
+          "target": "salary"
+        },
+        {
+          "side": "left",
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "side": "right",
+          "source": "position",
+          "target": "position"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "contract_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "player_id",
+            "right": "player_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_contracts",
+      "name": "j_con_players",
+      "operation": "join",
+      "right": "stg_players"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "left",
+          "source": "salary",
+          "target": "salary"
+        },
+        {
+          "side": "left",
+          "source": "bonus",
+          "target": "bonus"
+        },
+        {
+          "side": "left",
+          "source": "position",
+          "target": "position"
+        },
+        {
+          "side": "right",
+          "source": "club_id",
+          "target": "club_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "contract_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "club_id",
+            "right": "club_id"
+          },
+          {
+            "left": "season",
+            "right": "season"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_con_players",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_club_seasons"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "position"
+      ],
+      "group_by": [
+        {
+          "source": "position",
+          "target": "position"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "salary",
+          "function": "max",
+          "name": "max_salary"
+        },
+        {
+          "column": "bonus",
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "salary",
+              "kind": "column"
+            },
+            "operator": "gte",
+            "right": {
+              "kind": "literal",
+              "value": 500000.0
+            }
+          },
+          "function": "conditional_sum",
+          "name": "star_bonus"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_contracts"
+        }
+      ],
+      "name": "o_pay_by_position",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "player_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "defender",
+              "forward",
+              "keeper"
+            ]
+          },
+          "name": "position",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_players",
+      "primary_key": [
+        "player_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 40
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "FC-"
+          },
+          "name": "club_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "23",
+              "24"
+            ]
+          },
+          "name": "season",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_club_seasons",
+      "primary_key": [
+        "club_id",
+        "season"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "CT-"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_transfers",
+            "target_side": "left"
+          },
+          "name": "player_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_transfers",
+            "target_side": "right"
+          },
+          "name": "club_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_transfers",
+            "target_side": "right"
+          },
+          "name": "season",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000000.0,
+            "min": 50000.0
+          },
+          "name": "salary",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500000.0,
+            "min": 0.0
+          },
+          "name": "bonus",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_contracts",
+      "primary_key": [
+        "contract_id"
+      ],
+      "rows": {
+        "max": 200,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "bridge": {
+        "left_columns": [
+          "player_id"
+        ],
+        "right_columns": [
+          "club_id",
+          "season"
+        ],
+        "table": "raw_contracts"
+      },
+      "cardinality": "many_to_many",
+      "left": {
+        "columns": [
+          "player_id"
+        ],
+        "table": "raw_players"
+      },
+      "name": "rel_transfers",
+      "right": {
+        "columns": [
+          "club_id",
+          "season"
+        ],
+        "table": "raw_club_seasons"
+      }
+    }
+  ],
+  "scenario_id": "sports_transfers_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "player_id",
+          "target": "player_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [],
+          "source": "position",
+          "target": "position"
+        }
+      ],
+      "grain": [
+        "player_id"
+      ],
+      "name": "stg_players",
+      "row_operations": [],
+      "source": "raw_players"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "club_id",
+          "target": "club_id"
+        },
+        {
+          "operations": [],
+          "source": "season",
+          "target": "season"
+        }
+      ],
+      "grain": [
+        "club_id",
+        "season"
+      ],
+      "name": "stg_club_seasons",
+      "row_operations": [],
+      "source": "raw_club_seasons"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "player_id",
+          "target": "player_id"
+        },
+        {
+          "operations": [],
+          "source": "club_id",
+          "target": "club_id"
+        },
+        {
+          "operations": [],
+          "source": "season",
+          "target": "season"
+        },
+        {
+          "operations": [],
+          "source": "salary",
+          "target": "salary"
+        },
+        {
+          "operations": [],
+          "source": "bonus",
+          "target": "bonus"
+        }
+      ],
+      "grain": [
+        "contract_id"
+      ],
+      "name": "stg_contracts",
+      "row_operations": [],
+      "source": "raw_contracts"
+    }
+  ],
+  "tests": [
+    {
+      "column": "position",
+      "model": "stg_players",
+      "name": "position_values",
+      "type": "accepted_values",
+      "values": [
+        "defender",
+        "forward",
+        "keeper"
+      ]
+    }
+  ]
+}

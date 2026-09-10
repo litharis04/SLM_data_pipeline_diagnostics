@@ -1,0 +1,421 @@
+{
+  "description": "Media podcast pipeline: composite season linkage, public genre labels, earliest publish dates.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "publish_date",
+          "target": "publish_date"
+        },
+        {
+          "side": "right",
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "side": "right",
+          "source": "season_no",
+          "target": "season_no"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "episode_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "show_id",
+            "right": "show_id"
+          },
+          {
+            "left": "season_no",
+            "right": "season_no"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_episodes",
+      "name": "j_ep_seasons",
+      "operation": "join",
+      "right": "stg_seasons"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "publish_date",
+          "target": "publish_date"
+        },
+        {
+          "side": "right",
+          "source": "niche",
+          "target": "niche"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "episode_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "show_id",
+            "right": "show_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ep_seasons",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_shows"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "genre"
+      ],
+      "group_by": [
+        {
+          "source": "niche",
+          "target": "genre"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "publish_date",
+          "function": "min",
+          "name": "first_published"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_episodes"
+        }
+      ],
+      "name": "o_first_by_genre",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SH-"
+          },
+          "name": "show_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 6
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "comedy",
+              "documentary"
+            ]
+          },
+          "name": "niche",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_shows",
+      "primary_key": [
+        "show_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_show_seasons",
+            "target_side": "left"
+          },
+          "name": "show_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 4,
+            "min": 1
+          },
+          "name": "season_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_seasons",
+      "primary_key": [
+        "show_id",
+        "season_no"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 24
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EP-"
+          },
+          "name": "episode_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_season_episodes",
+            "target_side": "left"
+          },
+          "name": "show_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_season_episodes",
+            "target_side": "left"
+          },
+          "name": "season_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 120,
+            "min": 10
+          },
+          "name": "duration_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2023-01-01"
+          },
+          "name": "publish_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_episodes",
+      "primary_key": [
+        "episode_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "show_id"
+        ],
+        "table": "raw_shows"
+      },
+      "name": "rel_show_seasons",
+      "right": {
+        "columns": [
+          "show_id"
+        ],
+        "table": "raw_seasons"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "show_id",
+          "season_no"
+        ],
+        "table": "raw_seasons"
+      },
+      "name": "rel_season_episodes",
+      "right": {
+        "columns": [
+          "show_id",
+          "season_no"
+        ],
+        "table": "raw_episodes"
+      }
+    }
+  ],
+  "scenario_id": "media_podcasts_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "operations": [],
+          "source": "niche",
+          "target": "niche"
+        }
+      ],
+      "grain": [
+        "show_id"
+      ],
+      "name": "stg_shows",
+      "row_operations": [],
+      "source": "raw_shows"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "operations": [],
+          "source": "season_no",
+          "target": "season_no"
+        }
+      ],
+      "grain": [
+        "show_id",
+        "season_no"
+      ],
+      "name": "stg_seasons",
+      "row_operations": [],
+      "source": "raw_seasons"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "operations": [],
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "operations": [],
+          "source": "season_no",
+          "target": "season_no"
+        },
+        {
+          "operations": [],
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "operations": [],
+          "source": "publish_date",
+          "target": "publish_date"
+        }
+      ],
+      "grain": [
+        "episode_id"
+      ],
+      "name": "stg_episodes",
+      "row_operations": [],
+      "source": "raw_episodes"
+    }
+  ],
+  "tests": [
+    {
+      "column": "niche",
+      "model": "stg_shows",
+      "name": "niche_values",
+      "type": "accepted_values",
+      "values": [
+        "comedy",
+        "documentary"
+      ]
+    }
+  ]
+}

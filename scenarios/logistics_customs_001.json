@@ -1,0 +1,438 @@
+{
+  "description": "Logistics port-call pipeline: deduplicated call feed joined to vessels, port contact details.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "side": "left",
+          "source": "dwell_hrs",
+          "target": "dwell_hrs"
+        },
+        {
+          "side": "left",
+          "source": "arrival",
+          "target": "arrival"
+        },
+        {
+          "side": "right",
+          "source": "port_name",
+          "target": "port_name"
+        },
+        {
+          "side": "left",
+          "source": "vessel_id",
+          "target": "vessel_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "call_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "port_id",
+            "right": "port_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_calls",
+      "name": "j_calls_ports",
+      "operation": "join",
+      "right": "stg_ports"
+    },
+    {
+      "grain": [
+        "call_id"
+      ],
+      "keys": [
+        "call_id"
+      ],
+      "name": "d_calls_dedup",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "arrival",
+          "direction": "desc"
+        }
+      ],
+      "source": "j_calls_ports"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "side": "left",
+          "source": "dwell_hrs",
+          "target": "dwell_hrs"
+        },
+        {
+          "side": "left",
+          "source": "port_name",
+          "target": "port_name"
+        },
+        {
+          "side": "right",
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "call_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "vessel_id",
+            "right": "vessel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_calls_dedup",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_vessels"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "port_name"
+      ],
+      "group_by": [
+        {
+          "source": "port_name",
+          "target": "port_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "dwell_hrs",
+          "function": "avg",
+          "name": "avg_dwell"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_calls"
+        }
+      ],
+      "name": "o_dwell_by_port",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "PT-"
+          },
+          "name": "port_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "street_address"
+          },
+          "name": "address",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "phone_number"
+          },
+          "name": "phone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "port_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_ports",
+      "primary_key": [
+        "port_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "VS-"
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "vessel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vessels",
+      "primary_key": [
+        "vessel_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CL-"
+          },
+          "name": "call_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_port_calls",
+            "target_side": "left"
+          },
+          "name": "port_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_vessel_calls",
+            "target_side": "right"
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "arrival",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 168,
+            "min": 1
+          },
+          "name": "dwell_hrs",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_calls",
+      "primary_key": [
+        "call_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "port_id"
+        ],
+        "table": "raw_ports"
+      },
+      "name": "rel_port_calls",
+      "right": {
+        "columns": [
+          "port_id"
+        ],
+        "table": "raw_calls"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "vessel_id"
+        ],
+        "table": "raw_calls"
+      },
+      "name": "rel_vessel_calls",
+      "right": {
+        "columns": [
+          "vessel_id"
+        ],
+        "table": "raw_vessels"
+      }
+    }
+  ],
+  "scenario_id": "logistics_customs_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "port_id",
+          "target": "port_id"
+        },
+        {
+          "operations": [],
+          "source": "address",
+          "target": "address"
+        },
+        {
+          "operations": [],
+          "source": "phone",
+          "target": "phone"
+        },
+        {
+          "operations": [],
+          "source": "port_name",
+          "target": "port_name"
+        }
+      ],
+      "grain": [
+        "port_id"
+      ],
+      "name": "stg_ports",
+      "row_operations": [],
+      "source": "raw_ports"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "operations": [],
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "grain": [
+        "vessel_id"
+      ],
+      "name": "stg_vessels",
+      "row_operations": [],
+      "source": "raw_vessels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "operations": [],
+          "source": "port_id",
+          "target": "port_id"
+        },
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "operations": [],
+          "source": "arrival",
+          "target": "arrival"
+        },
+        {
+          "operations": [],
+          "source": "dwell_hrs",
+          "target": "dwell_hrs"
+        }
+      ],
+      "grain": [
+        "call_id"
+      ],
+      "name": "stg_calls",
+      "row_operations": [],
+      "source": "raw_calls"
+    }
+  ],
+  "tests": [
+    {
+      "column": "dwell_hrs",
+      "min": 0,
+      "model": "stg_calls",
+      "name": "dwell_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

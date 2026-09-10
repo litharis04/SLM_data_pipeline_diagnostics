@@ -1,0 +1,520 @@
+{
+  "description": "Telecom usage pipeline: nested billing expression, day-of-month derivation, unique eSIM pairing codes.",
+  "domain": "telecom",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "source": "iccid",
+          "target": "iccid"
+        },
+        {
+          "source": "puk",
+          "target": "puk"
+        },
+        {
+          "source": "activated",
+          "target": "activated"
+        },
+        {
+          "source": "monthly_fee",
+          "target": "monthly_fee"
+        },
+        {
+          "source": "roaming",
+          "target": "roaming"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day",
+            "value": {
+              "column": "activated",
+              "kind": "column"
+            }
+          },
+          "name": "act_day",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "kind": "coalesce",
+              "values": [
+                {
+                  "column": "monthly_fee",
+                  "kind": "column"
+                },
+                {
+                  "kind": "literal",
+                  "value": 0.0
+                }
+              ]
+            },
+            "operator": "add",
+            "right": {
+              "column": "roaming",
+              "kind": "column"
+            }
+          },
+          "name": "bill",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "sim_id"
+      ],
+      "name": "t_sims",
+      "operation": "transform",
+      "source": "stg_sims"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "side": "left",
+          "source": "iccid",
+          "target": "iccid"
+        },
+        {
+          "side": "left",
+          "source": "puk",
+          "target": "puk"
+        },
+        {
+          "side": "left",
+          "source": "act_day",
+          "target": "act_day"
+        },
+        {
+          "side": "right",
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "sub_id",
+            "right": "sub_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_sims",
+      "name": "j_sims_subs",
+      "operation": "join",
+      "right": "stg_subscribers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "side": "left",
+          "source": "act_day",
+          "target": "act_day"
+        },
+        {
+          "side": "right",
+          "source": "usage_id",
+          "target": "usage_id"
+        },
+        {
+          "side": "right",
+          "source": "mb",
+          "target": "mb"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "usage_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "sim_id",
+            "right": "sim_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_sims_subs",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_usages"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "act_day"
+      ],
+      "group_by": [
+        {
+          "source": "act_day",
+          "target": "act_day"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "mb",
+          "function": "sum",
+          "name": "total_mb"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_usages"
+        }
+      ],
+      "name": "o_mb_by_act_day",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SB-"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "sub_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_subscribers",
+      "primary_key": [
+        "sub_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "SM-"
+          },
+          "name": "sim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sub_sims",
+            "target_side": "left"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "iccid",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "puk",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2023-01-01"
+          },
+          "name": "activated",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50.0,
+            "min": 5.0
+          },
+          "name": "monthly_fee",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 30.0,
+            "min": 0.0
+          },
+          "name": "roaming",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_sims",
+      "primary_key": [
+        "sim_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "UG-"
+          },
+          "name": "usage_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sim_usages",
+            "target_side": "left"
+          },
+          "name": "sim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 5000.0,
+            "min": 10.0
+          },
+          "name": "mb",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_usages",
+      "primary_key": [
+        "usage_id"
+      ],
+      "rows": {
+        "max": 400,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_subscribers"
+      },
+      "name": "rel_sub_sims",
+      "right": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_sims"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "sim_id"
+        ],
+        "table": "raw_sims"
+      },
+      "name": "rel_sim_usages",
+      "right": {
+        "columns": [
+          "sim_id"
+        ],
+        "table": "raw_usages"
+      }
+    }
+  ],
+  "scenario_id": "telecom_usage_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "grain": [
+        "sub_id"
+      ],
+      "name": "stg_subscribers",
+      "row_operations": [],
+      "source": "raw_subscribers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "iccid",
+          "target": "iccid"
+        },
+        {
+          "operations": [],
+          "source": "puk",
+          "target": "puk"
+        },
+        {
+          "operations": [],
+          "source": "activated",
+          "target": "activated"
+        },
+        {
+          "operations": [],
+          "source": "monthly_fee",
+          "target": "monthly_fee"
+        },
+        {
+          "operations": [],
+          "source": "roaming",
+          "target": "roaming"
+        }
+      ],
+      "grain": [
+        "sim_id"
+      ],
+      "name": "stg_sims",
+      "row_operations": [],
+      "source": "raw_sims"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "usage_id",
+          "target": "usage_id"
+        },
+        {
+          "operations": [],
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "operations": [],
+          "source": "mb",
+          "target": "mb"
+        }
+      ],
+      "grain": [
+        "usage_id"
+      ],
+      "name": "stg_usages",
+      "row_operations": [],
+      "source": "raw_usages"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "iccid",
+        "puk"
+      ],
+      "model": "j_sims_subs",
+      "name": "pairing_unique",
+      "type": "unique"
+    }
+  ]
+}

@@ -1,0 +1,494 @@
+{
+  "description": "HR recruiting pipeline: unique weighted requisition codes, post-screening reviewed interviews only.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "int_id",
+          "target": "int_id"
+        },
+        {
+          "side": "left",
+          "source": "round",
+          "target": "round"
+        },
+        {
+          "side": "left",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "right",
+          "source": "cand_id",
+          "target": "cand_id"
+        },
+        {
+          "side": "right",
+          "source": "req_id",
+          "target": "req_id"
+        },
+        {
+          "side": "right",
+          "source": "score",
+          "target": "score"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "int_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "cand_id",
+            "right": "cand_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_interviews",
+      "name": "j_int_cands",
+      "operation": "join",
+      "right": "stg_candidates"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "int_id",
+          "target": "int_id"
+        },
+        {
+          "side": "left",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "right",
+          "source": "req_code",
+          "target": "req_code"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "int_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "req_id",
+            "right": "req_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_int_cands",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_requisitions"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "req_code"
+      ],
+      "group_by": [
+        {
+          "source": "req_code",
+          "target": "req_code"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "score",
+          "function": "avg",
+          "name": "avg_score"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_interviews"
+        }
+      ],
+      "name": "o_score_by_req",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RQ-"
+          },
+          "name": "req_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "BE-1",
+              "BE-2",
+              "DA-1",
+              "DS-1",
+              "FE-1",
+              "QA-1"
+            ],
+            "weights": [
+              3.0,
+              2.0,
+              4.0,
+              1.0,
+              5.0,
+              2.0
+            ]
+          },
+          "name": "req_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 15,
+            "min_length": 5
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_requisitions",
+      "primary_key": [
+        "req_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "CD-"
+          },
+          "name": "cand_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_req_cands",
+            "target_side": "left"
+          },
+          "name": "req_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_candidates",
+      "primary_key": [
+        "cand_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "IV-"
+          },
+          "name": "int_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_cand_interviews",
+            "target_side": "left"
+          },
+          "name": "cand_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "hr",
+              "screening",
+              "tech"
+            ]
+          },
+          "name": "round",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "rating",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 40,
+            "min_length": 5
+          },
+          "name": "feedback",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_interviews",
+      "primary_key": [
+        "int_id"
+      ],
+      "rows": {
+        "max": 200,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "req_id"
+        ],
+        "table": "raw_requisitions"
+      },
+      "name": "rel_req_cands",
+      "right": {
+        "columns": [
+          "req_id"
+        ],
+        "table": "raw_candidates"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "cand_id"
+        ],
+        "table": "raw_candidates"
+      },
+      "name": "rel_cand_interviews",
+      "right": {
+        "columns": [
+          "cand_id"
+        ],
+        "table": "raw_interviews"
+      }
+    }
+  ],
+  "scenario_id": "hr_recruiting_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "req_id",
+          "target": "req_id"
+        },
+        {
+          "operations": [],
+          "source": "req_code",
+          "target": "req_code"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "grain": [
+        "req_id"
+      ],
+      "name": "stg_requisitions",
+      "row_operations": [],
+      "source": "raw_requisitions"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "cand_id",
+          "target": "cand_id"
+        },
+        {
+          "operations": [],
+          "source": "req_id",
+          "target": "req_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        }
+      ],
+      "grain": [
+        "cand_id"
+      ],
+      "name": "stg_candidates",
+      "row_operations": [],
+      "source": "raw_candidates"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "int_id",
+          "target": "int_id"
+        },
+        {
+          "operations": [],
+          "source": "cand_id",
+          "target": "cand_id"
+        },
+        {
+          "operations": [],
+          "source": "round",
+          "target": "round"
+        },
+        {
+          "operations": [],
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "operations": [],
+          "source": "feedback",
+          "target": "feedback"
+        }
+      ],
+      "grain": [
+        "int_id"
+      ],
+      "name": "stg_interviews",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "in",
+                "negated": true,
+                "options": [
+                  "screening"
+                ],
+                "value": {
+                  "column": "round",
+                  "kind": "column"
+                }
+              },
+              {
+                "kind": "is_null",
+                "negated": true,
+                "value": {
+                  "column": "feedback",
+                  "kind": "column"
+                }
+              }
+            ],
+            "kind": "all"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_interviews"
+    }
+  ],
+  "tests": [
+    {
+      "column": "round",
+      "model": "stg_interviews",
+      "name": "round_values",
+      "type": "accepted_values",
+      "values": [
+        "hr",
+        "screening",
+        "tech"
+      ]
+    }
+  ]
+}

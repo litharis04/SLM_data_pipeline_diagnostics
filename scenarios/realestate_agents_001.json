@@ -1,0 +1,481 @@
+{
+  "description": "Real-estate showcase pipeline: curated budget and luxury listings through a nested transform filter.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "source": "segment",
+          "target": "segment"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "conditions": [
+            {
+              "conditions": [
+                {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "price",
+                    "kind": "column"
+                  },
+                  "operator": "lt",
+                  "right": {
+                    "kind": "literal",
+                    "value": 300000.0
+                  }
+                },
+                {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "segment",
+                    "kind": "column"
+                  },
+                  "operator": "eq",
+                  "right": {
+                    "kind": "literal",
+                    "value": "budget"
+                  }
+                }
+              ],
+              "kind": "all"
+            },
+            {
+              "conditions": [
+                {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "price",
+                    "kind": "column"
+                  },
+                  "operator": "gte",
+                  "right": {
+                    "kind": "literal",
+                    "value": 1000000.0
+                  }
+                },
+                {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "segment",
+                    "kind": "column"
+                  },
+                  "operator": "eq",
+                  "right": {
+                    "kind": "literal",
+                    "value": "luxury"
+                  }
+                }
+              ],
+              "kind": "all"
+            }
+          ],
+          "kind": "any"
+        }
+      ],
+      "grain": [
+        "listing_id"
+      ],
+      "name": "t_showcase",
+      "operation": "transform",
+      "source": "stg_listings"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "left",
+          "source": "segment",
+          "target": "segment"
+        },
+        {
+          "side": "right",
+          "source": "office_id",
+          "target": "office_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "listing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "agent_id",
+            "right": "agent_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_showcase",
+      "name": "j_show_agents",
+      "operation": "join",
+      "right": "stg_agents"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "left",
+          "source": "segment",
+          "target": "segment"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "listing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "office_id",
+            "right": "office_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_show_agents",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_offices"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "segment"
+      ],
+      "group_by": [
+        {
+          "source": "segment",
+          "target": "segment"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "price",
+          "function": "avg",
+          "name": "avg_price"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_listings"
+        }
+      ],
+      "name": "o_price_by_segment",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 1,
+            "kind": "formatted_id",
+            "prefix": "O-"
+          },
+          "name": "office_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "city"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_offices",
+      "primary_key": [
+        "office_id"
+      ],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AG-"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_office_agents",
+            "target_side": "left"
+          },
+          "name": "office_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_agents",
+      "primary_key": [
+        "agent_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LS-"
+          },
+          "name": "listing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_agent_listings",
+            "target_side": "left"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 3000000.0,
+            "min": 100000.0
+          },
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "budget",
+              "luxury",
+              "mid"
+            ]
+          },
+          "name": "segment",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_listings",
+      "primary_key": [
+        "listing_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "office_id"
+        ],
+        "table": "raw_offices"
+      },
+      "name": "rel_office_agents",
+      "right": {
+        "columns": [
+          "office_id"
+        ],
+        "table": "raw_agents"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_agents"
+      },
+      "name": "rel_agent_listings",
+      "right": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_listings"
+      }
+    }
+  ],
+  "scenario_id": "realestate_agents_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "office_id",
+          "target": "office_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "office_id"
+      ],
+      "name": "stg_offices",
+      "row_operations": [],
+      "source": "raw_offices"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "office_id",
+          "target": "office_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "agent_id"
+      ],
+      "name": "stg_agents",
+      "row_operations": [],
+      "source": "raw_agents"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "operations": [],
+          "source": "segment",
+          "target": "segment"
+        }
+      ],
+      "grain": [
+        "listing_id"
+      ],
+      "name": "stg_listings",
+      "row_operations": [],
+      "source": "raw_listings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "segment",
+      "model": "stg_listings",
+      "name": "segment_values",
+      "type": "accepted_values",
+      "values": [
+        "budget",
+        "luxury",
+        "mid"
+      ]
+    }
+  ]
+}
