@@ -1,0 +1,477 @@
+{
+  "description": "Sports league pipeline: shared game feed branching into team and venue summaries with different grains.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "game_id",
+          "target": "game_id"
+        },
+        {
+          "side": "left",
+          "source": "home_id",
+          "target": "home_id"
+        },
+        {
+          "side": "left",
+          "source": "attendance",
+          "target": "attendance"
+        },
+        {
+          "side": "left",
+          "source": "weather",
+          "target": "weather"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "coalesce",
+            "values": [
+              {
+                "column": "weather",
+                "kind": "column"
+              },
+              {
+                "kind": "literal",
+                "value": "dome"
+              }
+            ]
+          },
+          "name": "forecast",
+          "type": "string"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "game_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "home_id",
+            "right": "team_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_games",
+      "name": "j_games_teams",
+      "operation": "join",
+      "right": "stg_teams"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "game_id",
+          "target": "game_id"
+        },
+        {
+          "side": "left",
+          "source": "attendance",
+          "target": "attendance"
+        },
+        {
+          "side": "right",
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "side": "right",
+          "source": "venue_name",
+          "target": "venue_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "game_id",
+        "venue_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "venue_id",
+            "right": "venue_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_games",
+      "name": "j_games_venues",
+      "operation": "join",
+      "right": "stg_venues"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "home_id"
+      ],
+      "group_by": [
+        {
+          "source": "home_id",
+          "target": "home_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "attendance",
+          "function": "sum",
+          "name": "total_attendance"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_games"
+        }
+      ],
+      "name": "o_attendance_by_team",
+      "source": "j_games_teams"
+    },
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "venue_name"
+      ],
+      "group_by": [
+        {
+          "source": "venue_name",
+          "target": "venue_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "attendance",
+          "function": "avg",
+          "name": "avg_attendance"
+        }
+      ],
+      "name": "o_attendance_by_venue",
+      "source": "j_games_venues"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "TM-"
+          },
+          "name": "team_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "coach",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_teams",
+      "primary_key": [
+        "team_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 99,
+            "min": 1
+          },
+          "name": "venue_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "venue_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 80000,
+            "min": 5000
+          },
+          "name": "capacity",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_venues",
+      "primary_key": [
+        "venue_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "GM-"
+          },
+          "name": "game_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_team_games",
+            "target_side": "left"
+          },
+          "name": "home_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_venue_games",
+            "target_side": "right"
+          },
+          "name": "venue_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "game_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 80000,
+            "min": 0
+          },
+          "name": "attendance",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "clear",
+              "rain",
+              "snow"
+            ]
+          },
+          "name": "weather",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_games",
+      "primary_key": [
+        "game_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "team_id"
+        ],
+        "table": "raw_teams"
+      },
+      "name": "rel_team_games",
+      "right": {
+        "columns": [
+          "home_id"
+        ],
+        "table": "raw_games"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "venue_id"
+        ],
+        "table": "raw_games"
+      },
+      "name": "rel_venue_games",
+      "right": {
+        "columns": [
+          "venue_id"
+        ],
+        "table": "raw_venues"
+      }
+    }
+  ],
+  "scenario_id": "sports_league_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "team_id",
+          "target": "team_id"
+        },
+        {
+          "operations": [],
+          "source": "coach",
+          "target": "coach"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "team_id"
+      ],
+      "name": "stg_teams",
+      "row_operations": [],
+      "source": "raw_teams"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "operations": [],
+          "source": "venue_name",
+          "target": "venue_name"
+        },
+        {
+          "operations": [],
+          "source": "capacity",
+          "target": "capacity"
+        }
+      ],
+      "grain": [
+        "venue_id"
+      ],
+      "name": "stg_venues",
+      "row_operations": [],
+      "source": "raw_venues"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "game_id",
+          "target": "game_id"
+        },
+        {
+          "operations": [],
+          "source": "home_id",
+          "target": "home_id"
+        },
+        {
+          "operations": [],
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "operations": [],
+          "source": "game_date",
+          "target": "game_date"
+        },
+        {
+          "operations": [],
+          "source": "attendance",
+          "target": "attendance"
+        },
+        {
+          "operations": [],
+          "source": "weather",
+          "target": "weather"
+        }
+      ],
+      "grain": [
+        "game_id"
+      ],
+      "name": "stg_games",
+      "row_operations": [],
+      "source": "raw_games"
+    }
+  ],
+  "tests": [
+    {
+      "column": "attendance",
+      "min": 0,
+      "model": "stg_games",
+      "name": "attendance_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

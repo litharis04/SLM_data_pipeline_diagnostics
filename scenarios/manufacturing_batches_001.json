@@ -1,0 +1,482 @@
+{
+  "description": "Manufacturing quality pipeline: composite many-to-one defect linkage, whole-dollar defect costs.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "side": "left",
+          "source": "check_no",
+          "target": "check_no"
+        },
+        {
+          "side": "left",
+          "source": "inspector",
+          "target": "inspector"
+        },
+        {
+          "side": "left",
+          "source": "result",
+          "target": "result"
+        },
+        {
+          "side": "right",
+          "source": "product",
+          "target": "product"
+        },
+        {
+          "side": "right",
+          "source": "qty",
+          "target": "qty"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "batch_id",
+        "check_no"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "batch_id",
+            "right": "batch_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_qc",
+      "name": "j_qc_batches",
+      "operation": "join",
+      "right": "stg_batches"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "defect_id",
+          "target": "defect_id"
+        },
+        {
+          "side": "left",
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "side": "left",
+          "source": "cost",
+          "target": "cost"
+        },
+        {
+          "side": "right",
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "defect_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "batch_id",
+            "right": "batch_id"
+          },
+          {
+            "left": "check_no",
+            "right": "check_no"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_defects",
+      "name": "j_def_full",
+      "operation": "join",
+      "right": "j_qc_batches"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "product"
+      ],
+      "group_by": [
+        {
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "cost",
+          "function": "sum",
+          "name": "total_cost"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_defects"
+        }
+      ],
+      "name": "o_cost_by_product",
+      "source": "j_def_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id"
+          },
+          "name": "batch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "gadget",
+              "sprocket",
+              "widget"
+            ]
+          },
+          "name": "product",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 500,
+            "min": 10
+          },
+          "name": "qty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-06-30",
+            "min": "2024-01-01"
+          },
+          "name": "start_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_batches",
+      "primary_key": [
+        "batch_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_batch_qc",
+            "target_side": "left"
+          },
+          "name": "batch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 3,
+            "min": 1
+          },
+          "name": "check_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "inspector",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "fail",
+              "pass"
+            ]
+          },
+          "name": "result",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_qc",
+      "primary_key": [
+        "batch_id",
+        "check_no"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "DF-"
+          },
+          "name": "defect_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_qc_defects",
+            "target_side": "right"
+          },
+          "name": "batch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_qc_defects",
+            "target_side": "right"
+          },
+          "name": "check_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "critical",
+              "major",
+              "minor"
+            ]
+          },
+          "name": "severity",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "decimal_places": 0,
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 0.0
+          },
+          "name": "cost",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_defects",
+      "primary_key": [
+        "defect_id"
+      ],
+      "rows": {
+        "max": 120,
+        "min": 40
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "batch_id"
+        ],
+        "table": "raw_batches"
+      },
+      "name": "rel_batch_qc",
+      "right": {
+        "columns": [
+          "batch_id"
+        ],
+        "table": "raw_qc"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "batch_id",
+          "check_no"
+        ],
+        "table": "raw_defects"
+      },
+      "name": "rel_qc_defects",
+      "right": {
+        "columns": [
+          "batch_id",
+          "check_no"
+        ],
+        "table": "raw_qc"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_batches_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "operations": [],
+          "source": "product",
+          "target": "product"
+        },
+        {
+          "operations": [],
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "operations": [],
+          "source": "start_date",
+          "target": "start_date"
+        }
+      ],
+      "grain": [
+        "batch_id"
+      ],
+      "name": "stg_batches",
+      "row_operations": [],
+      "source": "raw_batches"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "operations": [],
+          "source": "check_no",
+          "target": "check_no"
+        },
+        {
+          "operations": [],
+          "source": "inspector",
+          "target": "inspector"
+        },
+        {
+          "operations": [],
+          "source": "result",
+          "target": "result"
+        }
+      ],
+      "grain": [
+        "batch_id",
+        "check_no"
+      ],
+      "name": "stg_qc",
+      "row_operations": [],
+      "source": "raw_qc"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "defect_id",
+          "target": "defect_id"
+        },
+        {
+          "operations": [],
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "operations": [],
+          "source": "check_no",
+          "target": "check_no"
+        },
+        {
+          "operations": [],
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "operations": [],
+          "source": "cost",
+          "target": "cost"
+        }
+      ],
+      "grain": [
+        "defect_id"
+      ],
+      "name": "stg_defects",
+      "row_operations": [],
+      "source": "raw_defects"
+    }
+  ],
+  "tests": [
+    {
+      "column": "result",
+      "model": "stg_qc",
+      "name": "result_values",
+      "type": "accepted_values",
+      "values": [
+        "fail",
+        "pass"
+      ]
+    }
+  ]
+}

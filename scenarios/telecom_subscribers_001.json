@@ -1,0 +1,470 @@
+{
+  "description": "Telecom subscriptions pipeline: one-to-one billing linkage over a composite key, legacy string flags cast to boolean.",
+  "domain": "telecom",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "credit_limit",
+          "target": "credit_limit"
+        },
+        {
+          "side": "left",
+          "source": "autopay",
+          "target": "autopay"
+        },
+        {
+          "side": "left",
+          "source": "pin_code",
+          "target": "pin_code"
+        },
+        {
+          "side": "right",
+          "source": "subscriber_id",
+          "target": "subscriber_id"
+        },
+        {
+          "side": "right",
+          "source": "service_code",
+          "target": "service_code"
+        },
+        {
+          "side": "right",
+          "source": "plan",
+          "target": "plan"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "subscriber_id",
+        "service_code"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "subscriber_id",
+            "right": "subscriber_id"
+          },
+          {
+            "left": "service_code",
+            "right": "service_code"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_billing",
+      "name": "j_bill_subs",
+      "operation": "join",
+      "right": "stg_subscriptions"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "subscriber_id",
+          "target": "subscriber_id"
+        },
+        {
+          "side": "left",
+          "source": "service_code",
+          "target": "service_code"
+        },
+        {
+          "side": "left",
+          "source": "credit_limit",
+          "target": "credit_limit"
+        },
+        {
+          "side": "left",
+          "source": "plan",
+          "target": "plan"
+        },
+        {
+          "side": "left",
+          "source": "autopay",
+          "target": "autopay"
+        },
+        {
+          "side": "right",
+          "source": "subscriber_name",
+          "target": "subscriber_name"
+        },
+        {
+          "side": "right",
+          "source": "country",
+          "target": "country"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "subscriber_id",
+        "service_code"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "subscriber_id",
+            "right": "subscriber_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_bill_subs",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_subscribers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "plan"
+      ],
+      "group_by": [
+        {
+          "source": "plan",
+          "target": "plan"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "credit_limit",
+          "function": "avg",
+          "name": "avg_limit"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_subs"
+        }
+      ],
+      "name": "o_limit_by_plan",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SUB-"
+          },
+          "name": "subscriber_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "subscriber_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "DE"
+            ]
+          },
+          "name": "country",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_subscribers",
+      "primary_key": [
+        "subscriber_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sub_subs",
+            "target_side": "right"
+          },
+          "name": "subscriber_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "data",
+              "voice"
+            ]
+          },
+          "name": "service_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "basic",
+              "plus"
+            ]
+          },
+          "name": "plan",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_subscriptions",
+      "primary_key": [
+        "subscriber_id",
+        "service_code"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 60
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_bill_sub",
+            "target_side": "right"
+          },
+          "name": "subscriber_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_bill_sub",
+            "target_side": "right"
+          },
+          "name": "service_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000.0,
+            "min": 100.0
+          },
+          "name": "credit_limit",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N",
+              "Y"
+            ]
+          },
+          "name": "autopay_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 4,
+            "min_length": 1
+          },
+          "name": "pin_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_billing",
+      "primary_key": [
+        "subscriber_id",
+        "service_code"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "subscriber_id"
+        ],
+        "table": "raw_subscriptions"
+      },
+      "name": "rel_sub_subs",
+      "right": {
+        "columns": [
+          "subscriber_id"
+        ],
+        "table": "raw_subscribers"
+      }
+    },
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "subscriber_id",
+          "service_code"
+        ],
+        "table": "raw_billing"
+      },
+      "name": "rel_bill_sub",
+      "right": {
+        "columns": [
+          "subscriber_id",
+          "service_code"
+        ],
+        "table": "raw_subscriptions"
+      }
+    }
+  ],
+  "scenario_id": "telecom_subscribers_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "subscriber_id",
+          "target": "subscriber_id"
+        },
+        {
+          "operations": [],
+          "source": "subscriber_name",
+          "target": "subscriber_name"
+        },
+        {
+          "operations": [],
+          "source": "country",
+          "target": "country"
+        }
+      ],
+      "grain": [
+        "subscriber_id"
+      ],
+      "name": "stg_subscribers",
+      "row_operations": [],
+      "source": "raw_subscribers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "subscriber_id",
+          "target": "subscriber_id"
+        },
+        {
+          "operations": [],
+          "source": "service_code",
+          "target": "service_code"
+        },
+        {
+          "operations": [],
+          "source": "plan",
+          "target": "plan"
+        }
+      ],
+      "grain": [
+        "subscriber_id",
+        "service_code"
+      ],
+      "name": "stg_subscriptions",
+      "row_operations": [],
+      "source": "raw_subscriptions"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "subscriber_id",
+          "target": "subscriber_id"
+        },
+        {
+          "operations": [],
+          "source": "service_code",
+          "target": "service_code"
+        },
+        {
+          "operations": [],
+          "source": "credit_limit",
+          "target": "credit_limit"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "autopay_str",
+          "target": "autopay"
+        },
+        {
+          "operations": [],
+          "source": "pin_code",
+          "target": "pin_code"
+        }
+      ],
+      "grain": [
+        "subscriber_id",
+        "service_code"
+      ],
+      "name": "stg_billing",
+      "row_operations": [],
+      "source": "raw_billing"
+    }
+  ],
+  "tests": [
+    {
+      "column": "plan",
+      "model": "stg_subscriptions",
+      "name": "plan_values",
+      "type": "accepted_values",
+      "values": [
+        "basic",
+        "plus"
+      ]
+    }
+  ]
+}

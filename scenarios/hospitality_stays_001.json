@@ -1,0 +1,511 @@
+{
+  "description": "Hospitality stays pipeline: many-to-many guest to room-night linkage through a keyless booking bridge.",
+  "domain": "hospitality",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "booking_ref",
+          "target": "booking_ref"
+        },
+        {
+          "side": "left",
+          "source": "room_id",
+          "target": "room_id"
+        },
+        {
+          "side": "left",
+          "source": "night_date",
+          "target": "night_date"
+        },
+        {
+          "side": "left",
+          "source": "adults",
+          "target": "adults"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "guest_name",
+          "target": "guest_name"
+        },
+        {
+          "side": "right",
+          "source": "vip",
+          "target": "vip"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "booking_ref"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "guest_id",
+            "right": "guest_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_bookings",
+      "name": "j_book_guests",
+      "operation": "join",
+      "right": "stg_guests"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "booking_ref",
+          "target": "booking_ref"
+        },
+        {
+          "side": "left",
+          "source": "adults",
+          "target": "adults"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "left",
+          "source": "guest_name",
+          "target": "guest_name"
+        },
+        {
+          "side": "left",
+          "source": "vip",
+          "target": "vip"
+        },
+        {
+          "side": "right",
+          "source": "room_id",
+          "target": "room_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "booking_ref"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "room_id",
+            "right": "room_id"
+          },
+          {
+            "left": "night_date",
+            "right": "night_date"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_book_guests",
+      "name": "j_full_nights",
+      "operation": "join",
+      "right": "stg_room_nights"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "room_id"
+      ],
+      "group_by": [
+        {
+          "source": "room_id",
+          "target": "room_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "price",
+          "function": "sum",
+          "name": "revenue"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_bookings"
+        }
+      ],
+      "name": "o_revenue_by_room",
+      "source": "j_full_nights"
+    },
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "vip"
+      ],
+      "group_by": [
+        {
+          "source": "vip",
+          "target": "vip"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_bookings"
+        }
+      ],
+      "name": "o_bookings_by_vip",
+      "source": "j_book_guests"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 18,
+            "kind": "formatted_id",
+            "prefix": "GST-"
+          },
+          "name": "guest_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "guest_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "vip",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_guests",
+      "primary_key": [
+        "guest_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 999,
+            "min": 100
+          },
+          "name": "room_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-03-06",
+            "min": "2024-03-01"
+          },
+          "name": "night_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "double",
+              "single",
+              "suite"
+            ]
+          },
+          "name": "room_type",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_room_nights",
+      "primary_key": [
+        "room_id",
+        "night_date"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 60
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "alphabet": "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+            "kind": "random_string",
+            "max_length": 6,
+            "min_length": 6
+          },
+          "name": "booking_ref",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_bookings",
+            "target_side": "left"
+          },
+          "name": "guest_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_bookings",
+            "target_side": "right"
+          },
+          "name": "room_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_bookings",
+            "target_side": "right"
+          },
+          "name": "night_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 4,
+            "min": 1
+          },
+          "name": "adults",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 600.0,
+            "min": 50.0
+          },
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "checked_in",
+              "checked_out",
+              "confirmed"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_bookings",
+      "primary_key": [],
+      "rows": {
+        "max": 150,
+        "min": 50
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "bridge": {
+        "left_columns": [
+          "guest_id"
+        ],
+        "right_columns": [
+          "room_id",
+          "night_date"
+        ],
+        "table": "raw_bookings"
+      },
+      "cardinality": "many_to_many",
+      "left": {
+        "columns": [
+          "guest_id"
+        ],
+        "table": "raw_guests"
+      },
+      "name": "rel_bookings",
+      "right": {
+        "columns": [
+          "room_id",
+          "night_date"
+        ],
+        "table": "raw_room_nights"
+      }
+    }
+  ],
+  "scenario_id": "hospitality_stays_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "guest_id",
+          "target": "guest_id"
+        },
+        {
+          "operations": [],
+          "source": "guest_name",
+          "target": "guest_name"
+        },
+        {
+          "operations": [],
+          "source": "vip",
+          "target": "vip"
+        }
+      ],
+      "grain": [
+        "guest_id"
+      ],
+      "name": "stg_guests",
+      "row_operations": [],
+      "source": "raw_guests"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "room_id",
+          "target": "room_id"
+        },
+        {
+          "operations": [],
+          "source": "night_date",
+          "target": "night_date"
+        },
+        {
+          "operations": [],
+          "source": "room_type",
+          "target": "room_type"
+        }
+      ],
+      "grain": [
+        "room_id",
+        "night_date"
+      ],
+      "name": "stg_room_nights",
+      "row_operations": [],
+      "source": "raw_room_nights"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "booking_ref",
+          "target": "booking_ref"
+        },
+        {
+          "operations": [],
+          "source": "guest_id",
+          "target": "guest_id"
+        },
+        {
+          "operations": [],
+          "source": "room_id",
+          "target": "room_id"
+        },
+        {
+          "operations": [],
+          "source": "night_date",
+          "target": "night_date"
+        },
+        {
+          "operations": [],
+          "source": "adults",
+          "target": "adults"
+        },
+        {
+          "operations": [],
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        }
+      ],
+      "grain": [
+        "booking_ref"
+      ],
+      "name": "stg_bookings",
+      "row_operations": [],
+      "source": "raw_bookings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "stg_bookings",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "checked_in",
+        "checked_out",
+        "confirmed"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,433 @@
+{
+  "description": "Retail returns pipeline: at most one return per order, deduplicated return feed, always-null legacy notes.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "return_id",
+          "target": "return_id"
+        },
+        {
+          "side": "left",
+          "source": "refund",
+          "target": "refund"
+        },
+        {
+          "side": "left",
+          "source": "reason",
+          "target": "reason"
+        },
+        {
+          "side": "left",
+          "source": "return_date",
+          "target": "return_date"
+        },
+        {
+          "side": "right",
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "side": "right",
+          "source": "customer_id",
+          "target": "customer_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "return_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "order_id",
+            "right": "order_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_returns",
+      "name": "j_ret_orders",
+      "operation": "join",
+      "right": "stg_orders"
+    },
+    {
+      "grain": [
+        "return_id"
+      ],
+      "keys": [
+        "return_id"
+      ],
+      "name": "d_ret_dedup",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "return_date",
+          "direction": "desc"
+        }
+      ],
+      "source": "j_ret_orders"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "return_id",
+          "target": "return_id"
+        },
+        {
+          "side": "left",
+          "source": "refund",
+          "target": "refund"
+        },
+        {
+          "side": "left",
+          "source": "reason",
+          "target": "reason"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "return_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "customer_id",
+            "right": "customer_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_ret_dedup",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_customers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "reason"
+      ],
+      "group_by": [
+        {
+          "source": "reason",
+          "target": "reason"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "refund",
+          "function": "sum",
+          "name": "total_refund"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_returns"
+        }
+      ],
+      "name": "o_refund_by_reason",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "C-"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_customers",
+      "primary_key": [
+        "customer_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 40
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "O-"
+          },
+          "name": "order_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_customer_orders",
+            "target_side": "left"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_orders",
+      "primary_key": [
+        "order_id"
+      ],
+      "rows": {
+        "max": 50,
+        "min": 50
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "R-"
+          },
+          "name": "return_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_order_return",
+            "target_side": "left"
+          },
+          "name": "order_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 5.0
+          },
+          "name": "refund",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "damaged",
+              "wrong_item"
+            ]
+          },
+          "name": "reason",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "return_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 5
+          },
+          "name": "resolution",
+          "null_probability": 1.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_returns",
+      "primary_key": [
+        "return_id"
+      ],
+      "rows": {
+        "max": 50,
+        "min": 20
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_customers"
+      },
+      "name": "rel_customer_orders",
+      "right": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_orders"
+      }
+    },
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "order_id"
+        ],
+        "table": "raw_orders"
+      },
+      "name": "rel_order_return",
+      "right": {
+        "columns": [
+          "order_id"
+        ],
+        "table": "raw_returns"
+      }
+    }
+  ],
+  "scenario_id": "retail_returns_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "customer_id"
+      ],
+      "name": "stg_customers",
+      "row_operations": [],
+      "source": "raw_customers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        }
+      ],
+      "grain": [
+        "order_id"
+      ],
+      "name": "stg_orders",
+      "row_operations": [],
+      "source": "raw_orders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "return_id",
+          "target": "return_id"
+        },
+        {
+          "operations": [],
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "operations": [],
+          "source": "refund",
+          "target": "refund"
+        },
+        {
+          "operations": [],
+          "source": "reason",
+          "target": "reason"
+        },
+        {
+          "operations": [],
+          "source": "return_date",
+          "target": "return_date"
+        },
+        {
+          "operations": [],
+          "source": "resolution",
+          "target": "resolution"
+        }
+      ],
+      "grain": [
+        "return_id"
+      ],
+      "name": "stg_returns",
+      "row_operations": [],
+      "source": "raw_returns"
+    }
+  ],
+  "tests": [
+    {
+      "column": "reason",
+      "model": "stg_returns",
+      "name": "reason_values",
+      "type": "accepted_values",
+      "values": [
+        "damaged",
+        "wrong_item"
+      ]
+    }
+  ]
+}

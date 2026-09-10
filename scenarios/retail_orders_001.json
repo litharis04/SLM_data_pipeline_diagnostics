@@ -1,1 +1,600 @@
-{"domain":"retail","description":"Retail orders pipeline with guest checkout: nullable customer link kept through a left join.","intermediate_models":[{"columns":[{"side":"left","source":"order_id","target":"order_id"},{"side":"left","source":"customer_id","target":"customer_id"},{"side":"left","source":"quantity","target":"quantity"},{"side":"left","source":"total","target":"total"},{"side":"left","source":"order_date","target":"order_date"},{"side":"left","source":"status","target":"status"},{"side":"right","source":"product_name","target":"product_name"},{"side":"right","source":"category","target":"category"},{"side":"right","source":"unit_price","target":"unit_price"}],"derived_columns":[],"filters":[],"grain":["order_id"],"join":{"on":[{"left":"product_id","right":"product_id"}],"type":"inner"},"left":"stg_orders","name":"j_orders_products","operation":"join","right":"stg_products"},{"columns":[{"side":"left","source":"order_id","target":"order_id"},{"side":"left","source":"quantity","target":"quantity"},{"side":"left","source":"total","target":"total"},{"side":"left","source":"order_date","target":"order_date"},{"side":"left","source":"status","target":"status"},{"side":"left","source":"product_name","target":"product_name"},{"side":"left","source":"category","target":"category"},{"side":"left","source":"unit_price","target":"unit_price"},{"side":"right","source":"full_name","target":"full_name"},{"side":"right","source":"loyalty_tier","target":"loyalty_tier"}],"derived_columns":[],"filters":[],"grain":["order_id"],"join":{"on":[{"left":"customer_id","right":"customer_id"}],"type":"left"},"left":"j_orders_products","name":"j_orders_customers","operation":"join","right":"stg_customers"}],"output_models":[{"dimensions":[],"filters":[],"grain":["category"],"group_by":[{"source":"category","target":"category"}],"metrics":[{"column":"total","function":"sum","name":"revenue"},{"function":"count_rows","name":"n_orders"}],"name":"o_revenue_by_category","source":"j_orders_customers"}],"raw_tables":[{"columns":[{"generator":{"digits":4,"kind":"formatted_id","prefix":"CUST-"},"name":"customer_id","nullable":false,"null_probability":0.0,"type":"string","unique":true},{"generator":{"kind":"person_name"},"name":"full_name","nullable":false,"null_probability":0.0,"type":"string","unique":false},{"generator":{"kind":"email"},"name":"email_address","nullable":false,"null_probability":0.0,"type":"string","unique":true},{"generator":{"kind":"date_range","max":"2024-12-31","min":"2020-01-01"},"name":"signup_date","nullable":false,"null_probability":0.0,"type":"date","unique":false},{"generator":{"kind":"categorical","values":["gold","silver","bronze"]},"name":"loyalty_tier","nullable":false,"null_probability":0.0,"type":"string","unique":false}],"name":"raw_customers","primary_key":["customer_id"],"rows":{"max":50,"min":50}},{"columns":[{"generator":{"digits":5,"kind":"formatted_id","prefix":"ORD-"},"name":"order_id","nullable":false,"null_probability":0.0,"type":"string","unique":false},{"generator":{"kind":"foreign_key","relationship":"rel_customer_orders","target_side":"left"},"name":"customer_id","nullable":true,"null_probability":0.2,"type":"string","unique":false},{"generator":{"kind":"foreign_key","relationship":"rel_product_orders","target_side":"right"},"name":"product_id","nullable":false,"null_probability":0.0,"type":"string","unique":false},{"generator":{"kind":"integer_range","max":10,"min":1},"name":"quantity","nullable":false,"null_probability":0.0,"type":"integer","unique":false},{"generator":{"kind":"float_range","max":500.0,"min":1.0},"name":"order_total","nullable":false,"null_probability":0.0,"type":"float","unique":false},{"generator":{"kind":"date_range","max":"2024-12-31","min":"2023-01-01"},"name":"order_date","nullable":false,"null_probability":0.0,"type":"date","unique":false},{"generator":{"kind":"categorical","values":["placed","paid","shipped","cancelled"]},"name":"status","nullable":false,"null_probability":0.0,"type":"string","unique":false}],"name":"raw_orders","primary_key":["order_id"],"rows":{"max":500,"min":100}},{"columns":[{"generator":{"digits":3,"kind":"formatted_id","prefix":"PRD-"},"name":"product_id","nullable":false,"null_probability":0.0,"type":"string","unique":false},{"generator":{"kind":"random_string","max_length":12,"min_length":5},"name":"product_name","nullable":false,"null_probability":0.0,"type":"string","unique":false},{"generator":{"kind":"categorical","values":["food","toys","books"],"weights":[5.0,3.0,2.0]},"name":"category","nullable":false,"null_probability":0.0,"type":"string","unique":false},{"generator":{"kind":"float_range","max":200.0,"min":0.5},"name":"unit_price","nullable":false,"null_probability":0.0,"type":"float","unique":false}],"name":"raw_products","primary_key":["product_id"],"rows":{"max":30,"min":10}}],"relationships":[{"cardinality":"one_to_many","left":{"columns":["customer_id"],"table":"raw_customers"},"name":"rel_customer_orders","right":{"columns":["customer_id"],"table":"raw_orders"}},{"cardinality":"many_to_one","left":{"columns":["product_id"],"table":"raw_orders"},"name":"rel_product_orders","right":{"columns":["product_id"],"table":"raw_products"}}],"scenario_id":"retail_orders_001","schema_version":"1.0","staging_models":[{"columns":[{"operations":[{"op":"trim"}],"source":"customer_id","target":"customer_id"},{"operations":[],"source":"full_name","target":"full_name"},{"operations":[{"op":"lower"}],"source":"email_address","target":"email_address"},{"operations":[],"source":"signup_date","target":"signup_date"},{"operations":[],"source":"loyalty_tier","target":"loyalty_tier"}],"grain":["customer_id"],"name":"stg_customers","row_operations":[],"source":"raw_customers"},{"columns":[{"operations":[],"source":"order_id","target":"order_id"},{"operations":[],"source":"customer_id","target":"customer_id"},{"operations":[],"source":"product_id","target":"product_id"},{"operations":[],"source":"quantity","target":"quantity"},{"operations":[],"source":"order_total","target":"total"},{"operations":[],"source":"order_date","target":"order_date"},{"operations":[],"source":"status","target":"status"}],"grain":["order_id"],"name":"stg_orders","row_operations":[{"condition":{"kind":"comparison","left":{"kind":"column","column":"total"},"operator":"gt","right":{"kind":"literal","value":0.0}},"op":"filter"}],"source":"raw_orders"},{"columns":[{"operations":[],"source":"product_id","target":"product_id"},{"operations":[],"source":"product_name","target":"product_name"},{"operations":[],"source":"category","target":"category"},{"operations":[],"source":"unit_price","target":"unit_price"}],"grain":["product_id"],"name":"stg_products","row_operations":[],"source":"raw_products"}],"tests":[{"column":"status","model":"stg_orders","name":"status_values","type":"accepted_values","values":["placed","paid","shipped","cancelled"]}]}
+{
+  "description": "Retail orders pipeline with guest checkout: nullable customer link kept through a left join.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "side": "left",
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "side": "left",
+          "source": "quantity",
+          "target": "quantity"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "order_date",
+          "target": "order_date"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "product_name",
+          "target": "product_name"
+        },
+        {
+          "side": "right",
+          "source": "category",
+          "target": "category"
+        },
+        {
+          "side": "right",
+          "source": "unit_price",
+          "target": "unit_price"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "order_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "product_id",
+            "right": "product_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_orders",
+      "name": "j_orders_products",
+      "operation": "join",
+      "right": "stg_products"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "side": "left",
+          "source": "quantity",
+          "target": "quantity"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "order_date",
+          "target": "order_date"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "left",
+          "source": "product_name",
+          "target": "product_name"
+        },
+        {
+          "side": "left",
+          "source": "category",
+          "target": "category"
+        },
+        {
+          "side": "left",
+          "source": "unit_price",
+          "target": "unit_price"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "side": "right",
+          "source": "loyalty_tier",
+          "target": "loyalty_tier"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "order_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "customer_id",
+            "right": "customer_id"
+          }
+        ],
+        "type": "left"
+      },
+      "left": "j_orders_products",
+      "name": "j_orders_customers",
+      "operation": "join",
+      "right": "stg_customers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "category"
+      ],
+      "group_by": [
+        {
+          "source": "category",
+          "target": "category"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total",
+          "function": "sum",
+          "name": "revenue"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_orders"
+        }
+      ],
+      "name": "o_revenue_by_category",
+      "source": "j_orders_customers"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "CUST-"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email"
+          },
+          "name": "email_address",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2020-01-01"
+          },
+          "name": "signup_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "gold",
+              "silver",
+              "bronze"
+            ]
+          },
+          "name": "loyalty_tier",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_customers",
+      "primary_key": [
+        "customer_id"
+      ],
+      "rows": {
+        "max": 50,
+        "min": 50
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "ORD-"
+          },
+          "name": "order_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_customer_orders",
+            "target_side": "left"
+          },
+          "name": "customer_id",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_product_orders",
+            "target_side": "right"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 10,
+            "min": 1
+          },
+          "name": "quantity",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 1.0
+          },
+          "name": "order_total",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2023-01-01"
+          },
+          "name": "order_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "placed",
+              "paid",
+              "shipped",
+              "cancelled"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_orders",
+      "primary_key": [
+        "order_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 100
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PRD-"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "product_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "food",
+              "toys",
+              "books"
+            ],
+            "weights": [
+              5.0,
+              3.0,
+              2.0
+            ]
+          },
+          "name": "category",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 200.0,
+            "min": 0.5
+          },
+          "name": "unit_price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 10
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_customers"
+      },
+      "name": "rel_customer_orders",
+      "right": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_orders"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_orders"
+      },
+      "name": "rel_product_orders",
+      "right": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_products"
+      }
+    }
+  ],
+  "scenario_id": "retail_orders_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [
+            {
+              "op": "trim"
+            }
+          ],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "lower"
+            }
+          ],
+          "source": "email_address",
+          "target": "email_address"
+        },
+        {
+          "operations": [],
+          "source": "signup_date",
+          "target": "signup_date"
+        },
+        {
+          "operations": [],
+          "source": "loyalty_tier",
+          "target": "loyalty_tier"
+        }
+      ],
+      "grain": [
+        "customer_id"
+      ],
+      "name": "stg_customers",
+      "row_operations": [],
+      "source": "raw_customers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "order_id",
+          "target": "order_id"
+        },
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "quantity",
+          "target": "quantity"
+        },
+        {
+          "operations": [],
+          "source": "order_total",
+          "target": "total"
+        },
+        {
+          "operations": [],
+          "source": "order_date",
+          "target": "order_date"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        }
+      ],
+      "grain": [
+        "order_id"
+      ],
+      "name": "stg_orders",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "total",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0.0
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_orders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "product_name",
+          "target": "product_name"
+        },
+        {
+          "operations": [],
+          "source": "category",
+          "target": "category"
+        },
+        {
+          "operations": [],
+          "source": "unit_price",
+          "target": "unit_price"
+        }
+      ],
+      "grain": [
+        "product_id"
+      ],
+      "name": "stg_products",
+      "row_operations": [],
+      "source": "raw_products"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "stg_orders",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "placed",
+        "paid",
+        "shipped",
+        "cancelled"
+      ]
+    }
+  ]
+}

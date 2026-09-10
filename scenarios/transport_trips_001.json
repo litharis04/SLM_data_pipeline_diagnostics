@@ -1,0 +1,503 @@
+{
+  "description": "Public transport ridership pipeline: legacy compact date codes and ISO timestamps parsed in staging, net revenue derived over a join.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "trip_id",
+          "target": "trip_id"
+        },
+        {
+          "side": "left",
+          "source": "driver_id",
+          "target": "driver_id"
+        },
+        {
+          "side": "left",
+          "source": "fare",
+          "target": "fare"
+        },
+        {
+          "side": "left",
+          "source": "event_ts",
+          "target": "event_ts"
+        },
+        {
+          "side": "left",
+          "source": "service_day",
+          "target": "service_day"
+        },
+        {
+          "side": "right",
+          "source": "route_name",
+          "target": "route_name"
+        },
+        {
+          "side": "right",
+          "source": "zone",
+          "target": "zone"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "trip_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "route_id",
+            "right": "route_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_trips",
+      "name": "j_trips_routes",
+      "operation": "join",
+      "right": "stg_routes"
+    },
+    {
+      "columns": [
+        {
+          "source": "trip_id",
+          "target": "trip_id"
+        },
+        {
+          "source": "fare",
+          "target": "fare"
+        },
+        {
+          "source": "zone",
+          "target": "zone"
+        },
+        {
+          "source": "driver_id",
+          "target": "driver_id"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "fare",
+              "kind": "column"
+            },
+            "operator": "multiply",
+            "right": {
+              "kind": "literal",
+              "value": 0.9
+            }
+          },
+          "name": "net_revenue",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "trip_id"
+      ],
+      "name": "t_enriched",
+      "operation": "transform",
+      "source": "j_trips_routes"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "trip_id",
+          "target": "trip_id"
+        },
+        {
+          "side": "left",
+          "source": "net_revenue",
+          "target": "net_revenue"
+        },
+        {
+          "side": "left",
+          "source": "zone",
+          "target": "zone"
+        },
+        {
+          "side": "right",
+          "source": "driver_name",
+          "target": "driver_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "trip_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "driver_id",
+            "right": "driver_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_enriched",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_drivers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "zone"
+      ],
+      "group_by": [
+        {
+          "source": "zone",
+          "target": "zone"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "net_revenue",
+          "function": "avg",
+          "name": "avg_net"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_trips"
+        }
+      ],
+      "name": "o_net_by_zone",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "RT-"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "route_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "central",
+              "north",
+              "south"
+            ]
+          },
+          "name": "zone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_routes",
+      "primary_key": [
+        "route_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "DRV-"
+          },
+          "name": "driver_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "driver_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_drivers",
+      "primary_key": [
+        "driver_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TRP-"
+          },
+          "name": "trip_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_route_trips",
+            "target_side": "left"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_driver_trips",
+            "target_side": "right"
+          },
+          "name": "driver_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 5.0,
+            "min": 1.0
+          },
+          "name": "fare",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "2024-03-01T08:00:00",
+              "2024-03-01T12:30:00",
+              "2024-03-02T08:00:00",
+              "2024-03-02T18:15:00"
+            ]
+          },
+          "name": "event_ts_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "20240301",
+              "20240302",
+              "20240303"
+            ]
+          },
+          "name": "service_day_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_trips",
+      "primary_key": [
+        "trip_id"
+      ],
+      "rows": {
+        "max": 400,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "route_id"
+        ],
+        "table": "raw_routes"
+      },
+      "name": "rel_route_trips",
+      "right": {
+        "columns": [
+          "route_id"
+        ],
+        "table": "raw_trips"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "driver_id"
+        ],
+        "table": "raw_trips"
+      },
+      "name": "rel_driver_trips",
+      "right": {
+        "columns": [
+          "driver_id"
+        ],
+        "table": "raw_drivers"
+      }
+    }
+  ],
+  "scenario_id": "transport_trips_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "route_name",
+          "target": "route_name"
+        },
+        {
+          "operations": [],
+          "source": "zone",
+          "target": "zone"
+        }
+      ],
+      "grain": [
+        "route_id"
+      ],
+      "name": "stg_routes",
+      "row_operations": [],
+      "source": "raw_routes"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "driver_id",
+          "target": "driver_id"
+        },
+        {
+          "operations": [],
+          "source": "driver_name",
+          "target": "driver_name"
+        }
+      ],
+      "grain": [
+        "driver_id"
+      ],
+      "name": "stg_drivers",
+      "row_operations": [],
+      "source": "raw_drivers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "trip_id",
+          "target": "trip_id"
+        },
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "driver_id",
+          "target": "driver_id"
+        },
+        {
+          "operations": [],
+          "source": "fare",
+          "target": "fare"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "timestamp"
+            }
+          ],
+          "source": "event_ts_str",
+          "target": "event_ts"
+        },
+        {
+          "operations": [
+            {
+              "format": "%Y%m%d",
+              "op": "cast",
+              "type": "date"
+            }
+          ],
+          "source": "service_day_str",
+          "target": "service_day"
+        }
+      ],
+      "grain": [
+        "trip_id"
+      ],
+      "name": "stg_trips",
+      "row_operations": [],
+      "source": "raw_trips"
+    }
+  ],
+  "tests": [
+    {
+      "column": "zone",
+      "model": "stg_routes",
+      "name": "zone_values",
+      "type": "accepted_values",
+      "values": [
+        "central",
+        "north",
+        "south"
+      ]
+    }
+  ]
+}

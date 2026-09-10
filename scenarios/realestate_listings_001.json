@@ -1,0 +1,464 @@
+{
+  "description": "Real-estate listings pipeline: direct-sale listings kept through a left join, print-ready area labels.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "side": "left",
+          "source": "neighborhood_id",
+          "target": "neighborhood_id"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "left",
+          "source": "beds_label",
+          "target": "beds_label"
+        },
+        {
+          "side": "left",
+          "source": "sqft_label",
+          "target": "sqft_label"
+        },
+        {
+          "side": "right",
+          "source": "agent_name",
+          "target": "agent_name"
+        },
+        {
+          "side": "right",
+          "source": "agency",
+          "target": "agency"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "listing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "agent_id",
+            "right": "agent_id"
+          }
+        ],
+        "type": "left"
+      },
+      "left": "stg_listings",
+      "name": "j_list_agents",
+      "operation": "join",
+      "right": "stg_agents"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "left",
+          "source": "agent_name",
+          "target": "agent_name"
+        },
+        {
+          "side": "right",
+          "source": "neighborhood",
+          "target": "neighborhood"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "listing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "neighborhood_id",
+            "right": "neighborhood_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_list_agents",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_neighborhoods"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "neighborhood"
+      ],
+      "group_by": [
+        {
+          "source": "neighborhood",
+          "target": "neighborhood"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "price",
+          "function": "avg",
+          "name": "avg_price"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_listings"
+        }
+      ],
+      "name": "o_price_by_neighborhood",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AGT-"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "agent_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name"
+          },
+          "name": "agency",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_agents",
+      "primary_key": [
+        "agent_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N1",
+              "N2",
+              "N3",
+              "N4",
+              "N5",
+              "N6"
+            ]
+          },
+          "name": "neighborhood_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "neighborhood",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_neighborhoods",
+      "primary_key": [
+        "neighborhood_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LST-"
+          },
+          "name": "listing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_agent_listings",
+            "target_side": "right"
+          },
+          "name": "agent_id",
+          "null_probability": 0.15,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_listing_neighborhoods",
+            "target_side": "right"
+          },
+          "name": "neighborhood_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000000.0,
+            "min": 50000.0
+          },
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 6,
+            "min": 1
+          },
+          "name": "beds",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 300.0,
+            "min": 20.0
+          },
+          "name": "sqft",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "listed_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_listings",
+      "primary_key": [
+        "listing_id"
+      ],
+      "rows": {
+        "max": 400,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_listings"
+      },
+      "name": "rel_agent_listings",
+      "right": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_agents"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "neighborhood_id"
+        ],
+        "table": "raw_listings"
+      },
+      "name": "rel_listing_neighborhoods",
+      "right": {
+        "columns": [
+          "neighborhood_id"
+        ],
+        "table": "raw_neighborhoods"
+      }
+    }
+  ],
+  "scenario_id": "realestate_listings_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_name",
+          "target": "agent_name"
+        },
+        {
+          "operations": [],
+          "source": "agency",
+          "target": "agency"
+        }
+      ],
+      "grain": [
+        "agent_id"
+      ],
+      "name": "stg_agents",
+      "row_operations": [],
+      "source": "raw_agents"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "neighborhood_id",
+          "target": "neighborhood_id"
+        },
+        {
+          "operations": [],
+          "source": "neighborhood",
+          "target": "neighborhood"
+        }
+      ],
+      "grain": [
+        "neighborhood_id"
+      ],
+      "name": "stg_neighborhoods",
+      "row_operations": [],
+      "source": "raw_neighborhoods"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "neighborhood_id",
+          "target": "neighborhood_id"
+        },
+        {
+          "operations": [],
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "beds",
+          "target": "beds_label"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "sqft",
+          "target": "sqft_label"
+        },
+        {
+          "operations": [],
+          "source": "listed_date",
+          "target": "listed_date"
+        }
+      ],
+      "grain": [
+        "listing_id"
+      ],
+      "name": "stg_listings",
+      "row_operations": [],
+      "source": "raw_listings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "price",
+      "min": 0.0,
+      "model": "stg_listings",
+      "name": "price_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

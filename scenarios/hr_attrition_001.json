@@ -1,79 +1,23 @@
 {
-  "description": "Education enrollments pipeline: composite course-term key, legacy string scores cast to float, German locale names.",
-  "domain": "education",
+  "description": "HR attrition pipeline: deduplicated employee snapshots joined to departments and reviews, legacy level codes parsed.",
+  "domain": "human_resources",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "enrollment_id",
-          "target": "enrollment_id"
+          "source": "employee_id",
+          "target": "employee_id"
         },
         {
           "side": "left",
-          "source": "student_name",
-          "target": "student_name"
+          "source": "level",
+          "target": "level"
         },
         {
           "side": "left",
-          "source": "score",
-          "target": "score"
-        },
-        {
-          "side": "right",
-          "source": "credits",
-          "target": "credits"
-        },
-        {
-          "side": "right",
-          "source": "title",
-          "target": "title"
-        },
-        {
-          "side": "right",
-          "source": "dept_id",
-          "target": "dept_id"
-        }
-      ],
-      "derived_columns": [],
-      "filters": [],
-      "grain": [
-        "enrollment_id"
-      ],
-      "join": {
-        "on": [
-          {
-            "left": "course_id",
-            "right": "course_id"
-          },
-          {
-            "left": "term",
-            "right": "term"
-          }
-        ],
-        "type": "inner"
-      },
-      "left": "stg_enrollments",
-      "name": "j_enroll_terms",
-      "operation": "join",
-      "right": "stg_terms"
-    },
-    {
-      "columns": [
-        {
-          "side": "left",
-          "source": "enrollment_id",
-          "target": "enrollment_id"
-        },
-        {
-          "side": "left",
-          "source": "score",
-          "target": "score"
-        },
-        {
-          "side": "left",
-          "source": "credits",
-          "target": "credits"
+          "source": "hire_date",
+          "target": "hire_date"
         },
         {
           "side": "right",
@@ -84,7 +28,7 @@
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "enrollment_id"
+        "employee_id"
       ],
       "join": {
         "on": [
@@ -95,10 +39,79 @@
         ],
         "type": "inner"
       },
-      "left": "j_enroll_terms",
-      "name": "j_full_dept",
+      "left": "d_employees",
+      "name": "j_emp_depts",
       "operation": "join",
       "right": "stg_departments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "employee_id",
+          "target": "employee_id"
+        },
+        {
+          "side": "left",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "side": "left",
+          "source": "dept_name",
+          "target": "dept_name"
+        },
+        {
+          "side": "right",
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "side": "right",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "right",
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "review_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "employee_id",
+            "right": "employee_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_emp_depts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_reviews"
+    },
+    {
+      "grain": [
+        "employee_id"
+      ],
+      "keys": [
+        "employee_id"
+      ],
+      "name": "d_employees",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "hire_date",
+          "direction": "asc"
+        }
+      ],
+      "source": "stg_employees"
     }
   ],
   "output_models": [
@@ -116,17 +129,17 @@
       ],
       "metrics": [
         {
-          "column": "score",
+          "column": "rating",
           "function": "avg",
-          "name": "avg_score"
+          "name": "avg_rating"
         },
         {
           "function": "count_rows",
-          "name": "n_enrollments"
+          "name": "n_reviews"
         }
       ],
-      "name": "o_score_by_dept",
-      "source": "j_full_dept"
+      "name": "o_rating_by_dept",
+      "source": "j_full"
     }
   ],
   "raw_tables": [
@@ -134,10 +147,9 @@
       "columns": [
         {
           "generator": {
-            "digits": 3,
+            "digits": 2,
             "kind": "formatted_id",
-            "prefix": "DPT-",
-            "start": 100
+            "prefix": "DP-"
           },
           "name": "dept_id",
           "null_probability": 0.0,
@@ -149,9 +161,9 @@
           "generator": {
             "kind": "categorical",
             "values": [
-              "history",
-              "informatics",
-              "physics"
+              "engineering",
+              "sales",
+              "support"
             ]
           },
           "name": "dept_name",
@@ -166,19 +178,41 @@
         "dept_id"
       ],
       "rows": {
-        "max": 4,
-        "min": 4
+        "max": 5,
+        "min": 5
       }
     },
     {
       "columns": [
         {
           "generator": {
-            "digits": 2,
+            "digits": 4,
             "kind": "formatted_id",
-            "prefix": "CSE-"
+            "prefix": "EMP-"
           },
-          "name": "course_id",
+          "name": "employee_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_dept_emps",
+            "target_side": "left"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -188,11 +222,14 @@
           "generator": {
             "kind": "categorical",
             "values": [
-              "F24",
-              "S25"
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
             ]
           },
-          "name": "term",
+          "name": "level_str",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -200,60 +237,35 @@
         },
         {
           "generator": {
-            "kind": "random_string",
-            "max_length": 14,
-            "min_length": 6
+            "kind": "date_range",
+            "max": "2024-01-01",
+            "min": "2015-01-01"
           },
-          "name": "title",
+          "name": "hire_date",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "integer_range",
-            "max": 6,
-            "min": 1
-          },
-          "name": "credits",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "integer",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "foreign_key",
-            "relationship": "rel_dept_terms",
-            "target_side": "right"
-          },
-          "name": "dept_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
+          "type": "date",
           "unique": false
         }
       ],
-      "name": "raw_terms",
+      "name": "raw_employees",
       "primary_key": [
-        "course_id",
-        "term"
+        "employee_id"
       ],
       "rows": {
-        "max": 12,
-        "min": 12
+        "max": 100,
+        "min": 30
       }
     },
     {
       "columns": [
         {
           "generator": {
-            "digits": 4,
+            "digits": 5,
             "kind": "formatted_id",
-            "prefix": "ENR-"
+            "prefix": "RVW-"
           },
-          "name": "enrollment_id",
+          "name": "review_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -262,33 +274,10 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_term_enrollments",
+            "relationship": "rel_emp_reviews",
             "target_side": "left"
           },
-          "name": "course_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "foreign_key",
-            "relationship": "rel_term_enrollments",
-            "target_side": "left"
-          },
-          "name": "term",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "person_name",
-            "locale": "de_DE"
-          },
-          "name": "student_name",
+          "name": "employee_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -297,10 +286,10 @@
         {
           "generator": {
             "kind": "integer_range",
-            "max": 100,
-            "min": 0
+            "max": 5,
+            "min": 1
           },
-          "name": "points_int",
+          "name": "rating",
           "null_probability": 0.0,
           "nullable": false,
           "type": "integer",
@@ -308,63 +297,65 @@
         },
         {
           "generator": {
-            "kind": "template_string",
-            "template": "{points_int}"
+            "kind": "categorical",
+            "values": [
+              "high",
+              "low",
+              "mid"
+            ]
           },
-          "name": "score_str",
+          "name": "band",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_enrollments",
+      "name": "raw_reviews",
       "primary_key": [
-        "enrollment_id"
+        "review_id"
       ],
       "rows": {
-        "max": 240,
-        "min": 80
+        "max": 400,
+        "min": 100
       }
     }
   ],
   "relationships": [
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
           "dept_id"
         ],
-        "table": "raw_terms"
+        "table": "raw_departments"
       },
-      "name": "rel_dept_terms",
+      "name": "rel_dept_emps",
       "right": {
         "columns": [
           "dept_id"
         ],
-        "table": "raw_departments"
+        "table": "raw_employees"
       }
     },
     {
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "course_id",
-          "term"
+          "employee_id"
         ],
-        "table": "raw_terms"
+        "table": "raw_employees"
       },
-      "name": "rel_term_enrollments",
+      "name": "rel_emp_reviews",
       "right": {
         "columns": [
-          "course_id",
-          "term"
+          "employee_id"
         ],
-        "table": "raw_enrollments"
+        "table": "raw_reviews"
       }
     }
   ],
-  "scenario_id": "education_enrollments_001",
+  "scenario_id": "hr_attrition_001",
   "schema_version": "1.0",
   "staging_models": [
     {
@@ -391,88 +382,92 @@
       "columns": [
         {
           "operations": [],
-          "source": "course_id",
-          "target": "course_id"
-        },
-        {
-          "operations": [],
-          "source": "term",
-          "target": "term"
-        },
-        {
-          "operations": [],
-          "source": "title",
-          "target": "title"
-        },
-        {
-          "operations": [],
-          "source": "credits",
-          "target": "credits"
+          "source": "employee_id",
+          "target": "employee_id"
         },
         {
           "operations": [],
           "source": "dept_id",
           "target": "dept_id"
-        }
-      ],
-      "grain": [
-        "course_id",
-        "term"
-      ],
-      "name": "stg_terms",
-      "row_operations": [],
-      "source": "raw_terms"
-    },
-    {
-      "columns": [
-        {
-          "operations": [],
-          "source": "enrollment_id",
-          "target": "enrollment_id"
         },
         {
           "operations": [],
-          "source": "course_id",
-          "target": "course_id"
-        },
-        {
-          "operations": [],
-          "source": "term",
-          "target": "term"
-        },
-        {
-          "operations": [],
-          "source": "student_name",
-          "target": "student_name"
+          "source": "full_name",
+          "target": "full_name"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "float"
+              "type": "integer"
             }
           ],
-          "source": "score_str",
-          "target": "score"
+          "source": "level_str",
+          "target": "level"
+        },
+        {
+          "operations": [],
+          "source": "hire_date",
+          "target": "hire_date"
         }
       ],
       "grain": [
-        "enrollment_id"
+        "employee_id"
       ],
-      "name": "stg_enrollments",
+      "name": "stg_employees",
       "row_operations": [],
-      "source": "raw_enrollments"
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "operations": [],
+          "source": "employee_id",
+          "target": "employee_id"
+        },
+        {
+          "operations": [],
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "low": "L1",
+                "mid": "M1"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "grain": [
+        "review_id"
+      ],
+      "name": "stg_reviews",
+      "row_operations": [],
+      "source": "raw_reviews"
     }
   ],
   "tests": [
     {
-      "column": "term",
-      "model": "stg_terms",
-      "name": "term_values",
+      "column": "dept_name",
+      "model": "stg_departments",
+      "name": "dept_values",
       "type": "accepted_values",
       "values": [
-        "F24",
-        "S25"
+        "engineering",
+        "sales",
+        "support"
       ]
     }
   ]

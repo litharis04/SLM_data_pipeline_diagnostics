@@ -1,0 +1,518 @@
+{
+  "description": "Healthcare appointments pipeline: weekday derivation over timestamps, print-ready birth and flag labels.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "appt_id",
+          "target": "appt_id"
+        },
+        {
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "source": "doctor_id",
+          "target": "doctor_id"
+        },
+        {
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "source": "booked_at",
+          "target": "booked_at"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day_of_week",
+            "value": {
+              "column": "booked_at",
+              "kind": "column"
+            }
+          },
+          "name": "dow",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "appt_id"
+      ],
+      "name": "t_appts",
+      "operation": "transform",
+      "source": "stg_appointments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "appt_id",
+          "target": "appt_id"
+        },
+        {
+          "side": "left",
+          "source": "doctor_id",
+          "target": "doctor_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "right",
+          "source": "birth_str",
+          "target": "birth_str"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "appt_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "patient_id",
+            "right": "patient_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_appts",
+      "name": "j_appts_patients",
+      "operation": "join",
+      "right": "stg_patients"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "appt_id",
+          "target": "appt_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "right",
+          "source": "specialty",
+          "target": "specialty"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "appt_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "doctor_id",
+            "right": "doctor_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_appts_patients",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_doctors"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "specialty"
+      ],
+      "group_by": [
+        {
+          "source": "specialty",
+          "target": "specialty"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "duration_min",
+          "function": "avg",
+          "name": "avg_duration"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_appts"
+        }
+      ],
+      "name": "o_duration_by_specialty",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PT-"
+          },
+          "name": "patient_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2000-12-31",
+            "min": "1950-01-01"
+          },
+          "name": "birth_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "is_new",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_patients",
+      "primary_key": [
+        "patient_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DC-"
+          },
+          "name": "doctor_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "gp",
+              "pediatrics",
+              "surgery"
+            ]
+          },
+          "name": "specialty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_doctors",
+      "primary_key": [
+        "doctor_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AP-"
+          },
+          "name": "appt_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_patient_appts",
+            "target_side": "left"
+          },
+          "name": "patient_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_doctor_appts",
+            "target_side": "right"
+          },
+          "name": "doctor_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T18:00:00+00:00",
+            "min": "2024-01-01T08:00:00+00:00"
+          },
+          "name": "booked_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 120,
+            "min": 10
+          },
+          "name": "duration_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "done",
+              "noshow",
+              "scheduled"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_appointments",
+      "primary_key": [
+        "appt_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "patient_id"
+        ],
+        "table": "raw_patients"
+      },
+      "name": "rel_patient_appts",
+      "right": {
+        "columns": [
+          "patient_id"
+        ],
+        "table": "raw_appointments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "doctor_id"
+        ],
+        "table": "raw_appointments"
+      },
+      "name": "rel_doctor_appts",
+      "right": {
+        "columns": [
+          "doctor_id"
+        ],
+        "table": "raw_doctors"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_appointments_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "birth_date",
+          "target": "birth_str"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "is_new",
+          "target": "is_new_label"
+        }
+      ],
+      "grain": [
+        "patient_id"
+      ],
+      "name": "stg_patients",
+      "row_operations": [],
+      "source": "raw_patients"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "doctor_id",
+          "target": "doctor_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [],
+          "source": "specialty",
+          "target": "specialty"
+        }
+      ],
+      "grain": [
+        "doctor_id"
+      ],
+      "name": "stg_doctors",
+      "row_operations": [],
+      "source": "raw_doctors"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "appt_id",
+          "target": "appt_id"
+        },
+        {
+          "operations": [],
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "operations": [],
+          "source": "doctor_id",
+          "target": "doctor_id"
+        },
+        {
+          "operations": [],
+          "source": "booked_at",
+          "target": "booked_at"
+        },
+        {
+          "operations": [],
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        }
+      ],
+      "grain": [
+        "appt_id"
+      ],
+      "name": "stg_appointments",
+      "row_operations": [],
+      "source": "raw_appointments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "stg_appointments",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "done",
+        "noshow",
+        "scheduled"
+      ]
+    }
+  ]
+}

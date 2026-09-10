@@ -1,0 +1,471 @@
+{
+  "description": "Logistics deliveries pipeline: H2 backlog filter over dates, whole-kilo weights and priority flags cast in staging.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "delivery_id",
+          "target": "delivery_id"
+        },
+        {
+          "side": "left",
+          "source": "weight_kg",
+          "target": "weight_kg"
+        },
+        {
+          "side": "left",
+          "source": "is_priority",
+          "target": "is_priority"
+        },
+        {
+          "side": "left",
+          "source": "promised",
+          "target": "promised"
+        },
+        {
+          "side": "right",
+          "source": "hub_id",
+          "target": "hub_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "delivery_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "route_id",
+            "right": "route_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_deliveries",
+      "name": "j_del_routes",
+      "operation": "join",
+      "right": "stg_routes"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "delivery_id",
+          "target": "delivery_id"
+        },
+        {
+          "side": "left",
+          "source": "weight_kg",
+          "target": "weight_kg"
+        },
+        {
+          "side": "left",
+          "source": "is_priority",
+          "target": "is_priority"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "delivery_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hub_id",
+            "right": "hub_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_del_routes",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_hubs"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "city"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "weight_kg",
+          "function": "sum",
+          "name": "total_kg"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_deliveries"
+        }
+      ],
+      "name": "o_kg_by_city",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "HB-"
+          },
+          "name": "hub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hubs",
+      "primary_key": [
+        "hub_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RT-"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hub_routes",
+            "target_side": "left"
+          },
+          "name": "hub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 900.0,
+            "min": 20.0
+          },
+          "name": "distance_km",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_routes",
+      "primary_key": [
+        "route_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "DL-"
+          },
+          "name": "delivery_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_route_deliveries",
+            "target_side": "left"
+          },
+          "name": "route_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000.0,
+            "min": 0.5
+          },
+          "name": "weight",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1,
+            "min": 0
+          },
+          "name": "priority",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "promised",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "failed",
+              "ok"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "delivered",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_deliveries",
+      "primary_key": [
+        "delivery_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "hub_id"
+        ],
+        "table": "raw_hubs"
+      },
+      "name": "rel_hub_routes",
+      "right": {
+        "columns": [
+          "hub_id"
+        ],
+        "table": "raw_routes"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "route_id"
+        ],
+        "table": "raw_routes"
+      },
+      "name": "rel_route_deliveries",
+      "right": {
+        "columns": [
+          "route_id"
+        ],
+        "table": "raw_deliveries"
+      }
+    }
+  ],
+  "scenario_id": "logistics_deliveries_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hub_id",
+          "target": "hub_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "hub_id"
+      ],
+      "name": "stg_hubs",
+      "row_operations": [],
+      "source": "raw_hubs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [],
+          "source": "hub_id",
+          "target": "hub_id"
+        },
+        {
+          "operations": [],
+          "source": "distance_km",
+          "target": "distance_km"
+        }
+      ],
+      "grain": [
+        "route_id"
+      ],
+      "name": "stg_routes",
+      "row_operations": [],
+      "source": "raw_routes"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "delivery_id",
+          "target": "delivery_id"
+        },
+        {
+          "operations": [],
+          "source": "route_id",
+          "target": "route_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "weight",
+          "target": "weight_kg"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "priority",
+          "target": "is_priority"
+        },
+        {
+          "operations": [],
+          "source": "promised",
+          "target": "promised"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "delivered",
+          "target": "delivered"
+        }
+      ],
+      "grain": [
+        "delivery_id"
+      ],
+      "name": "stg_deliveries",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "delivered",
+              "kind": "column"
+            },
+            "operator": "gte",
+            "right": {
+              "column": "promised",
+              "kind": "column"
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_deliveries"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "stg_deliveries",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "failed",
+        "ok"
+      ]
+    }
+  ]
+}

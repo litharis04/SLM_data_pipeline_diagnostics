@@ -1,0 +1,436 @@
+{
+  "description": "Media streaming pipeline: one-to-one creator channels, per-channel aggregates rolled up to creators.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "video_id",
+          "target": "video_id"
+        },
+        {
+          "side": "left",
+          "source": "views",
+          "target": "views"
+        },
+        {
+          "side": "left",
+          "source": "publish_date",
+          "target": "publish_date"
+        },
+        {
+          "side": "right",
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "side": "right",
+          "source": "creator_id",
+          "target": "creator_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "video_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "channel_id",
+            "right": "channel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_videos",
+      "name": "j_vid_chan",
+      "operation": "join",
+      "right": "stg_channels"
+    },
+    {
+      "filters": [],
+      "grain": [
+        "channel_id",
+        "creator_id"
+      ],
+      "group_by": [
+        {
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "source": "creator_id",
+          "target": "creator_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "views",
+          "function": "sum",
+          "name": "total_views"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_videos"
+        }
+      ],
+      "name": "a_chan_stats",
+      "operation": "aggregate",
+      "source": "j_vid_chan"
+    },
+    {
+      "columns": [
+        {
+          "side": "right",
+          "source": "creator_id",
+          "target": "creator_id"
+        },
+        {
+          "side": "right",
+          "source": "creator_name",
+          "target": "creator_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "creator_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "creator_id",
+            "right": "creator_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_chan_stats",
+      "name": "j_stats_creators",
+      "operation": "join",
+      "right": "stg_creators"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "creator_id"
+      ],
+      "group_by": [
+        {
+          "source": "creator_id",
+          "target": "creator_id"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_channels"
+        }
+      ],
+      "name": "o_views_by_creator",
+      "source": "j_stats_creators"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CRT-"
+          },
+          "name": "creator_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name"
+          },
+          "name": "creator_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_creators",
+      "primary_key": [
+        "creator_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CH-"
+          },
+          "name": "channel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_creator_channel",
+            "target_side": "right"
+          },
+          "name": "creator_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "gaming",
+              "music",
+              "news"
+            ]
+          },
+          "name": "niche",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_channels",
+      "primary_key": [
+        "channel_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "VID-"
+          },
+          "name": "video_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_channel_videos",
+            "target_side": "left"
+          },
+          "name": "channel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000000,
+            "min": 0
+          },
+          "name": "views",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "publish_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_videos",
+      "primary_key": [
+        "video_id"
+      ],
+      "rows": {
+        "max": 400,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "creator_id"
+        ],
+        "table": "raw_channels"
+      },
+      "name": "rel_creator_channel",
+      "right": {
+        "columns": [
+          "creator_id"
+        ],
+        "table": "raw_creators"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "channel_id"
+        ],
+        "table": "raw_channels"
+      },
+      "name": "rel_channel_videos",
+      "right": {
+        "columns": [
+          "channel_id"
+        ],
+        "table": "raw_videos"
+      }
+    }
+  ],
+  "scenario_id": "media_streams_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "creator_id",
+          "target": "creator_id"
+        },
+        {
+          "operations": [],
+          "source": "creator_name",
+          "target": "creator_name"
+        }
+      ],
+      "grain": [
+        "creator_id"
+      ],
+      "name": "stg_creators",
+      "row_operations": [],
+      "source": "raw_creators"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "operations": [],
+          "source": "creator_id",
+          "target": "creator_id"
+        },
+        {
+          "operations": [],
+          "source": "niche",
+          "target": "niche"
+        }
+      ],
+      "grain": [
+        "channel_id"
+      ],
+      "name": "stg_channels",
+      "row_operations": [],
+      "source": "raw_channels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "video_id",
+          "target": "video_id"
+        },
+        {
+          "operations": [],
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "operations": [],
+          "source": "views",
+          "target": "views"
+        },
+        {
+          "operations": [],
+          "source": "publish_date",
+          "target": "publish_date"
+        }
+      ],
+      "grain": [
+        "video_id"
+      ],
+      "name": "stg_videos",
+      "row_operations": [
+        {
+          "keys": [
+            "video_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "publish_date",
+              "direction": "desc"
+            }
+          ]
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "views",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_videos"
+    }
+  ],
+  "tests": [
+    {
+      "column": "views",
+      "min": 0,
+      "model": "stg_videos",
+      "name": "views_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}
