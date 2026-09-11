@@ -1,0 +1,453 @@
+{
+  "description": "Agriculture yield pipeline: deduplicated harvest feed, per-area ratios and harvest years in the join.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "grain": [
+        "harvest_id"
+      ],
+      "keys": [
+        "harvest_id"
+      ],
+      "name": "d_harvests",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "harvested",
+          "direction": "desc"
+        }
+      ],
+      "source": "stg_harvests"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "harvest_id",
+          "target": "harvest_id"
+        },
+        {
+          "side": "left",
+          "source": "yield_t",
+          "target": "yield_t"
+        },
+        {
+          "side": "left",
+          "source": "harvested",
+          "target": "harvested"
+        },
+        {
+          "side": "right",
+          "source": "farm_id",
+          "target": "farm_id"
+        },
+        {
+          "side": "right",
+          "source": "area_ha",
+          "target": "area_ha"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "yield_t",
+              "kind": "column"
+            },
+            "operator": "divide",
+            "right": {
+              "column": "area_ha",
+              "kind": "column"
+            }
+          },
+          "name": "ratio",
+          "type": "float"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "year",
+            "value": {
+              "column": "harvested",
+              "kind": "column"
+            }
+          },
+          "name": "yr",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "harvest_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "field_id",
+            "right": "field_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_harvests",
+      "name": "j_harv_fields",
+      "operation": "join",
+      "right": "stg_fields"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "harvest_id",
+          "target": "harvest_id"
+        },
+        {
+          "side": "left",
+          "source": "yield_t",
+          "target": "yield_t"
+        },
+        {
+          "side": "left",
+          "source": "yr",
+          "target": "yr"
+        },
+        {
+          "side": "right",
+          "source": "farm_name",
+          "target": "farm_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "harvest_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "farm_id",
+            "right": "farm_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_harv_fields",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_farms"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "yr"
+      ],
+      "group_by": [
+        {
+          "source": "yr",
+          "target": "yr"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "yield_t",
+          "function": "sum",
+          "name": "total_yield"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_harvests"
+        }
+      ],
+      "name": "o_yield_by_year",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FM-"
+          },
+          "name": "farm_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "farm_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "manager",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_farms",
+      "primary_key": [
+        "farm_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "FL-"
+          },
+          "name": "field_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_farm_fields",
+            "target_side": "left"
+          },
+          "name": "farm_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 200.0,
+            "min": 1.0
+          },
+          "name": "area_ha",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_fields",
+      "primary_key": [
+        "field_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "HV-"
+          },
+          "name": "harvest_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_field_harvests",
+            "target_side": "left"
+          },
+          "name": "field_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50.0,
+            "min": 0.5
+          },
+          "name": "yield_t",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2020-01-01"
+          },
+          "name": "harvested",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_harvests",
+      "primary_key": [
+        "harvest_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "farm_id"
+        ],
+        "table": "raw_farms"
+      },
+      "name": "rel_farm_fields",
+      "right": {
+        "columns": [
+          "farm_id"
+        ],
+        "table": "raw_fields"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "field_id"
+        ],
+        "table": "raw_fields"
+      },
+      "name": "rel_field_harvests",
+      "right": {
+        "columns": [
+          "field_id"
+        ],
+        "table": "raw_harvests"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_yield_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "farm_id",
+          "target": "farm_id"
+        },
+        {
+          "operations": [],
+          "source": "farm_name",
+          "target": "farm_name"
+        },
+        {
+          "operations": [],
+          "source": "manager",
+          "target": "manager"
+        }
+      ],
+      "grain": [
+        "farm_id"
+      ],
+      "name": "stg_farms",
+      "row_operations": [],
+      "source": "raw_farms"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "field_id",
+          "target": "field_id"
+        },
+        {
+          "operations": [],
+          "source": "farm_id",
+          "target": "farm_id"
+        },
+        {
+          "operations": [],
+          "source": "area_ha",
+          "target": "area_ha"
+        }
+      ],
+      "grain": [
+        "field_id"
+      ],
+      "name": "stg_fields",
+      "row_operations": [],
+      "source": "raw_fields"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "harvest_id",
+          "target": "harvest_id"
+        },
+        {
+          "operations": [],
+          "source": "field_id",
+          "target": "field_id"
+        },
+        {
+          "operations": [],
+          "source": "yield_t",
+          "target": "yield_t"
+        },
+        {
+          "operations": [],
+          "source": "harvested",
+          "target": "harvested"
+        }
+      ],
+      "grain": [
+        "harvest_id"
+      ],
+      "name": "stg_harvests",
+      "row_operations": [],
+      "source": "raw_harvests"
+    }
+  ],
+  "tests": [
+    {
+      "column": "yield_t",
+      "min": 0.0,
+      "model": "stg_harvests",
+      "name": "yield_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

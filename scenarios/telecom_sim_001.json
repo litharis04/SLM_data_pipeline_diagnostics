@@ -1,0 +1,415 @@
+{
+  "description": "Telecom SIM pipeline: single-letter zones, uppercased plans and lowered agent emails.",
+  "domain": "telecom",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "activation_id",
+          "target": "activation_id"
+        },
+        {
+          "side": "left",
+          "source": "date",
+          "target": "date"
+        },
+        {
+          "side": "right",
+          "source": "region_id",
+          "target": "region_id"
+        },
+        {
+          "side": "right",
+          "source": "plan",
+          "target": "plan"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "activation_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "sim_id",
+            "right": "sim_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_activations",
+      "name": "j_act_sims",
+      "operation": "join",
+      "right": "stg_sims"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "activation_id",
+          "target": "activation_id"
+        },
+        {
+          "side": "left",
+          "source": "date",
+          "target": "date"
+        },
+        {
+          "side": "left",
+          "source": "plan",
+          "target": "plan"
+        },
+        {
+          "side": "right",
+          "source": "region_name",
+          "target": "region_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "activation_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "region_id",
+            "right": "region_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_act_sims",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_regions"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "plan"
+      ],
+      "group_by": [
+        {
+          "source": "plan",
+          "target": "plan"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "date",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_activations"
+        }
+      ],
+      "name": "o_latest_by_plan",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RG-"
+          },
+          "name": "region_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "region_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_regions",
+      "primary_key": [
+        "region_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "SM-"
+          },
+          "name": "sim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_region_sims",
+            "target_side": "left"
+          },
+          "name": "region_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 2,
+            "min_length": 1
+          },
+          "name": "zone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "a",
+              "b"
+            ]
+          },
+          "name": "plan",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_sims",
+      "primary_key": [
+        "sim_id"
+      ],
+      "rows": {
+        "max": 54,
+        "min": 18
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AV-"
+          },
+          "name": "activation_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sim_activations",
+            "target_side": "left"
+          },
+          "name": "sim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email",
+            "locale": "de_DE"
+          },
+          "name": "agent",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_activations",
+      "primary_key": [
+        "activation_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "region_id"
+        ],
+        "table": "raw_regions"
+      },
+      "name": "rel_region_sims",
+      "right": {
+        "columns": [
+          "region_id"
+        ],
+        "table": "raw_sims"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "sim_id"
+        ],
+        "table": "raw_sims"
+      },
+      "name": "rel_sim_activations",
+      "right": {
+        "columns": [
+          "sim_id"
+        ],
+        "table": "raw_activations"
+      }
+    }
+  ],
+  "scenario_id": "telecom_sim_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "region_id",
+          "target": "region_id"
+        },
+        {
+          "operations": [],
+          "source": "region_name",
+          "target": "region_name"
+        }
+      ],
+      "grain": [
+        "region_id"
+      ],
+      "name": "stg_regions",
+      "row_operations": [],
+      "source": "raw_regions"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "operations": [],
+          "source": "region_id",
+          "target": "region_id"
+        },
+        {
+          "operations": [],
+          "source": "zone",
+          "target": "zone"
+        },
+        {
+          "operations": [
+            {
+              "op": "upper"
+            }
+          ],
+          "source": "plan",
+          "target": "plan"
+        }
+      ],
+      "grain": [
+        "sim_id"
+      ],
+      "name": "stg_sims",
+      "row_operations": [],
+      "source": "raw_sims"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "activation_id",
+          "target": "activation_id"
+        },
+        {
+          "operations": [],
+          "source": "sim_id",
+          "target": "sim_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "lower"
+            }
+          ],
+          "source": "agent",
+          "target": "agent"
+        },
+        {
+          "operations": [],
+          "source": "date",
+          "target": "date"
+        }
+      ],
+      "grain": [
+        "activation_id"
+      ],
+      "name": "stg_activations",
+      "row_operations": [],
+      "source": "raw_activations"
+    }
+  ],
+  "tests": [
+    {
+      "column": "plan",
+      "model": "stg_sims",
+      "name": "plan_values",
+      "type": "accepted_values",
+      "values": [
+        "A",
+        "B"
+      ]
+    }
+  ]
+}

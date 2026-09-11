@@ -1,0 +1,459 @@
+{
+  "description": "Sports calendar pipeline: weekday derivation, row-preserving ticket ledger with city dimension.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "source": "attendance",
+          "target": "attendance"
+        },
+        {
+          "source": "match_date",
+          "target": "match_date"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day_of_week",
+            "value": {
+              "column": "match_date",
+              "kind": "column"
+            }
+          },
+          "name": "dow",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "fixture_id"
+      ],
+      "name": "t_fixtures",
+      "operation": "transform",
+      "source": "stg_fixtures"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "left",
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "side": "right",
+          "source": "manager",
+          "target": "manager"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "fixture_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "venue_id",
+            "right": "venue_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_fixtures",
+      "name": "j_fix_venues",
+      "operation": "join",
+      "right": "stg_venues"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "left",
+          "source": "city",
+          "target": "city"
+        },
+        {
+          "side": "right",
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "side": "right",
+          "source": "price",
+          "target": "price"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ticket_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "fixture_id",
+            "right": "fixture_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_fix_venues",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_tickets"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [
+        "city"
+      ],
+      "filters": [],
+      "grain": [
+        "ticket_id"
+      ],
+      "group_by": [
+        {
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "price",
+          "function": "sum",
+          "name": "ledger_price"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_lines"
+        }
+      ],
+      "name": "o_ledger_by_ticket",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "VN-"
+          },
+          "name": "venue_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "manager",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_venues",
+      "primary_key": [
+        "venue_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "FX-"
+          },
+          "name": "fixture_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_venue_fixtures",
+            "target_side": "left"
+          },
+          "name": "venue_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "match_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 80000,
+            "min": 1000
+          },
+          "name": "attendance",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_fixtures",
+      "primary_key": [
+        "fixture_id"
+      ],
+      "rows": {
+        "max": 72,
+        "min": 24
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TK-"
+          },
+          "name": "ticket_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_fixture_tickets",
+            "target_side": "left"
+          },
+          "name": "fixture_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 10.0
+          },
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_tickets",
+      "primary_key": [
+        "ticket_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "venue_id"
+        ],
+        "table": "raw_venues"
+      },
+      "name": "rel_venue_fixtures",
+      "right": {
+        "columns": [
+          "venue_id"
+        ],
+        "table": "raw_fixtures"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "fixture_id"
+        ],
+        "table": "raw_fixtures"
+      },
+      "name": "rel_fixture_tickets",
+      "right": {
+        "columns": [
+          "fixture_id"
+        ],
+        "table": "raw_tickets"
+      }
+    }
+  ],
+  "scenario_id": "sports_calendar_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "operations": [],
+          "source": "manager",
+          "target": "manager"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "venue_id"
+      ],
+      "name": "stg_venues",
+      "row_operations": [],
+      "source": "raw_venues"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "operations": [],
+          "source": "venue_id",
+          "target": "venue_id"
+        },
+        {
+          "operations": [],
+          "source": "match_date",
+          "target": "match_date"
+        },
+        {
+          "operations": [],
+          "source": "attendance",
+          "target": "attendance"
+        }
+      ],
+      "grain": [
+        "fixture_id"
+      ],
+      "name": "stg_fixtures",
+      "row_operations": [],
+      "source": "raw_fixtures"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "operations": [],
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "operations": [],
+          "source": "price",
+          "target": "price"
+        }
+      ],
+      "grain": [
+        "ticket_id"
+      ],
+      "name": "stg_tickets",
+      "row_operations": [],
+      "source": "raw_tickets"
+    }
+  ],
+  "tests": [
+    {
+      "column": "price",
+      "min": 0.0,
+      "model": "stg_tickets",
+      "name": "price_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

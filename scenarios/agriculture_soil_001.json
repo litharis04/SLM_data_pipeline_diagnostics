@@ -1,0 +1,418 @@
+{
+  "description": "Agriculture soil pipeline: multi-operation pH normalization, whole-ppm nitrogen and formatted sampling dates.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "soil_id",
+          "target": "soil_id"
+        },
+        {
+          "side": "left",
+          "source": "ph",
+          "target": "ph"
+        },
+        {
+          "side": "left",
+          "source": "lab_id",
+          "target": "lab_id"
+        },
+        {
+          "side": "right",
+          "source": "area_ha",
+          "target": "area_ha"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "soil_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plot_id",
+            "right": "plot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_soils",
+      "name": "j_soils_plots",
+      "operation": "join",
+      "right": "stg_plots"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "soil_id",
+          "target": "soil_id"
+        },
+        {
+          "side": "left",
+          "source": "ph",
+          "target": "ph"
+        },
+        {
+          "side": "right",
+          "source": "lab_name",
+          "target": "lab_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "soil_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "lab_id",
+            "right": "lab_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_soils_plots",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_labs"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "lab_name"
+      ],
+      "group_by": [
+        {
+          "source": "lab_name",
+          "target": "lab_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "ph",
+          "function": "avg",
+          "name": "avg_ph"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_soils"
+        }
+      ],
+      "name": "o_ph_by_lab",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "LB-"
+          },
+          "name": "lab_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "lab_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_labs",
+      "primary_key": [
+        "lab_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "plot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 1.0
+          },
+          "name": "area_ha",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_plots",
+      "primary_key": [
+        "plot_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SL-"
+          },
+          "name": "soil_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_plot_soils",
+            "target_side": "left"
+          },
+          "name": "plot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_lab_soils",
+            "target_side": "right"
+          },
+          "name": "lab_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "6.1",
+              "7.0",
+              "8.2"
+            ]
+          },
+          "name": "ph_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "decimal_places": 0,
+            "kind": "float_range",
+            "max": 200.0,
+            "min": 0.0
+          },
+          "name": "nitrogen",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "20240301",
+              "20240302"
+            ]
+          },
+          "name": "sampled_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_soils",
+      "primary_key": [
+        "soil_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "plot_id"
+        ],
+        "table": "raw_plots"
+      },
+      "name": "rel_plot_soils",
+      "right": {
+        "columns": [
+          "plot_id"
+        ],
+        "table": "raw_soils"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "lab_id"
+        ],
+        "table": "raw_soils"
+      },
+      "name": "rel_lab_soils",
+      "right": {
+        "columns": [
+          "lab_id"
+        ],
+        "table": "raw_labs"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_soil_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "lab_id",
+          "target": "lab_id"
+        },
+        {
+          "operations": [],
+          "source": "lab_name",
+          "target": "lab_name"
+        }
+      ],
+      "grain": [
+        "lab_id"
+      ],
+      "name": "stg_labs",
+      "row_operations": [],
+      "source": "raw_labs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "operations": [],
+          "source": "area_ha",
+          "target": "area_ha"
+        }
+      ],
+      "grain": [
+        "plot_id"
+      ],
+      "name": "stg_plots",
+      "row_operations": [],
+      "source": "raw_plots"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "soil_id",
+          "target": "soil_id"
+        },
+        {
+          "operations": [],
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "operations": [],
+          "source": "lab_id",
+          "target": "lab_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            },
+            {
+              "op": "coalesce",
+              "value": 7.0
+            }
+          ],
+          "source": "ph_str",
+          "target": "ph"
+        },
+        {
+          "operations": [],
+          "source": "nitrogen",
+          "target": "nitrogen"
+        },
+        {
+          "operations": [
+            {
+              "format": "%Y%m%d",
+              "op": "cast",
+              "type": "date"
+            }
+          ],
+          "source": "sampled_str",
+          "target": "sampled"
+        }
+      ],
+      "grain": [
+        "soil_id"
+      ],
+      "name": "stg_soils",
+      "row_operations": [],
+      "source": "raw_soils"
+    }
+  ],
+  "tests": [
+    {
+      "column": "ph",
+      "min": 0.0,
+      "model": "stg_soils",
+      "name": "ph_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

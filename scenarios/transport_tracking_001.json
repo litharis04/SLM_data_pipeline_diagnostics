@@ -1,0 +1,406 @@
+{
+  "description": "Transport tracking pipeline: ISO timestamp and odometer parsing without formats.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ping_id",
+          "target": "ping_id"
+        },
+        {
+          "side": "left",
+          "source": "ts",
+          "target": "ts"
+        },
+        {
+          "side": "left",
+          "source": "odo",
+          "target": "odo"
+        },
+        {
+          "side": "right",
+          "source": "carrier_id",
+          "target": "carrier_id"
+        },
+        {
+          "side": "right",
+          "source": "plate",
+          "target": "plate"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ping_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "vehicle_id",
+            "right": "vehicle_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_pings",
+      "name": "j_pings_vehicles",
+      "operation": "join",
+      "right": "stg_vehicles"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ping_id",
+          "target": "ping_id"
+        },
+        {
+          "side": "left",
+          "source": "ts",
+          "target": "ts"
+        },
+        {
+          "side": "left",
+          "source": "odo",
+          "target": "odo"
+        },
+        {
+          "side": "right",
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ping_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "carrier_id",
+            "right": "carrier_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_pings_vehicles",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_carriers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "company"
+      ],
+      "group_by": [
+        {
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "ts",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_pings"
+        }
+      ],
+      "name": "o_latest_by_company",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CR-"
+          },
+          "name": "carrier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "company",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_carriers",
+      "primary_key": [
+        "carrier_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "VH-"
+          },
+          "name": "vehicle_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_carrier_vehicles",
+            "target_side": "left"
+          },
+          "name": "carrier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 7,
+            "min_length": 7
+          },
+          "name": "plate",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vehicles",
+      "primary_key": [
+        "vehicle_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PG-"
+          },
+          "name": "ping_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_vehicle_pings",
+            "target_side": "left"
+          },
+          "name": "vehicle_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "2024-03-01T08:00:00",
+              "2024-03-02T08:00:00"
+            ]
+          },
+          "name": "ts_str",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "100",
+              "200",
+              "300"
+            ]
+          },
+          "name": "odo_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_pings",
+      "primary_key": [
+        "ping_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "carrier_id"
+        ],
+        "table": "raw_carriers"
+      },
+      "name": "rel_carrier_vehicles",
+      "right": {
+        "columns": [
+          "carrier_id"
+        ],
+        "table": "raw_vehicles"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "vehicle_id"
+        ],
+        "table": "raw_vehicles"
+      },
+      "name": "rel_vehicle_pings",
+      "right": {
+        "columns": [
+          "vehicle_id"
+        ],
+        "table": "raw_pings"
+      }
+    }
+  ],
+  "scenario_id": "transport_tracking_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "carrier_id",
+          "target": "carrier_id"
+        },
+        {
+          "operations": [],
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "grain": [
+        "carrier_id"
+      ],
+      "name": "stg_carriers",
+      "row_operations": [],
+      "source": "raw_carriers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "vehicle_id",
+          "target": "vehicle_id"
+        },
+        {
+          "operations": [],
+          "source": "carrier_id",
+          "target": "carrier_id"
+        },
+        {
+          "operations": [],
+          "source": "plate",
+          "target": "plate"
+        }
+      ],
+      "grain": [
+        "vehicle_id"
+      ],
+      "name": "stg_vehicles",
+      "row_operations": [],
+      "source": "raw_vehicles"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ping_id",
+          "target": "ping_id"
+        },
+        {
+          "operations": [],
+          "source": "vehicle_id",
+          "target": "vehicle_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "timestamp"
+            }
+          ],
+          "source": "ts_str",
+          "target": "ts"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "odo_str",
+          "target": "odo"
+        }
+      ],
+      "grain": [
+        "ping_id"
+      ],
+      "name": "stg_pings",
+      "row_operations": [],
+      "source": "raw_pings"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "ts"
+      ],
+      "model": "stg_pings",
+      "name": "ts_present",
+      "type": "not_null"
+    }
+  ]
+}
