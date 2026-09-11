@@ -191,7 +191,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "holder_name",
           "null_probability": 0.0,
@@ -201,7 +202,8 @@
         },
         {
           "generator": {
-            "kind": "city"
+            "kind": "city",
+            "locale": "de_DE"
           },
           "name": "city",
           "null_probability": 0.0,

@@ -1,100 +1,90 @@
 {
-  "description": "Finance ledger pipeline: void entries excluded by string comparison, unified float amounts, printable timestamps.",
-  "domain": "finance",
+  "description": "Healthcare transfers pipeline: dashless ward codes, compact transfer dates and ISO handoff parsing.",
+  "domain": "healthcare",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "transfer_id",
+          "target": "transfer_id"
         },
         {
           "side": "left",
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "transfer_date",
+          "target": "transfer_date"
         },
         {
           "side": "left",
-          "source": "amount",
-          "target": "amount"
-        },
-        {
-          "side": "left",
-          "source": "posted_label",
-          "target": "posted_label"
-        },
-        {
-          "side": "left",
-          "source": "status",
-          "target": "status"
+          "source": "reason",
+          "target": "reason"
         },
         {
           "side": "right",
-          "source": "owner",
-          "target": "owner"
+          "source": "hospital_id",
+          "target": "hospital_id"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "transfer_id"
       ],
       "join": {
         "on": [
           {
-            "left": "account_id",
-            "right": "account_id"
+            "left": "ward_id",
+            "right": "ward_id"
           }
         ],
         "type": "inner"
       },
-      "left": "stg_entries",
-      "name": "j_entries_accounts",
+      "left": "stg_transfers",
+      "name": "j_trans_wards",
       "operation": "join",
-      "right": "stg_accounts"
+      "right": "stg_wards"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "transfer_id",
+          "target": "transfer_id"
         },
         {
           "side": "left",
-          "source": "amount",
-          "target": "amount"
+          "source": "transfer_date",
+          "target": "transfer_date"
         },
         {
           "side": "left",
-          "source": "owner",
-          "target": "owner"
+          "source": "reason",
+          "target": "reason"
         },
         {
           "side": "right",
-          "source": "category",
-          "target": "category"
+          "source": "hospital_name",
+          "target": "hospital_name"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "transfer_id"
       ],
       "join": {
         "on": [
           {
-            "left": "merchant_id",
-            "right": "merchant_id"
+            "left": "hospital_id",
+            "right": "hospital_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_entries_accounts",
+      "left": "j_trans_wards",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_merchants"
+      "right": "stg_hospitals"
     }
   ],
   "output_models": [
@@ -102,26 +92,26 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "category"
+        "reason"
       ],
       "group_by": [
         {
-          "source": "category",
-          "target": "category"
+          "source": "reason",
+          "target": "reason"
         }
       ],
       "metrics": [
         {
-          "column": "amount",
-          "function": "avg",
-          "name": "avg_amount"
+          "column": "transfer_date",
+          "function": "max",
+          "name": "latest"
         },
         {
           "function": "count_rows",
-          "name": "n_entries"
+          "name": "n_transfers"
         }
       ],
-      "name": "o_amount_by_category",
+      "name": "o_latest_by_reason",
       "source": "j_full"
     }
   ],
@@ -132,9 +122,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "AC-"
+            "prefix": "HP-"
           },
-          "name": "account_id",
+          "name": "hospital_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -145,20 +135,20 @@
             "kind": "person_name",
             "locale": "de_DE"
           },
-          "name": "owner",
+          "name": "hospital_name",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_accounts",
+      "name": "raw_hospitals",
       "primary_key": [
-        "account_id"
+        "hospital_id"
       ],
       "rows": {
-        "max": 20,
-        "min": 20
+        "max": 8,
+        "min": 8
       }
     },
     {
@@ -167,9 +157,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "MC-"
+            "prefix": "WD-"
           },
-          "name": "merchant_id",
+          "name": "ward_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -177,10 +167,11 @@
         },
         {
           "generator": {
-            "kind": "company_name",
-            "locale": "de_DE"
+            "kind": "foreign_key",
+            "relationship": "rel_hospital_wards",
+            "target_side": "left"
           },
-          "name": "merchant_name",
+          "name": "hospital_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -190,24 +181,24 @@
           "generator": {
             "kind": "categorical",
             "values": [
-              "food",
-              "travel"
+              "N-1",
+              "S-2"
             ]
           },
-          "name": "category",
+          "name": "code",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_merchants",
+      "name": "raw_wards",
       "primary_key": [
-        "merchant_id"
+        "ward_id"
       ],
       "rows": {
-        "max": 15,
-        "min": 15
+        "max": 40,
+        "min": 16
       }
     },
     {
@@ -216,9 +207,9 @@
           "generator": {
             "digits": 5,
             "kind": "formatted_id",
-            "prefix": "EN-"
+            "prefix": "TF-"
           },
-          "name": "entry_id",
+          "name": "transfer_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -227,74 +218,65 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_account_entries",
+            "relationship": "rel_ward_transfers",
             "target_side": "left"
           },
-          "name": "account_id",
+          "name": "ward_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "foreign_key",
-            "relationship": "rel_merchant_entries",
-            "target_side": "right"
-          },
-          "name": "merchant_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "timestamp_range",
-            "max": "2024-12-31T23:59:59+00:00",
-            "min": "2024-01-01T00:00:00+00:00"
-          },
-          "name": "posted_at",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "timestamp",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "integer_range",
-            "max": 100000,
-            "min": 1
-          },
-          "name": "amount_cents",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "integer",
           "unique": false
         },
         {
           "generator": {
             "kind": "categorical",
             "values": [
-              "cleared",
-              "pending",
-              "void"
+              "20240301",
+              "20240302"
             ]
           },
-          "name": "status",
+          "name": "transfer_date_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "2024-03-01T08:00:00",
+              "2024-03-02T08:00:00"
+            ]
+          },
+          "name": "handoff_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "escalation",
+              "routine"
+            ]
+          },
+          "name": "reason",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_entries",
+      "name": "raw_transfers",
       "primary_key": [
-        "entry_id"
+        "transfer_id"
       ],
       "rows": {
-        "max": 600,
-        "min": 200
+        "max": 500,
+        "min": 150
       }
     }
   ],
@@ -303,160 +285,145 @@
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "account_id"
+          "hospital_id"
         ],
-        "table": "raw_accounts"
+        "table": "raw_hospitals"
       },
-      "name": "rel_account_entries",
+      "name": "rel_hospital_wards",
       "right": {
         "columns": [
-          "account_id"
+          "hospital_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_wards"
       }
     },
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "merchant_id"
+          "ward_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_wards"
       },
-      "name": "rel_merchant_entries",
+      "name": "rel_ward_transfers",
       "right": {
         "columns": [
-          "merchant_id"
+          "ward_id"
         ],
-        "table": "raw_merchants"
+        "table": "raw_transfers"
       }
     }
   ],
-  "scenario_id": "finance_ledger_001",
+  "scenario_id": "healthcare_transfers_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "hospital_id",
+          "target": "hospital_id"
         },
         {
           "operations": [],
-          "source": "owner",
-          "target": "owner"
+          "source": "hospital_name",
+          "target": "hospital_name"
         }
       ],
       "grain": [
-        "account_id"
+        "hospital_id"
       ],
-      "name": "stg_accounts",
+      "name": "stg_hospitals",
       "row_operations": [],
-      "source": "raw_accounts"
+      "source": "raw_hospitals"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "ward_id",
+          "target": "ward_id"
         },
         {
           "operations": [],
-          "source": "merchant_name",
-          "target": "merchant_name"
+          "source": "hospital_id",
+          "target": "hospital_id"
         },
         {
-          "operations": [],
-          "source": "category",
-          "target": "category"
+          "operations": [
+            {
+              "new": "",
+              "old": "-",
+              "op": "replace"
+            }
+          ],
+          "source": "code",
+          "target": "code"
         }
       ],
       "grain": [
-        "merchant_id"
+        "ward_id"
       ],
-      "name": "stg_merchants",
+      "name": "stg_wards",
       "row_operations": [],
-      "source": "raw_merchants"
+      "source": "raw_wards"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "transfer_id",
+          "target": "transfer_id"
         },
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "ward_id",
+          "target": "ward_id"
         },
         {
-          "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "operations": [
+            {
+              "format": "%Y%m%d",
+              "op": "cast",
+              "type": "date"
+            }
+          ],
+          "source": "transfer_date_str",
+          "target": "transfer_date"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "string"
+              "type": "timestamp"
             }
           ],
-          "source": "posted_at",
-          "target": "posted_label"
-        },
-        {
-          "operations": [
-            {
-              "op": "cast",
-              "type": "float"
-            }
-          ],
-          "source": "amount_cents",
-          "target": "amount"
+          "source": "handoff_str",
+          "target": "handoff_at"
         },
         {
           "operations": [],
-          "source": "status",
-          "target": "status"
+          "source": "reason",
+          "target": "reason"
         }
       ],
       "grain": [
-        "entry_id"
+        "transfer_id"
       ],
-      "name": "stg_entries",
-      "row_operations": [
-        {
-          "condition": {
-            "kind": "comparison",
-            "left": {
-              "column": "status",
-              "kind": "column"
-            },
-            "operator": "ne",
-            "right": {
-              "kind": "literal",
-              "value": "void"
-            }
-          },
-          "op": "filter"
-        }
-      ],
-      "source": "raw_entries"
+      "name": "stg_transfers",
+      "row_operations": [],
+      "source": "raw_transfers"
     }
   ],
   "tests": [
     {
-      "column": "status",
-      "model": "stg_entries",
-      "name": "status_values",
+      "column": "reason",
+      "model": "stg_transfers",
+      "name": "reason_values",
       "type": "accepted_values",
       "values": [
-        "cleared",
-        "pending",
-        "void"
+        "escalation",
+        "routine"
       ]
     }
   ]

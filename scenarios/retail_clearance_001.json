@@ -1,32 +1,24 @@
 {
-  "description": "Telecom overage pipeline: pay-as-you-go usages kept through a left join, derived extra and share metrics.",
-  "domain": "telecom",
+  "description": "Retail clearance pipeline: uppercased tags, whole-percent markdowns, derived margins.",
+  "domain": "retail",
   "intermediate_models": [
     {
       "columns": [
         {
-          "source": "usage_id",
-          "target": "usage_id"
+          "source": "sale_id",
+          "target": "sale_id"
         },
         {
-          "source": "sub_id",
-          "target": "sub_id"
+          "source": "product_id",
+          "target": "product_id"
         },
         {
-          "source": "plan_id",
-          "target": "plan_id"
+          "source": "price",
+          "target": "price"
         },
         {
-          "source": "mb",
-          "target": "mb"
-        },
-        {
-          "source": "quota",
-          "target": "quota"
-        },
-        {
-          "source": "overage",
-          "target": "overage"
+          "source": "cost",
+          "target": "cost"
         }
       ],
       "derived_columns": [
@@ -34,131 +26,110 @@
           "expression": {
             "kind": "binary",
             "left": {
-              "column": "mb",
+              "column": "price",
               "kind": "column"
             },
             "operator": "subtract",
             "right": {
-              "column": "quota",
+              "column": "cost",
               "kind": "column"
             }
           },
-          "name": "extra",
-          "type": "float"
-        },
-        {
-          "expression": {
-            "kind": "binary",
-            "left": {
-              "column": "overage",
-              "kind": "column"
-            },
-            "operator": "divide",
-            "right": {
-              "column": "mb",
-              "kind": "column"
-            }
-          },
-          "name": "share",
+          "name": "margin",
           "type": "float"
         }
       ],
       "filters": [],
       "grain": [
-        "usage_id"
+        "sale_id"
       ],
-      "name": "t_usages",
+      "name": "t_sales",
       "operation": "transform",
-      "source": "stg_usages"
+      "source": "stg_sales"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "usage_id",
-          "target": "usage_id"
+          "source": "sale_id",
+          "target": "sale_id"
         },
         {
           "side": "left",
-          "source": "sub_id",
-          "target": "sub_id"
-        },
-        {
-          "side": "left",
-          "source": "extra",
-          "target": "extra"
-        },
-        {
-          "side": "left",
-          "source": "share",
-          "target": "share"
+          "source": "margin",
+          "target": "margin"
         },
         {
           "side": "right",
-          "source": "plan_name",
-          "target": "plan_name"
+          "source": "outlet_id",
+          "target": "outlet_id"
+        },
+        {
+          "side": "right",
+          "source": "tag",
+          "target": "tag"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "usage_id"
+        "sale_id"
       ],
       "join": {
         "on": [
           {
-            "left": "plan_id",
-            "right": "plan_id"
-          }
-        ],
-        "type": "left"
-      },
-      "left": "t_usages",
-      "name": "j_use_plans",
-      "operation": "join",
-      "right": "stg_plans"
-    },
-    {
-      "columns": [
-        {
-          "side": "left",
-          "source": "usage_id",
-          "target": "usage_id"
-        },
-        {
-          "side": "left",
-          "source": "extra",
-          "target": "extra"
-        },
-        {
-          "side": "left",
-          "source": "plan_name",
-          "target": "plan_name"
-        },
-        {
-          "side": "right",
-          "source": "sub_name",
-          "target": "sub_name"
-        }
-      ],
-      "derived_columns": [],
-      "filters": [],
-      "grain": [
-        "usage_id"
-      ],
-      "join": {
-        "on": [
-          {
-            "left": "sub_id",
-            "right": "sub_id"
+            "left": "product_id",
+            "right": "product_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_use_plans",
+      "left": "t_sales",
+      "name": "j_sales_products",
+      "operation": "join",
+      "right": "stg_products"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "side": "left",
+          "source": "margin",
+          "target": "margin"
+        },
+        {
+          "side": "left",
+          "source": "tag",
+          "target": "tag"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "outlet_id",
+            "right": "outlet_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_sales_products",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_subscribers"
+      "right": "stg_outlets"
     }
   ],
   "output_models": [
@@ -166,26 +137,26 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "plan_name"
+        "tag"
       ],
       "group_by": [
         {
-          "source": "plan_name",
-          "target": "plan_name"
+          "source": "tag",
+          "target": "tag"
         }
       ],
       "metrics": [
         {
-          "column": "extra",
-          "function": "sum",
-          "name": "total_extra"
+          "column": "margin",
+          "function": "avg",
+          "name": "avg_margin"
         },
         {
           "function": "count_rows",
-          "name": "n_usages"
+          "name": "n_sales"
         }
       ],
-      "name": "o_extra_by_plan",
+      "name": "o_margin_by_tag",
       "source": "j_full"
     }
   ],
@@ -196,9 +167,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "TS-"
+            "prefix": "OT-"
           },
-          "name": "sub_id",
+          "name": "outlet_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -206,55 +177,19 @@
         },
         {
           "generator": {
-            "kind": "person_name",
+            "kind": "city",
             "locale": "de_DE"
           },
-          "name": "sub_name",
+          "name": "city",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_subscribers",
+      "name": "raw_outlets",
       "primary_key": [
-        "sub_id"
-      ],
-      "rows": {
-        "max": 30,
-        "min": 30
-      }
-    },
-    {
-      "columns": [
-        {
-          "generator": {
-            "digits": 3,
-            "kind": "formatted_id",
-            "prefix": "PP-"
-          },
-          "name": "plan_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "random_string",
-            "max_length": 12,
-            "min_length": 5
-          },
-          "name": "plan_name",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        }
-      ],
-      "name": "raw_plans",
-      "primary_key": [
-        "plan_id"
+        "outlet_id"
       ],
       "rows": {
         "max": 8,
@@ -265,11 +200,11 @@
       "columns": [
         {
           "generator": {
-            "digits": 5,
+            "digits": 4,
             "kind": "formatted_id",
-            "prefix": "US-"
+            "prefix": "PD-"
           },
-          "name": "usage_id",
+          "name": "product_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -278,10 +213,48 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_sub_usages",
+            "relationship": "rel_outlet_products",
             "target_side": "left"
           },
-          "name": "sub_id",
+          "name": "outlet_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "c",
+              "x"
+            ]
+          },
+          "name": "tag",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SL-"
+          },
+          "name": "sale_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -290,55 +263,55 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_plan_usages",
-            "target_side": "right"
+            "relationship": "rel_product_sales",
+            "target_side": "left"
           },
-          "name": "plan_id",
-          "null_probability": 0.25,
-          "nullable": true,
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
           "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "float_range",
-            "max": 20000.0,
-            "min": 1.0
-          },
-          "name": "mb",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "float",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "float_range",
-            "max": 10000.0,
-            "min": 0.0
-          },
-          "name": "quota",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "float",
           "unique": false
         },
         {
           "generator": {
             "kind": "float_range",
             "max": 500.0,
-            "min": 0.0
+            "min": 5.0
           },
-          "name": "overage",
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 400.0,
+            "min": 1.0
+          },
+          "name": "cost",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 70.0,
+            "min": 5.0
+          },
+          "name": "markdown",
           "null_probability": 0.0,
           "nullable": false,
           "type": "float",
           "unique": false
         }
       ],
-      "name": "raw_usages",
+      "name": "raw_sales",
       "primary_key": [
-        "usage_id"
+        "sale_id"
       ],
       "rows": {
         "max": 500,
@@ -351,126 +324,138 @@
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "sub_id"
+          "outlet_id"
         ],
-        "table": "raw_subscribers"
+        "table": "raw_outlets"
       },
-      "name": "rel_sub_usages",
+      "name": "rel_outlet_products",
       "right": {
         "columns": [
-          "sub_id"
+          "outlet_id"
         ],
-        "table": "raw_usages"
+        "table": "raw_products"
       }
     },
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "plan_id"
+          "product_id"
         ],
-        "table": "raw_usages"
+        "table": "raw_products"
       },
-      "name": "rel_plan_usages",
+      "name": "rel_product_sales",
       "right": {
         "columns": [
-          "plan_id"
+          "product_id"
         ],
-        "table": "raw_plans"
+        "table": "raw_sales"
       }
     }
   ],
-  "scenario_id": "telecom_overage_001",
+  "scenario_id": "retail_clearance_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "sub_id",
-          "target": "sub_id"
+          "source": "outlet_id",
+          "target": "outlet_id"
         },
         {
           "operations": [],
-          "source": "sub_name",
-          "target": "sub_name"
+          "source": "city",
+          "target": "city"
         }
       ],
       "grain": [
-        "sub_id"
+        "outlet_id"
       ],
-      "name": "stg_subscribers",
+      "name": "stg_outlets",
       "row_operations": [],
-      "source": "raw_subscribers"
+      "source": "raw_outlets"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "plan_id",
-          "target": "plan_id"
+          "source": "product_id",
+          "target": "product_id"
         },
         {
           "operations": [],
-          "source": "plan_name",
-          "target": "plan_name"
+          "source": "outlet_id",
+          "target": "outlet_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "upper"
+            }
+          ],
+          "source": "tag",
+          "target": "tag"
         }
       ],
       "grain": [
-        "plan_id"
+        "product_id"
       ],
-      "name": "stg_plans",
+      "name": "stg_products",
       "row_operations": [],
-      "source": "raw_plans"
+      "source": "raw_products"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "usage_id",
-          "target": "usage_id"
+          "source": "sale_id",
+          "target": "sale_id"
         },
         {
           "operations": [],
-          "source": "sub_id",
-          "target": "sub_id"
+          "source": "product_id",
+          "target": "product_id"
         },
         {
           "operations": [],
-          "source": "plan_id",
-          "target": "plan_id"
+          "source": "price",
+          "target": "price"
         },
         {
           "operations": [],
-          "source": "mb",
-          "target": "mb"
+          "source": "cost",
+          "target": "cost"
         },
         {
-          "operations": [],
-          "source": "quota",
-          "target": "quota"
-        },
-        {
-          "operations": [],
-          "source": "overage",
-          "target": "overage"
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "markdown",
+          "target": "markdown_pct"
         }
       ],
       "grain": [
-        "usage_id"
+        "sale_id"
       ],
-      "name": "stg_usages",
+      "name": "stg_sales",
       "row_operations": [],
-      "source": "raw_usages"
+      "source": "raw_sales"
     }
   ],
   "tests": [
     {
-      "column": "mb",
-      "min": 0.0,
-      "model": "stg_usages",
-      "name": "mb_nonnegative",
-      "type": "column_range"
+      "column": "tag",
+      "model": "stg_products",
+      "name": "tag_values",
+      "type": "accepted_values",
+      "values": [
+        "C",
+        "X"
+      ]
     }
   ]
 }

@@ -239,7 +239,8 @@
         },
         {
           "generator": {
-            "kind": "company_name"
+            "kind": "company_name",
+            "locale": "de_DE"
           },
           "name": "coop_name",
           "null_probability": 0.0,

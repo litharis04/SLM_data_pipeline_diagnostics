@@ -164,7 +164,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "sub_name",
           "null_probability": 0.0,

@@ -1,100 +1,90 @@
 {
-  "description": "Finance ledger pipeline: void entries excluded by string comparison, unified float amounts, printable timestamps.",
-  "domain": "finance",
+  "description": "Manufacturing serials pipeline: kept origin codes, print-ready manufacture and calibration labels.",
+  "domain": "manufacturing",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "unit_id",
+          "target": "unit_id"
         },
         {
           "side": "left",
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "mfg_label",
+          "target": "mfg_label"
         },
         {
           "side": "left",
-          "source": "amount",
-          "target": "amount"
-        },
-        {
-          "side": "left",
-          "source": "posted_label",
-          "target": "posted_label"
-        },
-        {
-          "side": "left",
-          "source": "status",
-          "target": "status"
+          "source": "cal_label",
+          "target": "cal_label"
         },
         {
           "side": "right",
-          "source": "owner",
-          "target": "owner"
+          "source": "plant_id",
+          "target": "plant_id"
+        },
+        {
+          "side": "left",
+          "source": "origin",
+          "target": "origin"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "unit_id"
       ],
       "join": {
         "on": [
           {
-            "left": "account_id",
-            "right": "account_id"
+            "left": "line_id",
+            "right": "line_id"
           }
         ],
         "type": "inner"
       },
-      "left": "stg_entries",
-      "name": "j_entries_accounts",
+      "left": "stg_units",
+      "name": "j_units_lines",
       "operation": "join",
-      "right": "stg_accounts"
+      "right": "stg_lines"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "unit_id",
+          "target": "unit_id"
         },
         {
           "side": "left",
-          "source": "amount",
-          "target": "amount"
-        },
-        {
-          "side": "left",
-          "source": "owner",
-          "target": "owner"
+          "source": "origin",
+          "target": "origin"
         },
         {
           "side": "right",
-          "source": "category",
-          "target": "category"
+          "source": "city",
+          "target": "city"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "unit_id"
       ],
       "join": {
         "on": [
           {
-            "left": "merchant_id",
-            "right": "merchant_id"
+            "left": "plant_id",
+            "right": "plant_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_entries_accounts",
+      "left": "j_units_lines",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_merchants"
+      "right": "stg_plants"
     }
   ],
   "output_models": [
@@ -102,26 +92,21 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "category"
+        "origin"
       ],
       "group_by": [
         {
-          "source": "category",
-          "target": "category"
+          "source": "origin",
+          "target": "origin"
         }
       ],
       "metrics": [
         {
-          "column": "amount",
-          "function": "avg",
-          "name": "avg_amount"
-        },
-        {
           "function": "count_rows",
-          "name": "n_entries"
+          "name": "n_units"
         }
       ],
-      "name": "o_amount_by_category",
+      "name": "o_units_by_origin",
       "source": "j_full"
     }
   ],
@@ -130,11 +115,11 @@
       "columns": [
         {
           "generator": {
-            "digits": 3,
+            "digits": 2,
             "kind": "formatted_id",
-            "prefix": "AC-"
+            "prefix": "PL-"
           },
-          "name": "account_id",
+          "name": "plant_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -142,23 +127,23 @@
         },
         {
           "generator": {
-            "kind": "person_name",
+            "kind": "city",
             "locale": "de_DE"
           },
-          "name": "owner",
+          "name": "city",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_accounts",
+      "name": "raw_plants",
       "primary_key": [
-        "account_id"
+        "plant_id"
       ],
       "rows": {
-        "max": 20,
-        "min": 20
+        "max": 6,
+        "min": 6
       }
     },
     {
@@ -167,9 +152,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "MC-"
+            "prefix": "LN-"
           },
-          "name": "merchant_id",
+          "name": "line_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -177,10 +162,11 @@
         },
         {
           "generator": {
-            "kind": "company_name",
-            "locale": "de_DE"
+            "kind": "foreign_key",
+            "relationship": "rel_plant_lines",
+            "target_side": "left"
           },
-          "name": "merchant_name",
+          "name": "plant_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -188,26 +174,24 @@
         },
         {
           "generator": {
-            "kind": "categorical",
-            "values": [
-              "food",
-              "travel"
-            ]
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
           },
-          "name": "category",
+          "name": "line_name",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_merchants",
+      "name": "raw_lines",
       "primary_key": [
-        "merchant_id"
+        "line_id"
       ],
       "rows": {
-        "max": 15,
-        "min": 15
+        "max": 36,
+        "min": 12
       }
     },
     {
@@ -216,9 +200,9 @@
           "generator": {
             "digits": 5,
             "kind": "formatted_id",
-            "prefix": "EN-"
+            "prefix": "SN-"
           },
-          "name": "entry_id",
+          "name": "unit_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -227,10 +211,10 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_account_entries",
+            "relationship": "rel_line_units",
             "target_side": "left"
           },
-          "name": "account_id",
+          "name": "line_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -238,14 +222,14 @@
         },
         {
           "generator": {
-            "kind": "foreign_key",
-            "relationship": "rel_merchant_entries",
-            "target_side": "right"
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
           },
-          "name": "merchant_id",
+          "name": "mfg_date",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "string",
+          "type": "date",
           "unique": false
         },
         {
@@ -254,7 +238,7 @@
             "max": "2024-12-31T23:59:59+00:00",
             "min": "2024-01-01T00:00:00+00:00"
           },
-          "name": "posted_at",
+          "name": "calibrated_at",
           "null_probability": 0.0,
           "nullable": false,
           "type": "timestamp",
@@ -262,39 +246,26 @@
         },
         {
           "generator": {
-            "kind": "integer_range",
-            "max": 100000,
-            "min": 1
-          },
-          "name": "amount_cents",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "integer",
-          "unique": false
-        },
-        {
-          "generator": {
             "kind": "categorical",
             "values": [
-              "cleared",
-              "pending",
-              "void"
+              "domestic",
+              "imported"
             ]
           },
-          "name": "status",
+          "name": "origin",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_entries",
+      "name": "raw_units",
       "primary_key": [
-        "entry_id"
+        "unit_id"
       ],
       "rows": {
-        "max": 600,
-        "min": 200
+        "max": 500,
+        "min": 150
       }
     }
   ],
@@ -303,99 +274,94 @@
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "account_id"
+          "plant_id"
         ],
-        "table": "raw_accounts"
+        "table": "raw_plants"
       },
-      "name": "rel_account_entries",
+      "name": "rel_plant_lines",
       "right": {
         "columns": [
-          "account_id"
+          "plant_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_lines"
       }
     },
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "merchant_id"
+          "line_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_lines"
       },
-      "name": "rel_merchant_entries",
+      "name": "rel_line_units",
       "right": {
         "columns": [
-          "merchant_id"
+          "line_id"
         ],
-        "table": "raw_merchants"
+        "table": "raw_units"
       }
     }
   ],
-  "scenario_id": "finance_ledger_001",
+  "scenario_id": "manufacturing_serials_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "plant_id",
+          "target": "plant_id"
         },
         {
           "operations": [],
-          "source": "owner",
-          "target": "owner"
+          "source": "city",
+          "target": "city"
         }
       ],
       "grain": [
-        "account_id"
+        "plant_id"
       ],
-      "name": "stg_accounts",
+      "name": "stg_plants",
       "row_operations": [],
-      "source": "raw_accounts"
+      "source": "raw_plants"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "line_id",
+          "target": "line_id"
         },
         {
           "operations": [],
-          "source": "merchant_name",
-          "target": "merchant_name"
+          "source": "plant_id",
+          "target": "plant_id"
         },
         {
           "operations": [],
-          "source": "category",
-          "target": "category"
+          "source": "line_name",
+          "target": "line_name"
         }
       ],
       "grain": [
-        "merchant_id"
+        "line_id"
       ],
-      "name": "stg_merchants",
+      "name": "stg_lines",
       "row_operations": [],
-      "source": "raw_merchants"
+      "source": "raw_lines"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "unit_id",
+          "target": "unit_id"
         },
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
-        },
-        {
-          "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "line_id",
+          "target": "line_id"
         },
         {
           "operations": [
@@ -404,59 +370,50 @@
               "type": "string"
             }
           ],
-          "source": "posted_at",
-          "target": "posted_label"
+          "source": "mfg_date",
+          "target": "mfg_label"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "float"
+              "type": "string"
             }
           ],
-          "source": "amount_cents",
-          "target": "amount"
+          "source": "calibrated_at",
+          "target": "cal_label"
         },
         {
-          "operations": [],
-          "source": "status",
-          "target": "status"
+          "operations": [
+            {
+              "mapping": {
+                "domestic": "DOM"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "origin",
+          "target": "origin"
         }
       ],
       "grain": [
-        "entry_id"
+        "unit_id"
       ],
-      "name": "stg_entries",
-      "row_operations": [
-        {
-          "condition": {
-            "kind": "comparison",
-            "left": {
-              "column": "status",
-              "kind": "column"
-            },
-            "operator": "ne",
-            "right": {
-              "kind": "literal",
-              "value": "void"
-            }
-          },
-          "op": "filter"
-        }
-      ],
-      "source": "raw_entries"
+      "name": "stg_units",
+      "row_operations": [],
+      "source": "raw_units"
     }
   ],
   "tests": [
     {
-      "column": "status",
-      "model": "stg_entries",
-      "name": "status_values",
+      "column": "origin",
+      "model": "stg_units",
+      "name": "origin_values",
       "type": "accepted_values",
       "values": [
-        "cleared",
-        "pending",
-        "void"
+        "DOM",
+        "imported"
       ]
     }
   ]

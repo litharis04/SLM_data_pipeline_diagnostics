@@ -1,85 +1,85 @@
 {
-  "description": "Retail catalog pipeline: unique weighted brand codes, print-ready launch and first-seen labels.",
-  "domain": "retail",
+  "description": "Hospitality rates pipeline: null-mapped room classes, unified float capacities and boolean smoking flags.",
+  "domain": "hospitality",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "stock_id",
-          "target": "stock_id"
+          "source": "booking_id",
+          "target": "booking_id"
         },
         {
           "side": "left",
-          "source": "qty",
-          "target": "qty"
-        },
-        {
-          "side": "left",
-          "source": "seen_label",
-          "target": "seen_label"
+          "source": "guests",
+          "target": "guests"
         },
         {
           "side": "right",
-          "source": "brand_id",
-          "target": "brand_id"
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "side": "right",
+          "source": "class",
+          "target": "class"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "stock_id"
+        "booking_id"
       ],
       "join": {
         "on": [
           {
-            "left": "product_id",
-            "right": "product_id"
+            "left": "type_id",
+            "right": "type_id"
           }
         ],
         "type": "inner"
       },
-      "left": "stg_stock",
-      "name": "j_stock_products",
+      "left": "stg_bookings",
+      "name": "j_book_types",
       "operation": "join",
-      "right": "stg_products"
+      "right": "stg_types"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "stock_id",
-          "target": "stock_id"
+          "source": "booking_id",
+          "target": "booking_id"
         },
         {
           "side": "left",
-          "source": "qty",
-          "target": "qty"
+          "source": "guests",
+          "target": "guests"
         },
         {
           "side": "right",
-          "source": "brand_code",
-          "target": "brand_code"
+          "source": "hotel_name",
+          "target": "hotel_name"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "stock_id"
+        "booking_id"
       ],
       "join": {
         "on": [
           {
-            "left": "brand_id",
-            "right": "brand_id"
+            "left": "hotel_id",
+            "right": "hotel_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_stock_products",
+      "left": "j_book_types",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_brands"
+      "right": "stg_hotels"
     }
   ],
   "output_models": [
@@ -87,26 +87,26 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "brand_code"
+        "hotel_name"
       ],
       "group_by": [
         {
-          "source": "brand_code",
-          "target": "brand_code"
+          "source": "hotel_name",
+          "target": "hotel_name"
         }
       ],
       "metrics": [
         {
-          "column": "qty",
+          "column": "guests",
           "function": "sum",
-          "name": "total_qty"
+          "name": "total_guests"
         },
         {
           "function": "count_rows",
-          "name": "n_items"
+          "name": "n_bookings"
         }
       ],
-      "name": "o_qty_by_brand",
+      "name": "o_guests_by_hotel",
       "source": "j_full"
     }
   ],
@@ -117,9 +117,68 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "BR-"
+            "prefix": "HT-"
           },
-          "name": "brand_id",
+          "name": "hotel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "hotel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "manager",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hotels",
+      "primary_key": [
+        "hotel_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RT-"
+          },
+          "name": "type_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hotel_types",
+            "target_side": "left"
+          },
+          "name": "hotel_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -129,107 +188,37 @@
           "generator": {
             "kind": "categorical",
             "values": [
-              "B1",
-              "B2",
-              "B3",
-              "B4",
-              "B5",
-              "B6"
-            ],
-            "weights": [
-              1.0,
-              2.0,
-              3.0,
-              2.0,
-              1.0,
-              1.0
+              "double",
+              "single",
+              "suite"
             ]
           },
-          "name": "brand_code",
-          "null_probability": 0.0,
-          "nullable": false,
+          "name": "class",
+          "null_probability": 0.1,
+          "nullable": true,
           "type": "string",
-          "unique": true
+          "unique": false
         },
         {
           "generator": {
-            "kind": "company_name",
-            "locale": "de_DE"
+            "kind": "integer_range",
+            "max": 6,
+            "min": 1
           },
-          "name": "brand_name",
+          "name": "capacity",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "string",
+          "type": "integer",
           "unique": false
         }
       ],
-      "name": "raw_brands",
+      "name": "raw_types",
       "primary_key": [
-        "brand_id"
+        "type_id"
       ],
       "rows": {
-        "max": 6,
-        "min": 6
-      }
-    },
-    {
-      "columns": [
-        {
-          "generator": {
-            "digits": 4,
-            "kind": "formatted_id",
-            "prefix": "PD-"
-          },
-          "name": "product_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "foreign_key",
-            "relationship": "rel_brand_products",
-            "target_side": "left"
-          },
-          "name": "brand_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "random_string",
-            "max_length": 14,
-            "min_length": 5
-          },
-          "name": "product_name",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "date_range",
-            "max": "2023-12-31",
-            "min": "2020-01-01"
-          },
-          "name": "launch_date",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "date",
-          "unique": false
-        }
-      ],
-      "name": "raw_products",
-      "primary_key": [
-        "product_id"
-      ],
-      "rows": {
-        "max": 36,
-        "min": 12
+        "max": 40,
+        "min": 16
       }
     },
     {
@@ -238,9 +227,9 @@
           "generator": {
             "digits": 5,
             "kind": "formatted_id",
-            "prefix": "SK-"
+            "prefix": "BK-"
           },
-          "name": "stock_id",
+          "name": "booking_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -249,10 +238,10 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_product_stock",
+            "relationship": "rel_type_bookings",
             "target_side": "left"
           },
-          "name": "product_id",
+          "name": "type_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -261,10 +250,10 @@
         {
           "generator": {
             "kind": "integer_range",
-            "max": 1000,
-            "min": 0
+            "max": 6,
+            "min": 1
           },
-          "name": "qty",
+          "name": "guests",
           "null_probability": 0.0,
           "nullable": false,
           "type": "integer",
@@ -272,24 +261,24 @@
         },
         {
           "generator": {
-            "kind": "timestamp_range",
-            "max": "2024-12-31T23:59:59+00:00",
-            "min": "2024-01-01T00:00:00+00:00"
+            "kind": "integer_range",
+            "max": 1,
+            "min": 0
           },
-          "name": "first_seen",
+          "name": "smoking",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "timestamp",
+          "type": "integer",
           "unique": false
         }
       ],
-      "name": "raw_stock",
+      "name": "raw_bookings",
       "primary_key": [
-        "stock_id"
+        "booking_id"
       ],
       "rows": {
-        "max": 240,
-        "min": 60
+        "max": 500,
+        "min": 150
       }
     }
   ],
@@ -298,148 +287,149 @@
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "brand_id"
+          "hotel_id"
         ],
-        "table": "raw_brands"
+        "table": "raw_hotels"
       },
-      "name": "rel_brand_products",
+      "name": "rel_hotel_types",
       "right": {
         "columns": [
-          "brand_id"
+          "hotel_id"
         ],
-        "table": "raw_products"
+        "table": "raw_types"
       }
     },
     {
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "product_id"
+          "type_id"
         ],
-        "table": "raw_products"
+        "table": "raw_types"
       },
-      "name": "rel_product_stock",
+      "name": "rel_type_bookings",
       "right": {
         "columns": [
-          "product_id"
+          "type_id"
         ],
-        "table": "raw_stock"
+        "table": "raw_bookings"
       }
     }
   ],
-  "scenario_id": "retail_catalog_001",
+  "scenario_id": "hospitality_rates_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "brand_id",
-          "target": "brand_id"
+          "source": "hotel_id",
+          "target": "hotel_id"
         },
         {
           "operations": [],
-          "source": "brand_code",
-          "target": "brand_code"
+          "source": "hotel_name",
+          "target": "hotel_name"
         },
         {
           "operations": [],
-          "source": "brand_name",
-          "target": "brand_name"
+          "source": "manager",
+          "target": "manager"
         }
       ],
       "grain": [
-        "brand_id"
+        "hotel_id"
       ],
-      "name": "stg_brands",
+      "name": "stg_hotels",
       "row_operations": [],
-      "source": "raw_brands"
+      "source": "raw_hotels"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "product_id",
-          "target": "product_id"
+          "source": "type_id",
+          "target": "type_id"
         },
         {
           "operations": [],
-          "source": "brand_id",
-          "target": "brand_id"
+          "source": "hotel_id",
+          "target": "hotel_id"
         },
         {
-          "operations": [],
-          "source": "product_name",
-          "target": "product_name"
+          "operations": [
+            {
+              "mapping": {
+                "double": "D"
+              },
+              "on_unmapped": "null",
+              "op": "map_values"
+            }
+          ],
+          "source": "class",
+          "target": "class"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "string"
+              "type": "float"
             }
           ],
-          "source": "launch_date",
-          "target": "launch_label"
+          "source": "capacity",
+          "target": "cap"
         }
       ],
       "grain": [
-        "product_id"
+        "type_id"
       ],
-      "name": "stg_products",
+      "name": "stg_types",
       "row_operations": [],
-      "source": "raw_products"
+      "source": "raw_types"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "stock_id",
-          "target": "stock_id"
+          "source": "booking_id",
+          "target": "booking_id"
         },
         {
           "operations": [],
-          "source": "product_id",
-          "target": "product_id"
+          "source": "type_id",
+          "target": "type_id"
         },
         {
           "operations": [],
-          "source": "qty",
-          "target": "qty"
+          "source": "guests",
+          "target": "guests"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "string"
+              "type": "boolean"
             }
           ],
-          "source": "first_seen",
-          "target": "seen_label"
+          "source": "smoking",
+          "target": "flag"
         }
       ],
       "grain": [
-        "stock_id"
+        "booking_id"
       ],
-      "name": "stg_stock",
+      "name": "stg_bookings",
       "row_operations": [],
-      "source": "raw_stock"
+      "source": "raw_bookings"
     }
   ],
   "tests": [
     {
-      "column": "brand_code",
-      "model": "stg_brands",
-      "name": "brand_values",
-      "type": "accepted_values",
-      "values": [
-        "B1",
-        "B2",
-        "B3",
-        "B4",
-        "B5",
-        "B6"
-      ]
+      "column": "guests",
+      "min": 0,
+      "model": "stg_bookings",
+      "name": "guests_nonnegative",
+      "type": "column_range"
     }
   ]
 }

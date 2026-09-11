@@ -161,7 +161,7 @@
         {
           "generator": {
             "kind": "person_name",
-            "locale": "fr_FR"
+            "locale": "de_DE"
           },
           "name": "guest_name",
           "null_probability": 0.0,

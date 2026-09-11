@@ -1,0 +1,457 @@
+{
+  "description": "Telecom support pipeline: strict priority codebook, integer VIP codes, filter-then-deduplicate tickets.",
+  "domain": "telecom",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "side": "left",
+          "source": "priority",
+          "target": "priority"
+        },
+        {
+          "side": "left",
+          "source": "vip_code",
+          "target": "vip_code"
+        },
+        {
+          "side": "left",
+          "source": "opened",
+          "target": "opened"
+        },
+        {
+          "side": "right",
+          "source": "agent_name",
+          "target": "agent_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ticket_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "agent_id",
+            "right": "agent_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_tickets",
+      "name": "j_tickets_agents",
+      "operation": "join",
+      "right": "stg_agents"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "side": "left",
+          "source": "priority",
+          "target": "priority"
+        },
+        {
+          "side": "left",
+          "source": "opened",
+          "target": "opened"
+        },
+        {
+          "side": "right",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "side": "right",
+          "source": "esc_id",
+          "target": "esc_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "esc_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "ticket_id",
+            "right": "ticket_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_tickets_agents",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_escalations"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "priority"
+      ],
+      "group_by": [
+        {
+          "source": "priority",
+          "target": "priority"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "opened",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_tickets"
+        }
+      ],
+      "name": "o_latest_by_priority",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AG-"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "agent_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_agents",
+      "primary_key": [
+        "agent_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "TK-"
+          },
+          "name": "ticket_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_agent_tickets",
+            "target_side": "left"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "high",
+              "low"
+            ]
+          },
+          "name": "priority",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "vip",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "opened",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_tickets",
+      "primary_key": [
+        "ticket_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "ES-"
+          },
+          "name": "esc_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_ticket_escalations",
+            "target_side": "left"
+          },
+          "name": "ticket_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 3,
+            "min": 1
+          },
+          "name": "level",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_escalations",
+      "primary_key": [
+        "esc_id"
+      ],
+      "rows": {
+        "max": 200,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_agents"
+      },
+      "name": "rel_agent_tickets",
+      "right": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_tickets"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "ticket_id"
+        ],
+        "table": "raw_tickets"
+      },
+      "name": "rel_ticket_escalations",
+      "right": {
+        "columns": [
+          "ticket_id"
+        ],
+        "table": "raw_escalations"
+      }
+    }
+  ],
+  "scenario_id": "telecom_support_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_name",
+          "target": "agent_name"
+        }
+      ],
+      "grain": [
+        "agent_id"
+      ],
+      "name": "stg_agents",
+      "row_operations": [],
+      "source": "raw_agents"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "high": "H",
+                "low": "L"
+              },
+              "on_unmapped": "error",
+              "op": "map_values"
+            }
+          ],
+          "source": "priority",
+          "target": "priority"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "vip",
+          "target": "vip_code"
+        },
+        {
+          "operations": [],
+          "source": "opened",
+          "target": "opened"
+        }
+      ],
+      "grain": [
+        "ticket_id"
+      ],
+      "name": "stg_tickets",
+      "row_operations": [
+        {
+      "condition": {
+        "kind": "comparison",
+        "left": {
+          "column": "priority",
+          "kind": "column"
+        },
+        "operator": "ne",
+        "right": {
+          "kind": "literal",
+          "value": "L"
+        }
+      },
+          "op": "filter"
+        },
+        {
+          "keys": [
+            "ticket_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "opened",
+              "direction": "desc"
+            }
+          ]
+        }
+      ],
+      "source": "raw_tickets"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "esc_id",
+          "target": "esc_id"
+        },
+        {
+          "operations": [],
+          "source": "ticket_id",
+          "target": "ticket_id"
+        },
+        {
+          "operations": [],
+          "source": "level",
+          "target": "level"
+        }
+      ],
+      "grain": [
+        "esc_id"
+      ],
+      "name": "stg_escalations",
+      "row_operations": [],
+      "source": "raw_escalations"
+    }
+  ],
+  "tests": [
+    {
+      "column": "priority",
+      "model": "stg_tickets",
+      "name": "priority_values",
+      "type": "accepted_values",
+      "values": [
+        "H",
+        "L"
+      ]
+    }
+  ]
+}

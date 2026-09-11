@@ -1,95 +1,90 @@
 {
-  "description": "Education admissions pipeline: self-serve applications kept through a left join, prefixless IDs and legacy reviewer numbering.",
-  "domain": "education",
+  "description": "Logistics tracking pipeline: fallback contacts, delivered flags and zone labels parsed in staging.",
+  "domain": "logistics",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "app_id",
-          "target": "app_id"
+          "source": "ship_id",
+          "target": "ship_id"
         },
         {
           "side": "left",
-          "source": "program_id",
-          "target": "program_id"
+          "source": "zone_label",
+          "target": "zone_label"
         },
         {
           "side": "left",
-          "source": "score",
-          "target": "score"
+          "source": "delivered",
+          "target": "delivered"
         },
         {
           "side": "left",
-          "source": "submitted",
-          "target": "submitted"
+          "source": "hub_id",
+          "target": "hub_id"
         },
         {
           "side": "right",
-          "source": "reviewer_name",
-          "target": "reviewer_name"
+          "source": "contact",
+          "target": "contact"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "app_id"
+        "ship_id"
       ],
       "join": {
         "on": [
           {
-            "left": "reviewer_id",
-            "right": "reviewer_id"
+            "left": "carrier_id",
+            "right": "carrier_id"
           }
         ],
-        "type": "left"
+        "type": "inner"
       },
-      "left": "stg_applications",
-      "name": "j_apps_reviewers",
+      "left": "stg_shipments",
+      "name": "j_ship_carriers",
       "operation": "join",
-      "right": "stg_reviewers"
+      "right": "stg_carriers"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "app_id",
-          "target": "app_id"
+          "source": "ship_id",
+          "target": "ship_id"
         },
         {
           "side": "left",
-          "source": "score",
-          "target": "score"
-        },
-        {
-          "side": "left",
-          "source": "reviewer_name",
-          "target": "reviewer_name"
+          "source": "zone_label",
+          "target": "zone_label"
         },
         {
           "side": "right",
-          "source": "degree",
-          "target": "degree"
+          "source": "city",
+          "target": "city"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "app_id"
+        "ship_id"
       ],
       "join": {
         "on": [
           {
-            "left": "program_id",
-            "right": "program_id"
+            "left": "hub_id",
+            "right": "hub_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_apps_reviewers",
+      "left": "j_ship_carriers",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_programs"
+      "right": "stg_hubs"
     }
   ],
   "output_models": [
@@ -97,26 +92,21 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "degree"
+        "zone_label"
       ],
       "group_by": [
         {
-          "source": "degree",
-          "target": "degree"
+          "source": "zone_label",
+          "target": "zone_label"
         }
       ],
       "metrics": [
         {
-          "column": "score",
-          "function": "avg",
-          "name": "avg_score"
-        },
-        {
           "function": "count_rows",
-          "name": "n_apps"
+          "name": "n_shipments"
         }
       ],
-      "name": "o_score_by_degree",
+      "name": "o_shipments_by_zone",
       "source": "j_full"
     }
   ],
@@ -127,10 +117,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "RV-",
-            "start": 500
+            "prefix": "CR-"
           },
-          "name": "reviewer_id",
+          "name": "carrier_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -138,19 +127,30 @@
         },
         {
           "generator": {
-            "kind": "person_name",
+            "kind": "company_name",
             "locale": "de_DE"
           },
-          "name": "reviewer_name",
+          "name": "company",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email",
+            "locale": "de_DE"
+          },
+          "name": "contact",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
         }
       ],
-      "name": "raw_reviewers",
+      "name": "raw_carriers",
       "primary_key": [
-        "reviewer_id"
+        "carrier_id"
       ],
       "rows": {
         "max": 12,
@@ -163,9 +163,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "PR-"
+            "prefix": "HB-"
           },
-          "name": "program_id",
+          "name": "hub_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -173,23 +173,19 @@
         },
         {
           "generator": {
-            "kind": "categorical",
-            "values": [
-              "ba",
-              "ma",
-              "phd"
-            ]
+            "kind": "city",
+            "locale": "de_DE"
           },
-          "name": "degree",
+          "name": "city",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_programs",
+      "name": "raw_hubs",
       "primary_key": [
-        "program_id"
+        "hub_id"
       ],
       "rows": {
         "max": 8,
@@ -201,9 +197,10 @@
         {
           "generator": {
             "digits": 5,
-            "kind": "formatted_id"
+            "kind": "formatted_id",
+            "prefix": "TR-"
           },
-          "name": "app_id",
+          "name": "ship_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -212,22 +209,22 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_reviewer_apps",
-            "target_side": "right"
+            "relationship": "rel_carrier_shipments",
+            "target_side": "left"
           },
-          "name": "reviewer_id",
-          "null_probability": 0.2,
-          "nullable": true,
+          "name": "carrier_id",
+          "null_probability": 0.0,
+          "nullable": false,
           "type": "string",
           "unique": false
         },
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_program_apps",
+            "relationship": "rel_hub_shipments",
             "target_side": "right"
           },
-          "name": "program_id",
+          "name": "hub_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -235,32 +232,34 @@
         },
         {
           "generator": {
-            "kind": "float_range",
-            "max": 100.0,
-            "min": 0.0
+            "kind": "integer_range",
+            "max": 9,
+            "min": 1
           },
-          "name": "score",
+          "name": "zone",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "float",
+          "type": "integer",
           "unique": false
         },
         {
           "generator": {
-            "kind": "date_range",
-            "max": "2024-08-31",
-            "min": "2024-01-01"
+            "kind": "categorical",
+            "values": [
+              "N",
+              "Y"
+            ]
           },
-          "name": "submitted",
+          "name": "delivered_str",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "date",
+          "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_applications",
+      "name": "raw_shipments",
       "primary_key": [
-        "app_id"
+        "ship_id"
       ],
       "rows": {
         "max": 500,
@@ -270,128 +269,145 @@
   ],
   "relationships": [
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "reviewer_id"
+          "carrier_id"
         ],
-        "table": "raw_applications"
+        "table": "raw_carriers"
       },
-      "name": "rel_reviewer_apps",
+      "name": "rel_carrier_shipments",
       "right": {
         "columns": [
-          "reviewer_id"
+          "carrier_id"
         ],
-        "table": "raw_reviewers"
+        "table": "raw_shipments"
       }
     },
     {
       "cardinality": "many_to_one",
       "left": {
         "columns": [
-          "program_id"
+          "hub_id"
         ],
-        "table": "raw_applications"
+        "table": "raw_shipments"
       },
-      "name": "rel_program_apps",
+      "name": "rel_hub_shipments",
       "right": {
         "columns": [
-          "program_id"
+          "hub_id"
         ],
-        "table": "raw_programs"
+        "table": "raw_hubs"
       }
     }
   ],
-  "scenario_id": "education_admissions_001",
+  "scenario_id": "logistics_tracking_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "reviewer_id",
-          "target": "reviewer_id"
+          "source": "carrier_id",
+          "target": "carrier_id"
         },
         {
           "operations": [],
-          "source": "reviewer_name",
-          "target": "reviewer_name"
+          "source": "company",
+          "target": "company"
+        },
+        {
+          "operations": [
+            {
+              "op": "coalesce",
+              "value": "unknown"
+            }
+          ],
+          "source": "contact",
+          "target": "contact"
         }
       ],
       "grain": [
-        "reviewer_id"
+        "carrier_id"
       ],
-      "name": "stg_reviewers",
+      "name": "stg_carriers",
       "row_operations": [],
-      "source": "raw_reviewers"
+      "source": "raw_carriers"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "program_id",
-          "target": "program_id"
+          "source": "hub_id",
+          "target": "hub_id"
         },
         {
           "operations": [],
-          "source": "degree",
-          "target": "degree"
+          "source": "city",
+          "target": "city"
         }
       ],
       "grain": [
-        "program_id"
+        "hub_id"
       ],
-      "name": "stg_programs",
+      "name": "stg_hubs",
       "row_operations": [],
-      "source": "raw_programs"
+      "source": "raw_hubs"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "app_id",
-          "target": "app_id"
+          "source": "ship_id",
+          "target": "ship_id"
         },
         {
           "operations": [],
-          "source": "reviewer_id",
-          "target": "reviewer_id"
+          "source": "carrier_id",
+          "target": "carrier_id"
         },
         {
           "operations": [],
-          "source": "program_id",
-          "target": "program_id"
+          "source": "hub_id",
+          "target": "hub_id"
         },
         {
-          "operations": [],
-          "source": "score",
-          "target": "score"
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "zone",
+          "target": "zone_label"
         },
         {
-          "operations": [],
-          "source": "submitted",
-          "target": "submitted"
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "delivered_str",
+          "target": "delivered"
         }
       ],
       "grain": [
-        "app_id"
+        "ship_id"
       ],
-      "name": "stg_applications",
+      "name": "stg_shipments",
       "row_operations": [],
-      "source": "raw_applications"
+      "source": "raw_shipments"
     }
   ],
   "tests": [
     {
-      "column": "degree",
-      "model": "stg_programs",
-      "name": "degree_values",
-      "type": "accepted_values",
-      "values": [
-        "ba",
-        "ma",
-        "phd"
-      ]
+      "columns": [
+        "contact"
+      ],
+      "model": "stg_carriers",
+      "name": "contact_filled",
+      "type": "not_null"
     }
   ]
 }

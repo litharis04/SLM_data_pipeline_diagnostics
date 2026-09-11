@@ -221,7 +221,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "inspector",
           "null_probability": 0.0,

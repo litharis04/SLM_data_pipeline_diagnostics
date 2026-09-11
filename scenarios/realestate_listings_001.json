@@ -147,7 +147,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "agent_name",
           "null_probability": 0.0,
@@ -157,7 +158,8 @@
         },
         {
           "generator": {
-            "kind": "company_name"
+            "kind": "company_name",
+            "locale": "de_DE"
           },
           "name": "agency",
           "null_probability": 0.0,

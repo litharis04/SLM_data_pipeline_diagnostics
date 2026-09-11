@@ -154,7 +154,8 @@
         },
         {
           "generator": {
-            "kind": "street_address"
+            "kind": "street_address",
+            "locale": "de_DE"
           },
           "name": "address",
           "null_probability": 0.0,
@@ -164,7 +165,8 @@
         },
         {
           "generator": {
-            "kind": "phone_number"
+            "kind": "phone_number",
+            "locale": "de_DE"
           },
           "name": "phone",
           "null_probability": 0.0,

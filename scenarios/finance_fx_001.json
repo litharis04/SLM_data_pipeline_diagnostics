@@ -1,100 +1,90 @@
 {
-  "description": "Finance ledger pipeline: void entries excluded by string comparison, unified float amounts, printable timestamps.",
+  "description": "Finance FX pipeline: quoted tenors and rates parsed in staging, placeholder memos nulled.",
   "domain": "finance",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "deal_id",
+          "target": "deal_id"
         },
         {
           "side": "left",
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "term",
+          "target": "term"
         },
         {
           "side": "left",
-          "source": "amount",
-          "target": "amount"
-        },
-        {
-          "side": "left",
-          "source": "posted_label",
-          "target": "posted_label"
-        },
-        {
-          "side": "left",
-          "source": "status",
-          "target": "status"
+          "source": "rate",
+          "target": "rate"
         },
         {
           "side": "right",
-          "source": "owner",
-          "target": "owner"
+          "source": "desk_id",
+          "target": "desk_id"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "deal_id"
       ],
       "join": {
         "on": [
           {
-            "left": "account_id",
-            "right": "account_id"
+            "left": "trader_id",
+            "right": "trader_id"
           }
         ],
         "type": "inner"
       },
-      "left": "stg_entries",
-      "name": "j_entries_accounts",
+      "left": "stg_deals",
+      "name": "j_deals_traders",
       "operation": "join",
-      "right": "stg_accounts"
+      "right": "stg_traders"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "deal_id",
+          "target": "deal_id"
         },
         {
           "side": "left",
-          "source": "amount",
-          "target": "amount"
+          "source": "term",
+          "target": "term"
         },
         {
           "side": "left",
-          "source": "owner",
-          "target": "owner"
+          "source": "rate",
+          "target": "rate"
         },
         {
           "side": "right",
-          "source": "category",
-          "target": "category"
+          "source": "desk_name",
+          "target": "desk_name"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "deal_id"
       ],
       "join": {
         "on": [
           {
-            "left": "merchant_id",
-            "right": "merchant_id"
+            "left": "desk_id",
+            "right": "desk_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_entries_accounts",
+      "left": "j_deals_traders",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_merchants"
+      "right": "stg_desks"
     }
   ],
   "output_models": [
@@ -102,26 +92,26 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "category"
+        "term"
       ],
       "group_by": [
         {
-          "source": "category",
-          "target": "category"
+          "source": "term",
+          "target": "term"
         }
       ],
       "metrics": [
         {
-          "column": "amount",
+          "column": "rate",
           "function": "avg",
-          "name": "avg_amount"
+          "name": "avg_rate"
         },
         {
           "function": "count_rows",
-          "name": "n_entries"
+          "name": "n_deals"
         }
       ],
-      "name": "o_amount_by_category",
+      "name": "o_rate_by_term",
       "source": "j_full"
     }
   ],
@@ -130,11 +120,59 @@
       "columns": [
         {
           "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DK-"
+          },
+          "name": "desk_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "desk_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_desks",
+      "primary_key": [
+        "desk_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "AC-"
+            "prefix": "TR-"
           },
-          "name": "account_id",
+          "name": "trader_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_desk_traders",
+            "target_side": "left"
+          },
+          "name": "desk_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -145,69 +183,20 @@
             "kind": "person_name",
             "locale": "de_DE"
           },
-          "name": "owner",
+          "name": "full_name",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_accounts",
+      "name": "raw_traders",
       "primary_key": [
-        "account_id"
+        "trader_id"
       ],
       "rows": {
-        "max": 20,
-        "min": 20
-      }
-    },
-    {
-      "columns": [
-        {
-          "generator": {
-            "digits": 3,
-            "kind": "formatted_id",
-            "prefix": "MC-"
-          },
-          "name": "merchant_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "company_name",
-            "locale": "de_DE"
-          },
-          "name": "merchant_name",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "categorical",
-            "values": [
-              "food",
-              "travel"
-            ]
-          },
-          "name": "category",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        }
-      ],
-      "name": "raw_merchants",
-      "primary_key": [
-        "merchant_id"
-      ],
-      "rows": {
-        "max": 15,
-        "min": 15
+        "max": 36,
+        "min": 12
       }
     },
     {
@@ -216,9 +205,9 @@
           "generator": {
             "digits": 5,
             "kind": "formatted_id",
-            "prefix": "EN-"
+            "prefix": "FX-"
           },
-          "name": "entry_id",
+          "name": "deal_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -227,74 +216,79 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_account_entries",
+            "relationship": "rel_trader_deals",
             "target_side": "left"
           },
-          "name": "account_id",
+          "name": "trader_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "foreign_key",
-            "relationship": "rel_merchant_entries",
-            "target_side": "right"
-          },
-          "name": "merchant_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "timestamp_range",
-            "max": "2024-12-31T23:59:59+00:00",
-            "min": "2024-01-01T00:00:00+00:00"
-          },
-          "name": "posted_at",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "timestamp",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "integer_range",
-            "max": 100000,
-            "min": 1
-          },
-          "name": "amount_cents",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "integer",
           "unique": false
         },
         {
           "generator": {
             "kind": "categorical",
             "values": [
-              "cleared",
-              "pending",
-              "void"
+              "EURUSD",
+              "USDJPY"
             ]
           },
-          "name": "status",
+          "name": "pair",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "12",
+              "3",
+              "6"
+            ]
+          },
+          "name": "term_months",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "1.05",
+              "1.10",
+              "150.2"
+            ]
+          },
+          "name": "rate_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 25,
+            "min_length": 5
+          },
+          "name": "memo",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
         }
       ],
-      "name": "raw_entries",
+      "name": "raw_deals",
       "primary_key": [
-        "entry_id"
+        "deal_id"
       ],
       "rows": {
-        "max": 600,
-        "min": 200
+        "max": 500,
+        "min": 150
       }
     }
   ],
@@ -303,109 +297,109 @@
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "account_id"
+          "desk_id"
         ],
-        "table": "raw_accounts"
+        "table": "raw_desks"
       },
-      "name": "rel_account_entries",
+      "name": "rel_desk_traders",
       "right": {
         "columns": [
-          "account_id"
+          "desk_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_traders"
       }
     },
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "merchant_id"
+          "trader_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_traders"
       },
-      "name": "rel_merchant_entries",
+      "name": "rel_trader_deals",
       "right": {
         "columns": [
-          "merchant_id"
+          "trader_id"
         ],
-        "table": "raw_merchants"
+        "table": "raw_deals"
       }
     }
   ],
-  "scenario_id": "finance_ledger_001",
+  "scenario_id": "finance_fx_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "desk_id",
+          "target": "desk_id"
         },
         {
           "operations": [],
-          "source": "owner",
-          "target": "owner"
+          "source": "desk_name",
+          "target": "desk_name"
         }
       ],
       "grain": [
-        "account_id"
+        "desk_id"
       ],
-      "name": "stg_accounts",
+      "name": "stg_desks",
       "row_operations": [],
-      "source": "raw_accounts"
+      "source": "raw_desks"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "trader_id",
+          "target": "trader_id"
         },
         {
           "operations": [],
-          "source": "merchant_name",
-          "target": "merchant_name"
+          "source": "desk_id",
+          "target": "desk_id"
         },
         {
           "operations": [],
-          "source": "category",
-          "target": "category"
+          "source": "full_name",
+          "target": "full_name"
         }
       ],
       "grain": [
-        "merchant_id"
+        "trader_id"
       ],
-      "name": "stg_merchants",
+      "name": "stg_traders",
       "row_operations": [],
-      "source": "raw_merchants"
+      "source": "raw_traders"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "deal_id",
+          "target": "deal_id"
         },
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "trader_id",
+          "target": "trader_id"
         },
         {
           "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "pair",
+          "target": "pair"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "string"
+              "type": "integer"
             }
           ],
-          "source": "posted_at",
-          "target": "posted_label"
+          "source": "term_months",
+          "target": "term"
         },
         {
           "operations": [
@@ -414,49 +408,39 @@
               "type": "float"
             }
           ],
-          "source": "amount_cents",
-          "target": "amount"
+          "source": "rate_str",
+          "target": "rate"
         },
         {
-          "operations": [],
-          "source": "status",
-          "target": "status"
+          "operations": [
+            {
+              "op": "null_if",
+              "values": [
+                "n/a"
+              ]
+            }
+          ],
+          "source": "memo",
+          "target": "memo"
         }
       ],
       "grain": [
-        "entry_id"
+        "deal_id"
       ],
-      "name": "stg_entries",
-      "row_operations": [
-        {
-          "condition": {
-            "kind": "comparison",
-            "left": {
-              "column": "status",
-              "kind": "column"
-            },
-            "operator": "ne",
-            "right": {
-              "kind": "literal",
-              "value": "void"
-            }
-          },
-          "op": "filter"
-        }
-      ],
-      "source": "raw_entries"
+      "name": "stg_deals",
+      "row_operations": [],
+      "source": "raw_deals"
     }
   ],
   "tests": [
     {
-      "column": "status",
-      "model": "stg_entries",
-      "name": "status_values",
+      "column": "pair",
+      "model": "stg_deals",
+      "name": "pair_values",
       "type": "accepted_values",
       "values": [
-        "cleared",
-        "pending",
-        "void"
+        "EURUSD",
+        "USDJPY"
       ]
     }
   ]

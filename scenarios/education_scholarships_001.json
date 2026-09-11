@@ -1,18 +1,13 @@
 {
-  "description": "Finance ledger pipeline: void entries excluded by string comparison, unified float amounts, printable timestamps.",
-  "domain": "finance",
+  "description": "Education scholarships pipeline: multi-operation award normalization with print-ready labels.",
+  "domain": "education",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
-        },
-        {
-          "side": "left",
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "award_id",
+          "target": "award_id"
         },
         {
           "side": "left",
@@ -21,45 +16,45 @@
         },
         {
           "side": "left",
-          "source": "posted_label",
-          "target": "posted_label"
-        },
-        {
-          "side": "left",
-          "source": "status",
-          "target": "status"
+          "source": "fund_id",
+          "target": "fund_id"
         },
         {
           "side": "right",
-          "source": "owner",
-          "target": "owner"
+          "source": "fund_name",
+          "target": "fund_name"
+        },
+        {
+          "side": "right",
+          "source": "donor_id",
+          "target": "donor_id"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "award_id"
       ],
       "join": {
         "on": [
           {
-            "left": "account_id",
-            "right": "account_id"
+            "left": "fund_id",
+            "right": "fund_id"
           }
         ],
         "type": "inner"
       },
-      "left": "stg_entries",
-      "name": "j_entries_accounts",
+      "left": "stg_awards",
+      "name": "j_awards_funds",
       "operation": "join",
-      "right": "stg_accounts"
+      "right": "stg_funds"
     },
     {
       "columns": [
         {
           "side": "left",
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "award_id",
+          "target": "award_id"
         },
         {
           "side": "left",
@@ -68,33 +63,33 @@
         },
         {
           "side": "left",
-          "source": "owner",
-          "target": "owner"
+          "source": "fund_name",
+          "target": "fund_name"
         },
         {
           "side": "right",
-          "source": "category",
-          "target": "category"
+          "source": "donor_name",
+          "target": "donor_name"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "entry_id"
+        "award_id"
       ],
       "join": {
         "on": [
           {
-            "left": "merchant_id",
-            "right": "merchant_id"
+            "left": "donor_id",
+            "right": "donor_id"
           }
         ],
         "type": "inner"
       },
-      "left": "j_entries_accounts",
+      "left": "j_awards_funds",
       "name": "j_full",
       "operation": "join",
-      "right": "stg_merchants"
+      "right": "stg_donors"
     }
   ],
   "output_models": [
@@ -102,26 +97,26 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "category"
+        "fund_name"
       ],
       "group_by": [
         {
-          "source": "category",
-          "target": "category"
+          "source": "fund_name",
+          "target": "fund_name"
         }
       ],
       "metrics": [
         {
           "column": "amount",
-          "function": "avg",
-          "name": "avg_amount"
+          "function": "sum",
+          "name": "total_amount"
         },
         {
           "function": "count_rows",
-          "name": "n_entries"
+          "name": "n_awards"
         }
       ],
-      "name": "o_amount_by_category",
+      "name": "o_amount_by_fund",
       "source": "j_full"
     }
   ],
@@ -132,9 +127,9 @@
           "generator": {
             "digits": 3,
             "kind": "formatted_id",
-            "prefix": "AC-"
+            "prefix": "DN-"
           },
-          "name": "account_id",
+          "name": "donor_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -145,65 +140,16 @@
             "kind": "person_name",
             "locale": "de_DE"
           },
-          "name": "owner",
+          "name": "donor_name",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_accounts",
+      "name": "raw_donors",
       "primary_key": [
-        "account_id"
-      ],
-      "rows": {
-        "max": 20,
-        "min": 20
-      }
-    },
-    {
-      "columns": [
-        {
-          "generator": {
-            "digits": 3,
-            "kind": "formatted_id",
-            "prefix": "MC-"
-          },
-          "name": "merchant_id",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "company_name",
-            "locale": "de_DE"
-          },
-          "name": "merchant_name",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "categorical",
-            "values": [
-              "food",
-              "travel"
-            ]
-          },
-          "name": "category",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": false
-        }
-      ],
-      "name": "raw_merchants",
-      "primary_key": [
-        "merchant_id"
+        "donor_id"
       ],
       "rows": {
         "max": 15,
@@ -214,11 +160,11 @@
       "columns": [
         {
           "generator": {
-            "digits": 5,
+            "digits": 3,
             "kind": "formatted_id",
-            "prefix": "EN-"
+            "prefix": "FD-"
           },
-          "name": "entry_id",
+          "name": "fund_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -227,10 +173,46 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_account_entries",
+            "relationship": "rel_donor_funds",
             "target_side": "left"
           },
-          "name": "account_id",
+          "name": "donor_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "fund_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_funds",
+      "primary_key": [
+        "fund_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AW-"
+          },
+          "name": "award_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -239,32 +221,20 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_merchant_entries",
-            "target_side": "right"
+            "relationship": "rel_fund_awards",
+            "target_side": "left"
           },
-          "name": "merchant_id",
+          "name": "fund_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
-          "unique": false
-        },
-        {
-          "generator": {
-            "kind": "timestamp_range",
-            "max": "2024-12-31T23:59:59+00:00",
-            "min": "2024-01-01T00:00:00+00:00"
-          },
-          "name": "posted_at",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "timestamp",
           "unique": false
         },
         {
           "generator": {
             "kind": "integer_range",
-            "max": 100000,
-            "min": 1
+            "max": 20000,
+            "min": 0
           },
           "name": "amount_cents",
           "null_probability": 0.0,
@@ -274,27 +244,45 @@
         },
         {
           "generator": {
-            "kind": "categorical",
-            "values": [
-              "cleared",
-              "pending",
-              "void"
-            ]
+            "kind": "template_string",
+            "template": "{amount_cents}"
           },
-          "name": "status",
+          "name": "amount_str",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
           "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "is_renewal",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 5000.0,
+            "min": 100.0
+          },
+          "name": "prize",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
         }
       ],
-      "name": "raw_entries",
+      "name": "raw_awards",
       "primary_key": [
-        "entry_id"
+        "award_id"
       ],
       "rows": {
-        "max": 600,
-        "min": 200
+        "max": 500,
+        "min": 150
       }
     }
   ],
@@ -303,99 +291,108 @@
       "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "account_id"
+          "donor_id"
         ],
-        "table": "raw_accounts"
+        "table": "raw_donors"
       },
-      "name": "rel_account_entries",
+      "name": "rel_donor_funds",
       "right": {
         "columns": [
-          "account_id"
+          "donor_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_funds"
       }
     },
     {
-      "cardinality": "many_to_one",
+      "cardinality": "one_to_many",
       "left": {
         "columns": [
-          "merchant_id"
+          "fund_id"
         ],
-        "table": "raw_entries"
+        "table": "raw_funds"
       },
-      "name": "rel_merchant_entries",
+      "name": "rel_fund_awards",
       "right": {
         "columns": [
-          "merchant_id"
+          "fund_id"
         ],
-        "table": "raw_merchants"
+        "table": "raw_awards"
       }
     }
   ],
-  "scenario_id": "finance_ledger_001",
+  "scenario_id": "education_scholarships_001",
   "schema_version": "1.0",
   "staging_models": [
     {
       "columns": [
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "donor_id",
+          "target": "donor_id"
         },
         {
           "operations": [],
-          "source": "owner",
-          "target": "owner"
+          "source": "donor_name",
+          "target": "donor_name"
         }
       ],
       "grain": [
-        "account_id"
+        "donor_id"
       ],
-      "name": "stg_accounts",
+      "name": "stg_donors",
       "row_operations": [],
-      "source": "raw_accounts"
+      "source": "raw_donors"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "source": "fund_id",
+          "target": "fund_id"
         },
         {
           "operations": [],
-          "source": "merchant_name",
-          "target": "merchant_name"
+          "source": "donor_id",
+          "target": "donor_id"
         },
         {
           "operations": [],
-          "source": "category",
-          "target": "category"
+          "source": "fund_name",
+          "target": "fund_name"
         }
       ],
       "grain": [
-        "merchant_id"
+        "fund_id"
       ],
-      "name": "stg_merchants",
+      "name": "stg_funds",
       "row_operations": [],
-      "source": "raw_merchants"
+      "source": "raw_funds"
     },
     {
       "columns": [
         {
           "operations": [],
-          "source": "entry_id",
-          "target": "entry_id"
+          "source": "award_id",
+          "target": "award_id"
         },
         {
           "operations": [],
-          "source": "account_id",
-          "target": "account_id"
+          "source": "fund_id",
+          "target": "fund_id"
         },
         {
-          "operations": [],
-          "source": "merchant_id",
-          "target": "merchant_id"
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            },
+            {
+              "op": "coalesce",
+              "value": 0.0
+            }
+          ],
+          "source": "amount_str",
+          "target": "amount"
         },
         {
           "operations": [
@@ -404,60 +401,35 @@
               "type": "string"
             }
           ],
-          "source": "posted_at",
-          "target": "posted_label"
+          "source": "is_renewal",
+          "target": "renewal_label"
         },
         {
           "operations": [
             {
               "op": "cast",
-              "type": "float"
+              "type": "string"
             }
           ],
-          "source": "amount_cents",
-          "target": "amount"
-        },
-        {
-          "operations": [],
-          "source": "status",
-          "target": "status"
+          "source": "prize",
+          "target": "prize_label"
         }
       ],
       "grain": [
-        "entry_id"
+        "award_id"
       ],
-      "name": "stg_entries",
-      "row_operations": [
-        {
-          "condition": {
-            "kind": "comparison",
-            "left": {
-              "column": "status",
-              "kind": "column"
-            },
-            "operator": "ne",
-            "right": {
-              "kind": "literal",
-              "value": "void"
-            }
-          },
-          "op": "filter"
-        }
-      ],
-      "source": "raw_entries"
+      "name": "stg_awards",
+      "row_operations": [],
+      "source": "raw_awards"
     }
   ],
   "tests": [
     {
-      "column": "status",
-      "model": "stg_entries",
-      "name": "status_values",
-      "type": "accepted_values",
-      "values": [
-        "cleared",
-        "pending",
-        "void"
-      ]
+      "column": "amount",
+      "min": 0.0,
+      "model": "stg_awards",
+      "name": "amount_nonnegative",
+      "type": "column_range"
     }
   ]
 }

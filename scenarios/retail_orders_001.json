@@ -187,7 +187,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "full_name",
           "null_probability": 0.0,
@@ -197,7 +198,8 @@
         },
         {
           "generator": {
-            "kind": "email"
+            "kind": "email",
+            "locale": "de_DE"
           },
           "name": "email_address",
           "null_probability": 0.0,

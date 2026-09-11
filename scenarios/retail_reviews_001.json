@@ -1,23 +1,18 @@
 {
-  "description": "Retail catalog pipeline: unique weighted brand codes, print-ready launch and first-seen labels.",
+  "description": "Retail reviews pipeline: one-to-one product details with right-side keys, trimmed reviews and lowered brand names.",
   "domain": "retail",
   "intermediate_models": [
     {
       "columns": [
         {
           "side": "left",
-          "source": "stock_id",
-          "target": "stock_id"
+          "source": "detail_id",
+          "target": "detail_id"
         },
         {
           "side": "left",
-          "source": "qty",
-          "target": "qty"
-        },
-        {
-          "side": "left",
-          "source": "seen_label",
-          "target": "seen_label"
+          "source": "rating",
+          "target": "rating"
         },
         {
           "side": "right",
@@ -28,7 +23,7 @@
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "stock_id"
+        "detail_id"
       ],
       "join": {
         "on": [
@@ -39,8 +34,8 @@
         ],
         "type": "inner"
       },
-      "left": "stg_stock",
-      "name": "j_stock_products",
+      "left": "stg_details",
+      "name": "j_det_products",
       "operation": "join",
       "right": "stg_products"
     },
@@ -48,24 +43,24 @@
       "columns": [
         {
           "side": "left",
-          "source": "stock_id",
-          "target": "stock_id"
+          "source": "detail_id",
+          "target": "detail_id"
         },
         {
           "side": "left",
-          "source": "qty",
-          "target": "qty"
+          "source": "rating",
+          "target": "rating"
         },
         {
           "side": "right",
-          "source": "brand_code",
-          "target": "brand_code"
+          "source": "brand_name",
+          "target": "brand_name"
         }
       ],
       "derived_columns": [],
       "filters": [],
       "grain": [
-        "stock_id"
+        "detail_id"
       ],
       "join": {
         "on": [
@@ -76,7 +71,7 @@
         ],
         "type": "inner"
       },
-      "left": "j_stock_products",
+      "left": "j_det_products",
       "name": "j_full",
       "operation": "join",
       "right": "stg_brands"
@@ -87,26 +82,26 @@
       "dimensions": [],
       "filters": [],
       "grain": [
-        "brand_code"
+        "brand_name"
       ],
       "group_by": [
         {
-          "source": "brand_code",
-          "target": "brand_code"
+          "source": "brand_name",
+          "target": "brand_name"
         }
       ],
       "metrics": [
         {
-          "column": "qty",
-          "function": "sum",
-          "name": "total_qty"
+          "column": "rating",
+          "function": "avg",
+          "name": "avg_rating"
         },
         {
           "function": "count_rows",
-          "name": "n_items"
+          "name": "n_reviews"
         }
       ],
-      "name": "o_qty_by_brand",
+      "name": "o_rating_by_brand",
       "source": "j_full"
     }
   ],
@@ -127,34 +122,9 @@
         },
         {
           "generator": {
-            "kind": "categorical",
-            "values": [
-              "B1",
-              "B2",
-              "B3",
-              "B4",
-              "B5",
-              "B6"
-            ],
-            "weights": [
-              1.0,
-              2.0,
-              3.0,
-              2.0,
-              1.0,
-              1.0
-            ]
-          },
-          "name": "brand_code",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "string",
-          "unique": true
-        },
-        {
-          "generator": {
-            "kind": "company_name",
-            "locale": "de_DE"
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
           },
           "name": "brand_name",
           "null_probability": 0.0,
@@ -168,8 +138,8 @@
         "brand_id"
       ],
       "rows": {
-        "max": 6,
-        "min": 6
+        "max": 8,
+        "min": 8
       }
     },
     {
@@ -209,18 +179,6 @@
           "nullable": false,
           "type": "string",
           "unique": false
-        },
-        {
-          "generator": {
-            "kind": "date_range",
-            "max": "2023-12-31",
-            "min": "2020-01-01"
-          },
-          "name": "launch_date",
-          "null_probability": 0.0,
-          "nullable": false,
-          "type": "date",
-          "unique": false
         }
       ],
       "name": "raw_products",
@@ -228,8 +186,8 @@
         "product_id"
       ],
       "rows": {
-        "max": 36,
-        "min": 12
+        "max": 30,
+        "min": 30
       }
     },
     {
@@ -238,9 +196,9 @@
           "generator": {
             "digits": 5,
             "kind": "formatted_id",
-            "prefix": "SK-"
+            "prefix": "DT-"
           },
-          "name": "stock_id",
+          "name": "detail_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
@@ -249,22 +207,22 @@
         {
           "generator": {
             "kind": "foreign_key",
-            "relationship": "rel_product_stock",
+            "relationship": "rel_product_details",
             "target_side": "left"
           },
           "name": "product_id",
           "null_probability": 0.0,
           "nullable": false,
           "type": "string",
-          "unique": false
+          "unique": true
         },
         {
           "generator": {
             "kind": "integer_range",
-            "max": 1000,
-            "min": 0
+            "max": 5,
+            "min": 1
           },
-          "name": "qty",
+          "name": "rating",
           "null_probability": 0.0,
           "nullable": false,
           "type": "integer",
@@ -272,24 +230,35 @@
         },
         {
           "generator": {
-            "kind": "timestamp_range",
-            "max": "2024-12-31T23:59:59+00:00",
-            "min": "2024-01-01T00:00:00+00:00"
+            "kind": "random_string",
+            "max_length": 40,
+            "min_length": 5
           },
-          "name": "first_seen",
+          "name": "review",
           "null_probability": 0.0,
           "nullable": false,
-          "type": "timestamp",
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "reviewer",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
           "unique": false
         }
       ],
-      "name": "raw_stock",
+      "name": "raw_details",
       "primary_key": [
-        "stock_id"
+        "detail_id"
       ],
       "rows": {
-        "max": 240,
-        "min": 60
+        "max": 30,
+        "min": 30
       }
     }
   ],
@@ -311,23 +280,23 @@
       }
     },
     {
-      "cardinality": "one_to_many",
+      "cardinality": "one_to_one",
       "left": {
         "columns": [
           "product_id"
         ],
         "table": "raw_products"
       },
-      "name": "rel_product_stock",
+      "name": "rel_product_details",
       "right": {
         "columns": [
           "product_id"
         ],
-        "table": "raw_stock"
+        "table": "raw_details"
       }
     }
   ],
-  "scenario_id": "retail_catalog_001",
+  "scenario_id": "retail_reviews_001",
   "schema_version": "1.0",
   "staging_models": [
     {
@@ -338,12 +307,11 @@
           "target": "brand_id"
         },
         {
-          "operations": [],
-          "source": "brand_code",
-          "target": "brand_code"
-        },
-        {
-          "operations": [],
+          "operations": [
+            {
+              "op": "lower"
+            }
+          ],
           "source": "brand_name",
           "target": "brand_name"
         }
@@ -371,16 +339,6 @@
           "operations": [],
           "source": "product_name",
           "target": "product_name"
-        },
-        {
-          "operations": [
-            {
-              "op": "cast",
-              "type": "string"
-            }
-          ],
-          "source": "launch_date",
-          "target": "launch_label"
         }
       ],
       "grain": [
@@ -394,8 +352,8 @@
       "columns": [
         {
           "operations": [],
-          "source": "stock_id",
-          "target": "stock_id"
+          "source": "detail_id",
+          "target": "detail_id"
         },
         {
           "operations": [],
@@ -404,41 +362,44 @@
         },
         {
           "operations": [],
-          "source": "qty",
-          "target": "qty"
+          "source": "rating",
+          "target": "rating"
         },
         {
           "operations": [
             {
-              "op": "cast",
-              "type": "string"
+              "op": "trim"
             }
           ],
-          "source": "first_seen",
-          "target": "seen_label"
+          "source": "review",
+          "target": "review"
+        },
+        {
+          "operations": [],
+          "source": "reviewer",
+          "target": "reviewer"
         }
       ],
       "grain": [
-        "stock_id"
+        "detail_id"
       ],
-      "name": "stg_stock",
+      "name": "stg_details",
       "row_operations": [],
-      "source": "raw_stock"
+      "source": "raw_details"
     }
   ],
   "tests": [
     {
-      "column": "brand_code",
-      "model": "stg_brands",
-      "name": "brand_values",
+      "column": "rating",
+      "model": "stg_details",
+      "name": "rating_values",
       "type": "accepted_values",
       "values": [
-        "B1",
-        "B2",
-        "B3",
-        "B4",
-        "B5",
-        "B6"
+        1,
+        2,
+        3,
+        4,
+        5
       ]
     }
   ]

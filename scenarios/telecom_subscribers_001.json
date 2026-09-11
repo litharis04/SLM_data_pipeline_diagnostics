@@ -163,7 +163,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "subscriber_name",
           "null_probability": 0.0,

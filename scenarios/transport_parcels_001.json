@@ -170,7 +170,8 @@
         },
         {
           "generator": {
-            "kind": "city"
+            "kind": "city",
+            "locale": "de_DE"
           },
           "name": "city",
           "null_probability": 0.0,
@@ -218,7 +219,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "courier_name",
           "null_probability": 0.0,
@@ -276,7 +278,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "sender",
           "null_probability": 0.0,

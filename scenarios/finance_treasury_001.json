@@ -142,7 +142,8 @@
         },
         {
           "generator": {
-            "kind": "person_name"
+            "kind": "person_name",
+            "locale": "de_DE"
           },
           "name": "owner",
           "null_probability": 0.0,
@@ -176,7 +177,8 @@
         },
         {
           "generator": {
-            "kind": "company_name"
+            "kind": "company_name",
+            "locale": "de_DE"
           },
           "name": "cp_name",
           "null_probability": 0.0,
@@ -186,7 +188,8 @@
         },
         {
           "generator": {
-            "kind": "email"
+            "kind": "email",
+            "locale": "de_DE"
           },
           "name": "treasury_email",
           "null_probability": 0.0,
