@@ -1,0 +1,448 @@
+{
+  "description": "Media subtitles pipeline: strict language codebook with print-ready release labels.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "side": "right",
+          "source": "lang",
+          "target": "lang"
+        },
+        {
+          "side": "right",
+          "source": "studio_id",
+          "target": "studio_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "episode_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "show_id",
+            "right": "show_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_episodes",
+      "name": "j_ep_shows",
+      "operation": "join",
+      "right": "stg_shows"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "lang",
+          "target": "lang"
+        },
+        {
+          "side": "right",
+          "source": "studio_name",
+          "target": "studio_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "episode_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "studio_id",
+            "right": "studio_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ep_shows",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_studios"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "lang"
+      ],
+      "group_by": [
+        {
+          "source": "lang",
+          "target": "lang"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "duration_min",
+          "function": "avg",
+          "name": "avg_duration"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_episodes"
+        }
+      ],
+      "name": "o_duration_by_lang",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "studio_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "studio_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "director",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_studios",
+      "primary_key": [
+        "studio_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SH-"
+          },
+          "name": "show_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_studio_shows",
+            "target_side": "left"
+          },
+          "name": "studio_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "de",
+              "en"
+            ]
+          },
+          "name": "lang",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2023-12-31",
+            "min": "2020-01-01"
+          },
+          "name": "release",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_shows",
+      "primary_key": [
+        "show_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EP-"
+          },
+          "name": "episode_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_show_episodes",
+            "target_side": "left"
+          },
+          "name": "show_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 120,
+            "min": 10
+          },
+          "name": "duration_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "aired",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        }
+      ],
+      "name": "raw_episodes",
+      "primary_key": [
+        "episode_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "studio_id"
+        ],
+        "table": "raw_studios"
+      },
+      "name": "rel_studio_shows",
+      "right": {
+        "columns": [
+          "studio_id"
+        ],
+        "table": "raw_shows"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "show_id"
+        ],
+        "table": "raw_shows"
+      },
+      "name": "rel_show_episodes",
+      "right": {
+        "columns": [
+          "show_id"
+        ],
+        "table": "raw_episodes"
+      }
+    }
+  ],
+  "scenario_id": "media_subtitles_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "studio_id",
+          "target": "studio_id"
+        },
+        {
+          "operations": [],
+          "source": "studio_name",
+          "target": "studio_name"
+        },
+        {
+          "operations": [],
+          "source": "director",
+          "target": "director"
+        }
+      ],
+      "grain": [
+        "studio_id"
+      ],
+      "name": "stg_studios",
+      "row_operations": [],
+      "source": "raw_studios"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "operations": [],
+          "source": "studio_id",
+          "target": "studio_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "de": "DE",
+                "en": "EN"
+              },
+              "on_unmapped": "error",
+              "op": "map_values"
+            }
+          ],
+          "source": "lang",
+          "target": "lang"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "release",
+          "target": "release_label"
+        }
+      ],
+      "grain": [
+        "show_id"
+      ],
+      "name": "stg_shows",
+      "row_operations": [],
+      "source": "raw_shows"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "operations": [],
+          "source": "show_id",
+          "target": "show_id"
+        },
+        {
+          "operations": [],
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "aired",
+          "target": "aired_label"
+        }
+      ],
+      "grain": [
+        "episode_id"
+      ],
+      "name": "stg_episodes",
+      "row_operations": [],
+      "source": "raw_episodes"
+    }
+  ],
+  "tests": [
+    {
+      "column": "lang",
+      "model": "stg_shows",
+      "name": "lang_values",
+      "type": "accepted_values",
+      "values": [
+        "DE",
+        "EN"
+      ]
+    }
+  ]
+}

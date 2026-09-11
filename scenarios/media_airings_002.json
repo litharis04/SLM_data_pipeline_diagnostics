@@ -1,0 +1,471 @@
+{
+  "description": "Media airings pipeline: episode airing ledger with composite episode link and bounded stage sizes.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ausstrahlung_id",
+          "target": "ausstrahlung_id"
+        },
+        {
+          "side": "left",
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "side": "left",
+          "source": "folgen_nr",
+          "target": "folgen_nr"
+        },
+        {
+          "side": "left",
+          "source": "datum",
+          "target": "datum"
+        },
+        {
+          "side": "left",
+          "source": "zuschauer",
+          "target": "zuschauer"
+        },
+        {
+          "side": "right",
+          "source": "programm_id",
+          "target": "programm_id"
+        },
+        {
+          "side": "right",
+          "source": "titel",
+          "target": "titel"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ausstrahlung_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "episode_id",
+            "right": "episode_id"
+          },
+          {
+            "left": "folgen_nr",
+            "right": "folgen_nr"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_ausstrahlungen",
+      "name": "j_aus_episoden",
+      "operation": "join",
+      "right": "stg_episoden"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ausstrahlung_id",
+          "target": "ausstrahlung_id"
+        },
+        {
+          "side": "left",
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "side": "left",
+          "source": "folgen_nr",
+          "target": "folgen_nr"
+        },
+        {
+          "side": "left",
+          "source": "zuschauer",
+          "target": "zuschauer"
+        },
+        {
+          "side": "right",
+          "source": "sender",
+          "target": "sender"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ausstrahlung_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "programm_id",
+            "right": "programm_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_aus_episoden",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_programme"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "sender"
+      ],
+      "group_by": [
+        {
+          "source": "sender",
+          "target": "sender"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "zuschauer",
+          "function": "sum",
+          "name": "zuschauer_gesamt"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_zuschauer_by_sender",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "programm_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "ARD",
+              "ZDF",
+              "RTL",
+              "SAT1"
+            ]
+          },
+          "name": "sender",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_programme",
+      "primary_key": [
+        "programm_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EP-"
+          },
+          "name": "episode_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_programm_episoden",
+            "target_side": "left"
+          },
+          "name": "programm_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 50,
+            "min": 1
+          },
+          "name": "folgen_nr",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 16,
+            "min_length": 6
+          },
+          "name": "titel",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_episoden",
+      "primary_key": [
+        "episode_id",
+        "folgen_nr"
+      ],
+      "rows": {
+        "max": 100,
+        "min": 60
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AU-"
+          },
+          "name": "ausstrahlung_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_episode_ausstrahlungen",
+            "target_side": "left"
+          },
+          "name": "episode_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_episode_ausstrahlungen",
+            "target_side": "left"
+          },
+          "name": "folgen_nr",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "datum",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5000000,
+            "min": 10000
+          },
+          "name": "zuschauer",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_ausstrahlungen",
+      "primary_key": [
+        "ausstrahlung_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "programm_id"
+        ],
+        "table": "raw_programme"
+      },
+      "name": "rel_programm_episoden",
+      "right": {
+        "columns": [
+          "programm_id"
+        ],
+        "table": "raw_episoden"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "episode_id",
+          "folgen_nr"
+        ],
+        "table": "raw_episoden"
+      },
+      "name": "rel_episode_ausstrahlungen",
+      "right": {
+        "columns": [
+          "episode_id",
+          "folgen_nr"
+        ],
+        "table": "raw_ausstrahlungen"
+      }
+    }
+  ],
+  "scenario_id": "media_airings_002",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "programm_id",
+          "target": "programm_id"
+        },
+        {
+          "operations": [],
+          "source": "sender",
+          "target": "sender"
+        }
+      ],
+      "grain": [
+        "programm_id"
+      ],
+      "name": "stg_programme",
+      "row_operations": [],
+      "source": "raw_programme"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "operations": [],
+          "source": "programm_id",
+          "target": "programm_id"
+        },
+        {
+          "operations": [],
+          "source": "folgen_nr",
+          "target": "folgen_nr"
+        },
+        {
+          "operations": [],
+          "source": "titel",
+          "target": "titel"
+        }
+      ],
+      "grain": [
+        "episode_id",
+        "folgen_nr"
+      ],
+      "name": "stg_episoden",
+      "row_operations": [],
+      "source": "raw_episoden"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ausstrahlung_id",
+          "target": "ausstrahlung_id"
+        },
+        {
+          "operations": [],
+          "source": "episode_id",
+          "target": "episode_id"
+        },
+        {
+          "operations": [],
+          "source": "folgen_nr",
+          "target": "folgen_nr"
+        },
+        {
+          "operations": [],
+          "source": "datum",
+          "target": "datum"
+        },
+        {
+          "operations": [],
+          "source": "zuschauer",
+          "target": "zuschauer"
+        }
+      ],
+      "grain": [
+        "ausstrahlung_id"
+      ],
+      "name": "stg_ausstrahlungen",
+      "row_operations": [],
+      "source": "raw_ausstrahlungen"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "episode_id",
+        "folgen_nr"
+      ],
+      "model": "m_full",
+      "name": "ausstrahlung_episode_link",
+      "to_columns": [
+        "episode_id",
+        "folgen_nr"
+      ],
+      "to_model": "raw_episoden",
+      "type": "relationships"
+    },
+    {
+      "min": 1,
+      "model": "stg_episoden",
+      "name": "episoden_present",
+      "type": "row_count"
+    },
+    {
+      "max": 100000,
+      "model": "j_aus_episoden",
+      "name": "ausstrahlungen_bounded",
+      "type": "row_count"
+    }
+  ]
+}

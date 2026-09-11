@@ -1,0 +1,444 @@
+{
+  "description": "Telecom calls pipeline: total call duration from integer parts, reachable numbers only, distinct callers per tariff.",
+  "domain": "telecom",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "gespraech_id",
+          "target": "gespraech_id"
+        },
+        {
+          "side": "left",
+          "source": "teilnehmer_id",
+          "target": "teilnehmer_id"
+        },
+        {
+          "side": "left",
+          "source": "dauer_min",
+          "target": "dauer_min"
+        },
+        {
+          "side": "left",
+          "source": "warte_min",
+          "target": "warte_min"
+        },
+        {
+          "side": "right",
+          "source": "msisdn",
+          "target": "msisdn"
+        },
+        {
+          "side": "right",
+          "source": "tarif_id",
+          "target": "tarif_id"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "dauer_min",
+              "kind": "column"
+            },
+            "operator": "add",
+            "right": {
+              "column": "warte_min",
+              "kind": "column"
+            }
+          },
+          "name": "gesamt_min",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "gespraech_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "teilnehmer_id",
+            "right": "teilnehmer_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_gespraeche",
+      "name": "j_gespraech_teilnehmer",
+      "operation": "join",
+      "right": "stg_teilnehmer"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "gespraech_id",
+          "target": "gespraech_id"
+        },
+        {
+          "side": "left",
+          "source": "teilnehmer_id",
+          "target": "teilnehmer_id"
+        },
+        {
+          "side": "left",
+          "source": "gesamt_min",
+          "target": "gesamt_min"
+        },
+        {
+          "side": "left",
+          "source": "msisdn",
+          "target": "msisdn"
+        },
+        {
+          "side": "right",
+          "source": "tarif_id",
+          "target": "tarif_id"
+        },
+        {
+          "side": "right",
+          "source": "tarif_name",
+          "target": "tarif_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "kind": "is_null",
+          "negated": true,
+          "value": {
+            "column": "msisdn",
+            "kind": "column"
+          }
+        }
+      ],
+      "grain": [
+        "gespraech_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "tarif_id",
+            "right": "tarif_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_gespraech_teilnehmer",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_tarife"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "tarif_name"
+      ],
+      "group_by": [
+        {
+          "source": "tarif_name",
+          "target": "tarif_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "teilnehmer_id",
+          "function": "count_distinct",
+          "name": "distinct_teilnehmer"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_teilnehmer_by_tarif",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TA-"
+          },
+          "name": "tarif_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 6
+          },
+          "name": "tarif_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_tarife",
+      "primary_key": [
+        "tarif_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "TN-"
+          },
+          "name": "teilnehmer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_tarif_teilnehmer",
+            "target_side": "left"
+          },
+          "name": "tarif_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 8
+          },
+          "name": "msisdn",
+          "null_probability": 0.08,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_teilnehmer",
+      "primary_key": [
+        "teilnehmer_id"
+      ],
+      "rows": {
+        "max": 50,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "GE-"
+          },
+          "name": "gespraech_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_teilnehmer_gespraeche",
+            "target_side": "left"
+          },
+          "name": "teilnehmer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "begonnen",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 120,
+            "min": 1
+          },
+          "name": "dauer_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 15,
+            "min": 0
+          },
+          "name": "warte_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_gespraeche",
+      "primary_key": [
+        "gespraech_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "tarif_id"
+        ],
+        "table": "raw_tarife"
+      },
+      "name": "rel_tarif_teilnehmer",
+      "right": {
+        "columns": [
+          "tarif_id"
+        ],
+        "table": "raw_teilnehmer"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "teilnehmer_id"
+        ],
+        "table": "raw_teilnehmer"
+      },
+      "name": "rel_teilnehmer_gespraeche",
+      "right": {
+        "columns": [
+          "teilnehmer_id"
+        ],
+        "table": "raw_gespraeche"
+      }
+    }
+  ],
+  "scenario_id": "telecom_calls_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "tarif_id",
+          "target": "tarif_id"
+        },
+        {
+          "operations": [],
+          "source": "tarif_name",
+          "target": "tarif_name"
+        }
+      ],
+      "grain": [
+        "tarif_id"
+      ],
+      "name": "stg_tarife",
+      "row_operations": [],
+      "source": "raw_tarife"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "teilnehmer_id",
+          "target": "teilnehmer_id"
+        },
+        {
+          "operations": [],
+          "source": "tarif_id",
+          "target": "tarif_id"
+        },
+        {
+          "operations": [],
+          "source": "msisdn",
+          "target": "msisdn"
+        }
+      ],
+      "grain": [
+        "teilnehmer_id"
+      ],
+      "name": "stg_teilnehmer",
+      "row_operations": [],
+      "source": "raw_teilnehmer"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "gespraech_id",
+          "target": "gespraech_id"
+        },
+        {
+          "operations": [],
+          "source": "teilnehmer_id",
+          "target": "teilnehmer_id"
+        },
+        {
+          "operations": [],
+          "source": "dauer_min",
+          "target": "dauer_min"
+        },
+        {
+          "operations": [],
+          "source": "warte_min",
+          "target": "warte_min"
+        }
+      ],
+      "grain": [
+        "gespraech_id"
+      ],
+      "name": "stg_gespraeche",
+      "row_operations": [],
+      "source": "raw_gespraeche"
+    }
+  ],
+  "tests": [
+    {
+      "column": "dauer_min",
+      "min": 0,
+      "model": "stg_gespraeche",
+      "name": "dauer_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

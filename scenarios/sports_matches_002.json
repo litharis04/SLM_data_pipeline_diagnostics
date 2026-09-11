@@ -1,0 +1,437 @@
+{
+  "description": "Sports matches pipeline: match-day ledger with bounded squad feed, capped attendance and plausible home scores.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "spiel_id",
+          "target": "spiel_id"
+        },
+        {
+          "side": "left",
+          "source": "kapitaen",
+          "target": "kapitaen"
+        },
+        {
+          "side": "left",
+          "source": "tore_heim",
+          "target": "tore_heim"
+        },
+        {
+          "side": "left",
+          "source": "zuschauer",
+          "target": "zuschauer"
+        },
+        {
+          "side": "right",
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "spiel_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "verein_id",
+            "right": "verein_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_spiele",
+      "name": "j_spiel_vereine",
+      "operation": "join",
+      "right": "stg_vereine"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "spiel_id",
+          "target": "spiel_id"
+        },
+        {
+          "side": "left",
+          "source": "tore_heim",
+          "target": "tore_heim"
+        },
+        {
+          "side": "left",
+          "source": "stadt",
+          "target": "stadt"
+        },
+        {
+          "side": "right",
+          "source": "vollname",
+          "target": "vollname"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "spiel_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "kapitaen",
+            "right": "spieler_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_spiel_vereine",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_spieler"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "stadt"
+      ],
+      "group_by": [
+        {
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "tore_heim",
+          "function": "sum",
+          "name": "tore_gesamt"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_tore_by_stadt",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "VE-"
+          },
+          "name": "verein_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "stadt",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vereine",
+      "primary_key": [
+        "verein_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SP-"
+          },
+          "name": "spieler_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_verein_spieler",
+            "target_side": "left"
+          },
+          "name": "verein_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "vollname",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_spieler",
+      "primary_key": [
+        "spieler_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SI-"
+          },
+          "name": "spiel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_verein_spiele",
+            "target_side": "left"
+          },
+          "name": "verein_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_spieler_spiele",
+            "target_side": "left"
+          },
+          "name": "kapitaen",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 9,
+            "min": 0
+          },
+          "name": "tore_heim",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 80000,
+            "min": 1000
+          },
+          "name": "zuschauer",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_spiele",
+      "primary_key": [
+        "spiel_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "verein_id"
+        ],
+        "table": "raw_vereine"
+      },
+      "name": "rel_verein_spieler",
+      "right": {
+        "columns": [
+          "verein_id"
+        ],
+        "table": "raw_spieler"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "verein_id"
+        ],
+        "table": "raw_vereine"
+      },
+      "name": "rel_verein_spiele",
+      "right": {
+        "columns": [
+          "verein_id"
+        ],
+        "table": "raw_spiele"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "spieler_id"
+        ],
+        "table": "raw_spieler"
+      },
+      "name": "rel_spieler_spiele",
+      "right": {
+        "columns": [
+          "kapitaen"
+        ],
+        "table": "raw_spiele"
+      }
+    }
+  ],
+  "scenario_id": "sports_matches_002",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "verein_id",
+          "target": "verein_id"
+        },
+        {
+          "operations": [],
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "grain": [
+        "verein_id"
+      ],
+      "name": "stg_vereine",
+      "row_operations": [],
+      "source": "raw_vereine"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "spieler_id",
+          "target": "spieler_id"
+        },
+        {
+          "operations": [],
+          "source": "verein_id",
+          "target": "verein_id"
+        },
+        {
+          "operations": [],
+          "source": "vollname",
+          "target": "vollname"
+        }
+      ],
+      "grain": [
+        "spieler_id"
+      ],
+      "name": "stg_spieler",
+      "row_operations": [],
+      "source": "raw_spieler"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "spiel_id",
+          "target": "spiel_id"
+        },
+        {
+          "operations": [],
+          "source": "verein_id",
+          "target": "verein_id"
+        },
+        {
+          "operations": [],
+          "source": "kapitaen",
+          "target": "kapitaen"
+        },
+        {
+          "operations": [],
+          "source": "tore_heim",
+          "target": "tore_heim"
+        },
+        {
+          "operations": [],
+          "source": "zuschauer",
+          "target": "zuschauer"
+        }
+      ],
+      "grain": [
+        "spiel_id"
+      ],
+      "name": "stg_spiele",
+      "row_operations": [],
+      "source": "raw_spiele"
+    }
+  ],
+  "tests": [
+    {
+      "max": 100000,
+      "min": 1,
+      "model": "m_full",
+      "name": "kader_bounded",
+      "type": "row_count"
+    },
+    {
+      "column": "zuschauer",
+      "max": 80000,
+      "model": "stg_spiele",
+      "name": "zuschauer_capped",
+      "type": "column_range"
+    },
+    {
+      "column": "tore_heim",
+      "max": 15,
+      "min": 0,
+      "model": "stg_spiele",
+      "name": "tore_plausibel",
+      "type": "column_range"
+    }
+  ]
+}
