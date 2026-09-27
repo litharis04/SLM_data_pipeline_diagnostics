@@ -20,4 +20,3 @@ wheels/
 
 # Tasks
 /tasks/*
-!/tasks/generator/
