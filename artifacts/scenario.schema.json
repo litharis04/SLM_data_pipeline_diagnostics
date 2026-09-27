@@ -626,8 +626,8 @@
           "type": "string"
         },
         "locale": {
-          "default": "en_US",
-          "minLength": 1,
+          "const": "de_DE",
+          "default": "de_DE",
           "title": "Locale",
           "type": "string"
         }
@@ -851,8 +851,8 @@
           "type": "string"
         },
         "locale": {
-          "default": "en_US",
-          "minLength": 1,
+          "const": "de_DE",
+          "default": "de_DE",
           "title": "Locale",
           "type": "string"
         }
@@ -1517,8 +1517,8 @@
           "type": "string"
         },
         "locale": {
-          "default": "en_US",
-          "minLength": 1,
+          "const": "de_DE",
+          "default": "de_DE",
           "title": "Locale",
           "type": "string"
         }
@@ -2701,8 +2701,8 @@
           "type": "string"
         },
         "locale": {
-          "default": "en_US",
-          "minLength": 1,
+          "const": "de_DE",
+          "default": "de_DE",
           "title": "Locale",
           "type": "string"
         }
@@ -2720,8 +2720,8 @@
           "type": "string"
         },
         "locale": {
-          "default": "en_US",
-          "minLength": 1,
+          "const": "de_DE",
+          "default": "de_DE",
           "title": "Locale",
           "type": "string"
         }
@@ -3401,8 +3401,8 @@
           "type": "string"
         },
         "locale": {
-          "default": "en_US",
-          "minLength": 1,
+          "const": "de_DE",
+          "default": "de_DE",
           "title": "Locale",
           "type": "string"
         }

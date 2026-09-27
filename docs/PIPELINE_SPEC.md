@@ -208,13 +208,22 @@ The scenario compiler, also called the pipeline generator, has two coordinated c
 Both components MUST consume the same `ValidatedScenario` and agree on identifiers, types,
 keys, relationships, lineage, and grain. Rendering MUST be deterministic and rule-based.
 
-The compiler MUST treat every `ValidatedScenario` as supported input. It MUST NOT reject constructs that passed the public contract, or infer
-behavior from a domain label or naming convention.
+The compiler MUST treat every `ValidatedScenario` as compilable input. It MUST NOT reject constructs that passed the public contract, or infer
+behavior from a domain label or naming convention. Compilability means the compiler renders
+a raw-data plan and a complete dbt project for the scenario; it does not promise that every
+concrete instance will pass clean control.
 
-For every `ValidatedScenario`, supported `data_seed`, and declared runtime environment, the
-combined compiler and generator MUST be capable of producing a clean instance that satisfies
-the scenario's generated and explicit healthy assertions. A counterexample exposes a defect
-or an omitted contract invariant; it is not normal corpus filtering.
+Clean-control success is a property of a concrete pipeline instance
+(`ValidatedScenario` + `data_seed` + compiler/runtime versions), not of scenario validity.
+Structural guarantees (keys, grains, relationships, lineage) are established by the two
+validation stages; data-dependent postconditions — explicit `accepted_values`/`column_range`
+bounds, `map_values(on_unmapped="error")` coverage, cast-format conformance, and filters that
+must retain rows — are evaluated only at clean-control time (see `GENERATOR_SPEC.md` §11.4).
+A data-dependent clean failure does not invalidate the scenario and is not normal corpus
+filtering: it aborts the current downstream build per section 7 and is fixed at the
+responsible layer (scenario edit with revalidation, or generator/runtime fix with retry of
+the same identity). A counterexample that no seed can satisfy exposes a defect or an omitted
+contract invariant.
 
 ## 7. Verification and failure semantics
 
@@ -248,6 +257,10 @@ The clean-baseline cache key MUST include at least:
 - compiler and raw-generator versions; and
 - every dbt, DuckDB, adapter, or other runtime version declared compatibility-relevant by
   `GENERATOR_SPEC.md`.
+
+The authoritative component list, including version granularity (Python `major.minor` in the
+key, patch as provenance only; exact versions otherwise), lives in `GENERATOR_SPEC.md` §7.2
+and is not duplicated here.
 
 A cache entry MUST NOT be reused after any identity component changes or when artifact
 integrity cannot be verified. Volatile metadata such as timestamps and absolute paths MAY be
@@ -340,7 +353,9 @@ every scenario, claim, count, requirement, and quota without finding an error.
 
 The pipeline-generation subsystem is ready for downstream use when the compiler and raw-data
 generator implement the full validated language, the conformance suite passes, and at least
-one representative instance can be reproduced end to end.
+one representative instance can be reproduced end to end. The exact readiness gate is the
+minimum conformance gate defined by `GENERATOR_SPEC.md` §21.0–§22; the full-corpus
+clean-control run belongs to the dataset-build gate, not to readiness.
 
 A concrete `(scenario, data_seed)` instance is eligible for fault injection only after its
 clean control succeeds and its exact baseline is recorded or cached. No downstream component

@@ -316,32 +316,32 @@ class ForeignKeyGenerator(ContractModel):
 
 class PersonNameGenerator(ContractModel):
     kind: Literal["person_name"] = "person_name"
-    locale: Annotated[str, StringConstraints(min_length=1, strict=True)] = "en_US"
+    locale: Literal["de_DE"] = "de_DE"
 
 
 class EmailGenerator(ContractModel):
     kind: Literal["email"] = "email"
-    locale: Annotated[str, StringConstraints(min_length=1, strict=True)] = "en_US"
+    locale: Literal["de_DE"] = "de_DE"
 
 
 class CityGenerator(ContractModel):
     kind: Literal["city"] = "city"
-    locale: Annotated[str, StringConstraints(min_length=1, strict=True)] = "en_US"
+    locale: Literal["de_DE"] = "de_DE"
 
 
 class StreetAddressGenerator(ContractModel):
     kind: Literal["street_address"] = "street_address"
-    locale: Annotated[str, StringConstraints(min_length=1, strict=True)] = "en_US"
+    locale: Literal["de_DE"] = "de_DE"
 
 
 class CompanyNameGenerator(ContractModel):
     kind: Literal["company_name"] = "company_name"
-    locale: Annotated[str, StringConstraints(min_length=1, strict=True)] = "en_US"
+    locale: Literal["de_DE"] = "de_DE"
 
 
 class PhoneNumberGenerator(ContractModel):
     kind: Literal["phone_number"] = "phone_number"
-    locale: Annotated[str, StringConstraints(min_length=1, strict=True)] = "en_US"
+    locale: Literal["de_DE"] = "de_DE"
 
 
 # ---------------------------------------------------------------------------

@@ -413,7 +413,7 @@ def test_positive_coverage_all_variants():
                 {
                     "name": "name",
                     "type": "string",
-                    "generator": {"kind": "person_name", "locale": "en_US"},
+                    "generator": {"kind": "person_name", "locale": "de_DE"},
                 },
             ),
             "primary_key": ("id",),

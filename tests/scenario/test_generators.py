@@ -295,11 +295,12 @@ def test_foreign_key_invalid():
 
 def test_faker_generators_valid():
     assert PersonNameGenerator().kind == "person_name"
+    assert PersonNameGenerator().locale == "de_DE"
     assert EmailGenerator(locale="de_DE").locale == "de_DE"
-    assert CityGenerator().locale == "en_US"
-    assert StreetAddressGenerator().locale == "en_US"
-    assert CompanyNameGenerator().locale == "en_US"
-    assert PhoneNumberGenerator().locale == "en_US"
+    assert CityGenerator().locale == "de_DE"
+    assert StreetAddressGenerator().locale == "de_DE"
+    assert CompanyNameGenerator().locale == "de_DE"
+    assert PhoneNumberGenerator().locale == "de_DE"
     for cls in [
         PersonNameGenerator,
         EmailGenerator,
@@ -320,6 +321,8 @@ def test_faker_generators_valid():
             cls(locale="")  # type: ignore[arg-type]
         with pytest.raises(ValidationError):
             cls(locale=123)  # type: ignore[arg-type]
+        with pytest.raises(ValidationError):
+            cls(locale="en_US")  # type: ignore[arg-type]
 
 
 # ---------------------------------------------------------------------------
@@ -330,7 +333,7 @@ def test_faker_generators_valid():
 def test_generator_spec_union():
     assert Wrap(gen={"kind": "integer_range", "min": 1, "max": 2}).gen.kind == "integer_range"
     assert Wrap(gen={"kind": "boolean", "true_probability": 0.7}).gen.kind == "boolean"
-    assert Wrap(gen={"kind": "person_name", "locale": "en_US"}).gen.kind == "person_name"
+    assert Wrap(gen={"kind": "person_name", "locale": "de_DE"}).gen.kind == "person_name"
     with pytest.raises(ValidationError, match="union_tag_invalid"):
         Wrap(gen={"kind": "unknown", "min": 1})  # type: ignore[arg-type]
     with pytest.raises(ValidationError, match="union_tag_not_found"):

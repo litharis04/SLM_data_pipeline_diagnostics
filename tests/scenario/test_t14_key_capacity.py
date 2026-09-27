@@ -509,7 +509,7 @@ def test_no_arbitrary_faker_rejection():
                 {
                     "name": "id",
                     "type": "string",
-                    "generator": {"kind": "person_name", "locale": "en_US"},
+                    "generator": {"kind": "person_name", "locale": "de_DE"},
                 },
             ),
             "primary_key": ("id",),

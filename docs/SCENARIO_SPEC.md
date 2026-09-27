@@ -481,8 +481,12 @@ Each corresponding model has:
 
 ```text
 kind: the literal kind above
-locale: strict string, default "en_US"
+locale: literal "de_DE", default "de_DE"
 ```
+
+Version 1 supports exactly one Faker locale: `de_DE`. A scenario declaring any other locale
+is structurally invalid and MUST fail Pydantic parsing; silently substituting `de_DE` for
+another locale is prohibited.
 
 The finite public kinds are the contract. A scenario MUST NOT name an arbitrary Faker provider or pass provider-specific arguments. The implementation MAY use Faker internally, but its version MUST be pinned and recorded in provenance. Faker MUST NOT control relationships, keys, cardinality, null insertion, uniqueness, or row counts.
 
@@ -953,7 +957,9 @@ The validator MUST verify:
 - categorical values are homogeneous for the column type;
 - every template placeholder resolves to another column in the same raw table, template dependencies are acyclic, and their evaluation order is deterministic;
 - foreign-key generators refer to an existing relationship and occur on the correct dependent or bridge columns;
-- every component of a composite foreign key uses the same relationship target and is generated atomically; and
+- every component of a composite foreign key uses the same relationship target and is generated atomically;
+- every component of a composite foreign key has the same `nullable` value and the same `null_probability` (one tuple-level null draw controls all components);
+- the raw foreign-key dependency graph is acyclic: every raw key dependency MUST reach an independently generatable key universe; a cycle with no such universe is a semantic error identifying the involved tables, columns, and relationships; and
 - Faker-backed kinds occur only on string columns.
 
 ### 17.4. Relationship checks
@@ -965,7 +971,7 @@ The validator MUST verify:
 - corresponding endpoint types are exactly equal in version 1;
 - the unique side required by cardinality is a declared primary or unique key;
 - `one_to_one` endpoints are both unique;
-- dependent columns have correct foreign-key generators and compatible nullability;
+- dependent columns have correct foreign-key generators and compatible nullability (within one composite tuple: equal `nullable` and equal `null_probability`);
 - a many-to-many bridge table exists and is distinct from both endpoints;
 - bridge component arities, types, generators, and target sides are correct; and
 - one dependent column is not owned by conflicting relationships.

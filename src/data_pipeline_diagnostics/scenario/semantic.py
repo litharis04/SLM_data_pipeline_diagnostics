@@ -462,20 +462,27 @@ def _check_composite_nullability(
     issues: list[SemanticIssue],
     base: str,
 ) -> None:
-    """Atomic composite FK must not have mixed nullability."""
+    """Atomic composite FK must not have mixed nullability or null probability.
+
+    All component columns share one tuple-level null draw, so they MUST agree on
+    both ``nullable`` and ``null_probability`` (SCENARIO_SPEC §17.3).
+    """
     cmap = raw_col_map.get(table, {})
-    nullables = []
+    settings = []
     for cname in cols:
         col = cmap.get(cname)
         if col is not None:
-            nullables.append(getattr(col, "nullable", False))
-    # If any is nullable and any is not, it's partial-null risk
-    if len(set(nullables)) > 1:
+            settings.append(
+                (getattr(col, "nullable", False), getattr(col, "null_probability", 0.0))
+            )
+    # If any component differs in nullability or null probability, the tuple
+    # cannot be sampled atomically with a single null draw.
+    if len(set(settings)) > 1:
         _add_issue(
             issues,
             ErrorCode.FOREIGN_KEY_SIDE,
             f"{base}",
-            f"composite FK '{rel_name}' has incompatible partial-null nullability {nullables}",
+            f"composite FK '{rel_name}' has incompatible partial-null nullability {settings}",
             related=rel_name,
         )
 
@@ -504,6 +511,71 @@ def _claim_fk_owner(
         )
     else:
         fk_owner[key] = rel_name
+
+
+def _check_raw_fk_acyclic(
+    resolved_rels: dict[str, ResolvedRelationship],
+    relationship_order: list[str],
+    issues: list[SemanticIssue],
+) -> None:
+    """Reject raw FK dependency cycles with no independently generatable universe.
+
+    Edges point from the dependent table to the table supplying its key universe
+    (SCENARIO_SPEC §17.3): direct relationships contribute
+    ``dependent_table -> target_table``; many-to-many bridges contribute
+    ``bridge_table -> left_table`` and ``bridge_table -> right_table``.
+    Every reported cycle names the involved tables and relationships.
+    Traversal is deterministic: tables and edges in sorted order.
+    """
+    edges: dict[str, list[tuple[str, str]]] = {}
+    for rel_name in relationship_order:
+        resolved = resolved_rels.get(rel_name)
+        if resolved is None:
+            continue
+        if resolved.cardinality == "many_to_many":
+            if resolved.bridge_table is not None:
+                for target in (resolved.left_table, resolved.right_table):
+                    edges.setdefault(resolved.bridge_table, []).append((target, rel_name))
+        else:
+            if resolved.dependent_table is not None and resolved.target_table is not None:
+                edges.setdefault(resolved.dependent_table, []).append(
+                    (resolved.target_table, rel_name)
+                )
+    for table in edges:
+        edges[table] = sorted(edges[table])
+
+    visited: dict[str, int] = {}  # 0 = unvisited (absent), 1 = on stack, 2 = done
+    stack: list[str] = []
+    stack_rels: list[str] = []
+    reported: set[tuple[str, ...]] = set()
+
+    def visit(node: str) -> None:
+        visited[node] = 1
+        stack.append(node)
+        for target, rel_name in edges.get(node, []):
+            if visited.get(target, 0) == 1:
+                cycle_tables = stack[stack.index(target) :] + [target]
+                key = tuple(cycle_tables)
+                if key not in reported:
+                    reported.add(key)
+                    _add_issue(
+                        issues,
+                        ErrorCode.RAW_FK_CYCLE,
+                        "relationships",
+                        f"raw foreign-key dependencies have cycle: {' -> '.join(cycle_tables)} "
+                        f"(relationships: {', '.join(sorted(set(stack_rels + [rel_name])))})",
+                        related=rel_name,
+                    )
+            elif visited.get(target, 0) == 0:
+                stack_rels.append(rel_name)
+                visit(target)
+                stack_rels.pop()
+        stack.pop()
+        visited[node] = 2
+
+    for table in sorted(edges):
+        if visited.get(table, 0) == 0:
+            visit(table)
 
 
 def _lookup_schema(
@@ -1619,6 +1691,14 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:
                         "bridge right arity must match right endpoint",
                         related=rel.name,
                     )
+
+    # §17.3 raw FK dependency cycles: every raw key universe must be reachable
+    # without passing through a dependent that needs it first.
+    _check_raw_fk_acyclic(
+        resolved_rels,
+        [rel.name for rel in scenario.relationships],
+        issues,
+    )
 
     # §17.5 Staging – single-pass chain finals reused for schemas below (T16).
     staging_final: dict[str, dict[str, DataType | None]] = {}
