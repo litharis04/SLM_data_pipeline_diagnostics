@@ -1,8 +1,9 @@
 """Generator package — validated-scenario compiler boundary (GENERATOR_SPEC §§3–4).
 
-G01 scaffold only: public API surface with immutable placeholder types.
-Later tasks fill execution logic; every entry point already enforces the
-``ValidatedScenario``-only boundary and ``data_seed`` contract.
+Public API surface with ``ValidatedScenario``-only entry points; every entry
+point enforces the boundary and the ``data_seed`` contract. ``RawPlan`` and
+``build_raw_plan`` are implemented in :mod:`raw_plan` (G08); the dbt and
+clean-instance surfaces follow in later tasks.
 """
 
 from __future__ import annotations
@@ -10,6 +11,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from data_pipeline_diagnostics.generator.raw_plan import RawPlan, build_raw_plan
 from data_pipeline_diagnostics.scenario.parsing import (
     parse_scenario_file,
     parse_scenario_json,
@@ -33,13 +35,6 @@ __all__ = [
 
 MIN_DATA_SEED = 0
 MAX_DATA_SEED = 2**63 - 1
-
-
-@dataclass(frozen=True)
-class RawPlan:
-    """Placeholder internal raw execution plan (grows in G08)."""
-
-    scenario_id: str
 
 
 @dataclass(frozen=True)
@@ -77,12 +72,6 @@ def _validate_seed(data_seed: object) -> int:
     if not MIN_DATA_SEED <= data_seed <= MAX_DATA_SEED:
         raise ValueError(f"data_seed {data_seed} out of range [0, 2**63 - 1]")
     return data_seed
-
-
-def build_raw_plan(validated: ValidatedScenario) -> RawPlan:
-    """Build the immutable raw execution plan (stub: G08 fills logic)."""
-    scenario = _require_validated(validated).scenario
-    return RawPlan(scenario_id=str(scenario.scenario_id))
 
 
 def render_dbt_project(validated: ValidatedScenario, destination: str | Path) -> RenderedDbtProject:
