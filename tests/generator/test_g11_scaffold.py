@@ -71,6 +71,7 @@ def test_sources_and_profile_content(tmp_path):
     profiles = (project_dir / "profiles.yml").read_text(encoding="utf-8")
     assert "../pipeline.duckdb" in profiles
     assert "threads: 1" in profiles
+    assert "schema: main" in profiles
     lowered = profiles.lower()
     for secret in ("password", "passwd", "token", "secret", "user:"):
         assert secret not in lowered
@@ -79,7 +80,6 @@ def test_sources_and_profile_content(tmp_path):
     assert "name: dpd_pipeline" in project
     assert "profile: dpd_pipeline" in project
     assert "+materialization: table" in project
-    assert "+schema: main" in project
     assert "http://" not in project and "https://" not in project
 
 

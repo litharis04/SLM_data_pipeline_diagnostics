@@ -18,7 +18,6 @@ discriminator fields — an unknown variant raises (never passthrough/omit).
 
 from __future__ import annotations
 
-import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -30,6 +29,7 @@ from data_pipeline_diagnostics.generator.physical import (
     MAIN_SCHEMA_NAME,
     RAW_SCHEMA_NAME,
     RAW_SOURCE_NAME,
+    physical_test_name,
     quote_ident,
     write_text_file,
     yaml_scalar,
@@ -123,7 +123,6 @@ def _dbt_project_yml() -> str:
         "models:\n"
         f"  {DBT_PROJECT_NAME}:\n"
         "    +materialization: table\n"
-        f"    +schema: {MAIN_SCHEMA_NAME}\n"
     )
 
 
@@ -135,6 +134,7 @@ def _profiles_yml() -> str:
         f"    {DBT_TARGET_NAME}:\n"
         "      type: duckdb\n"
         "      path: ../pipeline.duckdb\n"
+        f"      schema: {MAIN_SCHEMA_NAME}\n"
         "      threads: 1\n"
     )
 
@@ -684,16 +684,6 @@ def collect_assertions(validated: ValidatedScenario) -> list[LogicalAssertion]:
     return _deduplicate([*explicit, *derived])
 
 
-def _physical_name(assertion_type: str, logical: str, *roles: str) -> str:
-    """Deterministic physical test name from logical name + component roles
-    (stable hash suffix when long — no naming policy)."""
-    base = "__".join((assertion_type, logical, *roles)) if roles else f"{assertion_type}__{logical}"
-    if len(base) <= 64:
-        return base
-    digest = hashlib.sha256(base.encode("utf-8")).hexdigest()[:12]
-    return base[: 64 - 13] + "_" + digest
-
-
 def _target_ref(model: str, raw_tables: set[str]) -> str:
     if model in raw_tables:
         return f"source('{RAW_SOURCE_NAME}', '{model}')"
@@ -785,7 +775,7 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                     lines,
                     "not_null",
                     [f"column_name: {column}"],
-                    _physical_name("not_null", assertion.name, column),
+                    physical_test_name("not_null", assertion.name, column),
                 )
         case "unique":
             if len(assertion.columns) == 1:
@@ -794,14 +784,14 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                     lines,
                     "unique",
                     [f"column_name: {column}"],
-                    _physical_name("unique", assertion.name),
+                    physical_test_name("unique", assertion.name),
                 )
             else:
                 _emit_test(
                     lines,
                     "composite_unique",
                     [f"column_names: {_yaml_ident_list(assertion.columns)}"],
-                    _physical_name("composite_unique", assertion.name),
+                    physical_test_name("composite_unique", assertion.name),
                 )
         case "accepted_values":
             values = ", ".join(yaml_scalar(v) for v in assertion.values)
@@ -809,7 +799,7 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                 lines,
                 "accepted_values",
                 [f"column_name: {assertion.column}", f"values: [{values}]"],
-                _physical_name("accepted_values", assertion.name),
+                physical_test_name("accepted_values", assertion.name),
             )
         case "relationships":
             to = _target_ref(str(assertion.to_model), raw_tables)
@@ -820,7 +810,7 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                     lines,
                     "relationships",
                     [f"column_name: {column}", f"to: {to}", f"field: {to_column}"],
-                    _physical_name("relationships", assertion.name),
+                    physical_test_name("relationships", assertion.name),
                 )
             else:
                 child = [quote_ident(c) for c in assertion.columns]
@@ -841,7 +831,7 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                         f"join_on: {yaml_string(join_on)}",
                         f"orphan_filter: {yaml_string(orphans)}",
                     ],
-                    _physical_name("composite_relationships", assertion.name),
+                    physical_test_name("composite_relationships", assertion.name),
                 )
         case "row_count":
             args = []
@@ -853,7 +843,7 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                 lines,
                 "row_count_between",
                 args,
-                _physical_name("row_count_between", assertion.name),
+                physical_test_name("row_count_between", assertion.name),
             )
         case "column_range":
             args = [f"column_name: {assertion.column}"]
@@ -866,7 +856,7 @@ def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: s
                 lines,
                 "column_range",
                 args,
-                _physical_name("column_range", assertion.name),
+                physical_test_name("column_range", assertion.name),
             )
         case _:
             raise ValueError(f"assertion {assertion.name!r}: unknown type {assertion.type!r}")

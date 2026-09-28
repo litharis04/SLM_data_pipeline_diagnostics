@@ -30,6 +30,7 @@ contract (DuckDB-native writer, fresh-DB loader with exact verification).
 
 from __future__ import annotations
 
+import hashlib
 import math
 import re
 from collections.abc import Mapping, Sequence
@@ -60,6 +61,7 @@ __all__ = [
     "literal_string",
     "literal_timestamp",
     "load_raw_into_duckdb",
+    "physical_test_name",
     "quote_ident",
     "raw_parquet_path",
     "sql_literal",
@@ -94,6 +96,16 @@ def quote_ident(name: str) -> str:
     if type(name) is not str or not name:
         raise TypeError(f"identifier must be a non-empty str, got {name!r}")
     return '"' + name.replace('"', '""') + '"'
+
+
+def physical_test_name(assertion_type: str, logical: str, *roles: str) -> str:
+    """Deterministic physical test name from logical name + component roles
+    (stable hash suffix when long — no naming policy)."""
+    base = "__".join((assertion_type, logical, *roles)) if roles else f"{assertion_type}__{logical}"
+    if len(base) <= 64:
+        return base
+    digest = hashlib.sha256(base.encode("utf-8")).hexdigest()[:12]
+    return base[: 64 - 13] + "_" + digest
 
 
 def _quote_chunk(text: str) -> str:

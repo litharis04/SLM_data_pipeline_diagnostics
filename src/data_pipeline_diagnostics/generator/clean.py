@@ -343,14 +343,19 @@ def _fail(
 
 
 def build_clean_instance(
-    *, validated: ValidatedScenario, data_seed: int, instance_dir: str | Path
+    *,
+    validated: ValidatedScenario,
+    data_seed: int,
+    instance_dir: str | Path,
+    write_success: bool = True,
 ) -> BuiltInstance:
     """Build one clean baseline in ``instance_dir`` (fresh workspace semantics:
     an existing directory is removed first and never reused).
 
-    Returns success (with a ``SUCCESS`` marker) or writes
-    ``failure_record.json`` and returns failure — never raising for
-    data/contract problems, never retrying another seed.
+    Returns success (with a ``SUCCESS`` marker unless ``write_success`` is
+    false — the G19 cache flow defers it until after the instance record)
+    or writes ``failure_record.json`` and returns failure — never raising
+    for data/contract problems, never retrying another seed.
     """
     if type(data_seed) is not int or not 0 <= data_seed <= 2**63 - 1:
         raise ValueError(f"data_seed must be a strict int in [0, 2**63 - 1], got {data_seed!r}")
@@ -409,7 +414,8 @@ def build_clean_instance(
             command=result.command,
             exit_status=result.exit_status,
         )
-    (root / "SUCCESS").write_text("success\n", encoding="utf-8")
+    if write_success:
+        (root / "SUCCESS").write_text("success\n", encoding="utf-8")
     return BuiltInstance(
         scenario_id=scenario_id, data_seed=data_seed, instance_dir=root, success=True
     )
