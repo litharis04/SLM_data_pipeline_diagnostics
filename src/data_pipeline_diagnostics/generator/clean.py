@@ -46,15 +46,19 @@ from data_pipeline_diagnostics.scenario.semantic import ValidatedScenario
 __all__ = [
     "BuiltInstance",
     "CleanBuildResult",
+    "DBT_BUILD_COMMAND",
     "DBT_BUILD_TIMEOUT_SECONDS",
     "FAILURE_STAGES",
+    "SUCCESS_CONTENT",
     "build_clean_instance",
     "run_clean_build",
     "validate_failure_record",
     "write_failure_record",
 ]
 
+DBT_BUILD_COMMAND = ("dbt", "build", "--profiles-dir", ".", "--target", "clean", "--threads", "1")
 DBT_BUILD_TIMEOUT_SECONDS = 600
+SUCCESS_CONTENT = "success\n"
 
 FAILURE_STAGES = (
     "raw_plan",
@@ -102,7 +106,7 @@ def _dbt_env() -> dict[str, str]:
 def run_clean_build(*, dbt_dir: str | Path) -> CleanBuildResult:
     """Run the fixed clean build and validate its outcome."""
     project_dir = Path(dbt_dir)
-    command = ("dbt", "build", "--profiles-dir", ".", "--target", "clean", "--threads", "1")
+    command = DBT_BUILD_COMMAND
     log_path = project_dir / "logs" / "dbt.log"
     log_path.parent.mkdir(parents=True, exist_ok=True)
     try:
@@ -415,7 +419,7 @@ def build_clean_instance(
             exit_status=result.exit_status,
         )
     if write_success:
-        (root / "SUCCESS").write_text("success\n", encoding="utf-8")
+        (root / "SUCCESS").write_text(SUCCESS_CONTENT, encoding="utf-8")
     return BuiltInstance(
         scenario_id=scenario_id, data_seed=data_seed, instance_dir=root, success=True
     )

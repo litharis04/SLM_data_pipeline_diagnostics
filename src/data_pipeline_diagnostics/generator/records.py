@@ -28,6 +28,7 @@ from pathlib import Path
 
 import duckdb
 
+from data_pipeline_diagnostics.generator.clean import SUCCESS_CONTENT
 from data_pipeline_diagnostics.generator.dbt_render import (
     LogicalAssertion,
     collect_assertions,
@@ -70,17 +71,23 @@ def _tool_version(distribution: str) -> str:
     return importlib.metadata.version(distribution)
 
 
+def _python_version_key(version_info: object = None) -> str:
+    """Cache-identity Python component: ``major.minor`` only (patch is
+    provenance, recorded as ``python_full`` but excluded from identity)."""
+    info = sys.version_info if version_info is None else version_info
+    return f"{info.major}.{info.minor}"
+
+
 def identity_object(validated: ValidatedScenario, data_seed: int) -> dict[str, object]:
     """Canonical §7.2 identity object (key order fixed; serialized sorted)."""
     scenario = validated.scenario
-    major, minor = sys.version_info.major, sys.version_info.minor
     return {
         "scenario_sha256": scenario_content_hash(scenario),
         "data_seed": data_seed,
         "generator_contract": GENERATOR_CONTRACT_VERSION,
         "raw_generator": RAW_GENERATOR_VERSION,
         "dbt_renderer": DBT_RENDERER_VERSION,
-        "python": f"{major}.{minor}",
+        "python": _python_version_key(),
         "duckdb": _tool_version("duckdb"),
         "dbt_core": _tool_version("dbt-core"),
         "dbt_duckdb": _tool_version("dbt-duckdb"),
@@ -330,6 +337,11 @@ def write_instance_record(
         db.close()
 
     artifacts = []
+    success_bytes = SUCCESS_CONTENT.encode("utf-8")
+    expected_marker = (
+        len(success_bytes),
+        hashlib.sha256(success_bytes).hexdigest(),
+    )
     for relative in [
         "scenario.json",
         *[f"raw/{t}.parquet" for t in [str(t.name) for t in scenario.raw_tables]],
@@ -338,17 +350,23 @@ def write_instance_record(
         "SUCCESS",
     ]:
         path = root / relative
-        if not path.is_file():
-            raise GenerationFailure(
-                table="*",
-                column=None,
-                reason="incomplete-instance",
-                detail=f"missing artifact {relative}",
-            )
+        if relative == "SUCCESS" and not path.is_file():
+            # Publication seal: SUCCESS is written last, after this record.
+            # Its content is fixed, so the expected digest is inventoried now
+            # and verified on cache hits (when the file exists).
+            size, sha = expected_marker
+        else:
+            if not path.is_file():
+                raise GenerationFailure(
+                    table="*",
+                    column=None,
+                    reason="incomplete-instance",
+                    detail=f"missing artifact {relative}",
+                )
+            size, sha = _sha256_file(path)
         kind = _classify(relative)
         if kind is None:
             continue
-        size, sha = _sha256_file(path)
         artifacts.append({"path": relative, "kind": kind, "size_bytes": size, "sha256": sha})
 
     record = {
