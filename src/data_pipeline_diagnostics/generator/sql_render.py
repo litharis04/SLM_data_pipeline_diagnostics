@@ -1,8 +1,15 @@
-"""SQL rendering primitives: staging column pipelines (GENERATOR_SPEC §14.2).
+"""SQL rendering primitives: staging columns, expressions, conditions (§§14.2–14.5).
 
 Each staging column starts from its quoted raw source; operations wrap it in
 declaration order; the target alias is applied once at the end. Strict
 ``CAST`` only — never ``TRY_CAST``.
+
+Expressions dispatch exhaustively over the ``kind`` discriminator with full
+parenthesization (binary results always wrapped; safe division exactly as
+the §14.4 ``CASE`` template returning ``DOUBLE``; ``day_of_week`` via
+``extract(isodow)`` for ISO 1=Monday..7=Sunday). Conditions keep ordinary
+SQL three-valued semantics — no ``IS NOT DISTINCT FROM`` rewrites — and are
+fully parenthesized (``IN`` honors ``negated``).
 
 Materialization barrier (one deterministic technique for the whole
 renderer, G13–G15): the column-expression phase of every model is emitted
@@ -20,6 +27,7 @@ from data_pipeline_diagnostics.generator.physical import (
     quote_ident,
     sql_literal,
 )
+from data_pipeline_diagnostics.scenario.expressions import Condition, Expression
 from data_pipeline_diagnostics.scenario.staging import (
     MapValuesOperation,
     StagingColumn,
@@ -28,7 +36,10 @@ from data_pipeline_diagnostics.scenario.staging import (
 from data_pipeline_diagnostics.scenario.types import DataType
 
 __all__ = [
+    "HELPER_ROW_NUMBER",
     "materialized_cte",
+    "render_condition",
+    "render_expression",
     "render_staging_column",
     "typed_scalar_literal",
 ]
@@ -115,3 +126,90 @@ def _render_map_values(
         case _:
             raise ValueError(f"unknown on_unmapped mode: {operation.on_unmapped!r}")
     return f"CASE WHEN {expression} IS NULL THEN NULL {branches} ELSE {tail} END"
+
+
+# ---------------------------------------------------------------------------
+# Expressions (§14.4) and conditions (§14.5)
+# ---------------------------------------------------------------------------
+
+_BINARY_OPERATORS = {"add": "+", "subtract": "-", "multiply": "*"}
+
+_COMPARISON_OPERATORS = {
+    "eq": "=",
+    "ne": "<>",
+    "lt": "<",
+    "lte": "<=",
+    "gt": ">",
+    "gte": ">=",
+}
+
+_DATE_PARTS = {"year": "year", "quarter": "quarter", "month": "month", "day": "day"}
+
+# Leading underscore impossible in scenario identifiers, so generated SQL
+# can never collide with this helper column.
+HELPER_ROW_NUMBER = "_dpd_row_number"
+
+
+def render_expression(expression: Expression) -> str:
+    """Render one scalar expression (exhaustive over ``kind``)."""
+    match expression.kind:
+        case "column":
+            return quote_ident(str(expression.column))
+        case "literal":
+            return typed_scalar_literal(expression.value)
+        case "binary":
+            left = render_expression(expression.left)
+            right = render_expression(expression.right)
+            if expression.operator == "divide":
+                return (
+                    f"(CASE WHEN {right} IS NULL OR {right} = 0 THEN NULL "
+                    f"ELSE CAST({left} AS DOUBLE) / CAST({right} AS DOUBLE) END)"
+                )
+            try:
+                symbol = _BINARY_OPERATORS[expression.operator]
+            except KeyError:
+                raise ValueError(f"unknown binary operator: {expression.operator!r}") from None
+            return f"({left} {symbol} {right})"
+        case "date_part":
+            operand = render_expression(expression.value)
+            if expression.part == "day_of_week":
+                return f"extract(isodow from {operand})"
+            try:
+                part = _DATE_PARTS[expression.part]
+            except KeyError:
+                raise ValueError(f"unknown date part: {expression.part!r}") from None
+            return f"extract({part} from {operand})"
+        case "coalesce":
+            return f"coalesce({', '.join(render_expression(v) for v in expression.values)})"
+        case _:
+            raise ValueError(f"unknown expression kind: {expression.kind!r}")
+
+
+def render_condition(condition: Condition) -> str:
+    """Render one boolean condition, fully parenthesized (exhaustive over ``kind``)."""
+    match condition.kind:
+        case "comparison":
+            try:
+                symbol = _COMPARISON_OPERATORS[condition.operator]
+            except KeyError:
+                raise ValueError(f"unknown comparison operator: {condition.operator!r}") from None
+            left = render_expression(condition.left)
+            right = render_expression(condition.right)
+            return f"({left} {symbol} {right})"
+        case "in":
+            operand = render_expression(condition.value)
+            options = ", ".join(typed_scalar_literal(v) for v in condition.options)
+            keyword = "NOT IN" if condition.negated else "IN"
+            return f"({operand} {keyword} ({options}))"
+        case "is_null":
+            operand = render_expression(condition.value)
+            keyword = "IS NOT NULL" if condition.negated else "IS NULL"
+            return f"({operand} {keyword})"
+        case "all":
+            return f"({' AND '.join(render_condition(c) for c in condition.conditions)})"
+        case "any":
+            return f"({' OR '.join(render_condition(c) for c in condition.conditions)})"
+        case "not":
+            return f"(NOT {render_condition(condition.condition)})"
+        case _:
+            raise ValueError(f"unknown condition kind: {condition.kind!r}")
