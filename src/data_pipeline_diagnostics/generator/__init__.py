@@ -11,6 +11,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
+from data_pipeline_diagnostics.generator.dbt_render import (
+    RenderedDbtProject,
+    render_dbt_project,
+)
 from data_pipeline_diagnostics.generator.raw_plan import RawPlan, build_raw_plan
 from data_pipeline_diagnostics.scenario.parsing import (
     parse_scenario_file,
@@ -35,14 +39,6 @@ __all__ = [
 
 MIN_DATA_SEED = 0
 MAX_DATA_SEED = 2**63 - 1
-
-
-@dataclass(frozen=True)
-class RenderedDbtProject:
-    """Placeholder grouping of rendered dbt artifact locations (grows in G11)."""
-
-    scenario_id: str
-    destination: Path
 
 
 @dataclass(frozen=True)
@@ -72,12 +68,6 @@ def _validate_seed(data_seed: object) -> int:
     if not MIN_DATA_SEED <= data_seed <= MAX_DATA_SEED:
         raise ValueError(f"data_seed {data_seed} out of range [0, 2**63 - 1]")
     return data_seed
-
-
-def render_dbt_project(validated: ValidatedScenario, destination: str | Path) -> RenderedDbtProject:
-    """Render the dbt project skeleton (stub: G11 fills logic)."""
-    scenario = _require_validated(validated).scenario
-    return RenderedDbtProject(scenario_id=str(scenario.scenario_id), destination=Path(destination))
 
 
 def prepare_clean_instance(
