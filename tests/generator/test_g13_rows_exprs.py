@@ -201,25 +201,28 @@ def _dedup_model():
 
 
 def test_deduplication_snapshot():
-    rendered = render_staging_sql(_dedup_model())
+    rendered = render_staging_sql(_dedup_model(), ("a", "b"))
     assert '"b" ASC NULLS LAST' in rendered
     assert '"a" DESC NULLS LAST' in rendered
     order_clause = rendered.split("ORDER BY", 1)[1].split(")", 1)[0]
     assert order_clause.count("NULLS LAST") == 2
     assert "_dpd_row_number" not in rendered.rsplit("SELECT", 1)[1]
     assert 'WHERE "_dpd_row_number" = 1' in rendered
+    assert "SELECT *" not in rendered and ".*" not in rendered
 
 
 def test_full_staging_model_snapshot():
     data = json.loads((REPO / "scenarios" / "education_cohorts_001.json").read_text())
     validated = validate_semantics(parse_scenario_json(json.dumps(data)))
     model = next(m for m in validated.scenario.staging_models if str(m.name) == "stg_enrollments")
+    raw_table = next(t for t in validated.scenario.raw_tables if str(t.name) == str(model.source))
+    source_columns = tuple(str(c.name) for c in raw_table.columns)
     assert (
-        render_staging_sql(model)
+        render_staging_sql(model, source_columns)
         == """{{ config(materialization='table') }}
 
 WITH "base" AS (
-    SELECT * FROM {{ source('raw', 'raw_enrollments') }}
+    SELECT "student_id", "course_id", "enrolled", "status" FROM {{ source('raw', 'raw_enrollments') }}
 ),
 "columns" AS MATERIALIZED (SELECT
         "student_id" AS "student_id",
@@ -228,11 +231,11 @@ WITH "base" AS (
         "status" AS "status"
     FROM "base"),
 "row_0" AS (
-    SELECT * FROM "columns"
+    SELECT "student_id", "course_id", "enrolled", "status" FROM "columns"
     WHERE ("status" <> 'dropped')
 ),
 "row_1" AS (
-    SELECT * FROM (SELECT "row_0".*, row_number() OVER (PARTITION BY "course_id", "student_id" ORDER BY "enrolled" DESC NULLS LAST) AS "_dpd_row_number" FROM "row_0")
+    SELECT "student_id", "course_id", "enrolled", "status" FROM (SELECT "student_id", "course_id", "enrolled", "status", row_number() OVER (PARTITION BY "course_id", "student_id" ORDER BY "enrolled" DESC NULLS LAST) AS "_dpd_row_number" FROM "row_0")
     WHERE "_dpd_row_number" = 1
 )
 SELECT "student_id", "course_id", "enrolled", "status" FROM "row_1"
@@ -243,7 +246,7 @@ SELECT "student_id", "course_id", "enrolled", "status" FROM "row_1"
 def test_unknown_row_operation_raises():
     model = _dedup_model().model_copy(update={"row_operations": (SimpleNamespace(op="bogus"),)})
     with pytest.raises(ValueError):
-        render_staging_sql(model)
+        render_staging_sql(model, ("a", "b"))
 
 
 def test_filter_row_operation_snapshot():
@@ -258,6 +261,6 @@ def test_filter_row_operation_snapshot():
         ),
         grain=("a",),
     )
-    rendered = render_staging_sql(model)
+    rendered = render_staging_sql(model, ("a",))
     assert 'WHERE ("a" > 0)' in rendered
     assert rendered.rsplit("SELECT", 1)[1].strip() == '"a" FROM "row_0"'
