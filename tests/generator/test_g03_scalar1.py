@@ -22,9 +22,9 @@ from data_pipeline_diagnostics.generator.raw_values import (
 )
 from data_pipeline_diagnostics.generator.rng import stream as make_stream
 from data_pipeline_diagnostics.scenario.generators import (
-    BooleanGenerator,
     DateRangeGenerator,
     FloatRangeGenerator,
+    ForeignKeyGenerator,
     FormattedIdGenerator,
     IntegerRangeGenerator,
     TimestampRangeGenerator,
@@ -125,5 +125,11 @@ def test_timestamp_range_utc_and_bounded():
 
 
 def test_dispatch_unknown_kind_raises():
+    # foreign_key has no scalar execution (§10.8); the part-1/2 dispatch rejects it.
+    # (boolean was the placeholder here until G04 implemented it.)
     with pytest.raises(ValueError):
-        generate_scalar(BooleanGenerator(true_probability=0.5), _stream("b"), 0)
+        generate_scalar(
+            ForeignKeyGenerator(relationship="rel_a", target_side="left"),
+            _stream("fk"),
+            0,
+        )

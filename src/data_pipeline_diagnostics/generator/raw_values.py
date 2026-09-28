@@ -1,35 +1,56 @@
-"""Scalar mini-generator execution, part 1 (GENERATOR_SPEC §§10.1–10.3).
+"""Scalar mini-generator execution, parts 1–2 (GENERATOR_SPEC §§10.1–10.6).
 
-Pure proposal functions for ``formatted_id``, ``integer_range``,
-``float_range``, ``date_range`` and ``timestamp_range``. Each takes
-``(generator_config, rng, row_index)``; only the passed stream is consumed
-(``formatted_id`` consumes none). Null insertion and hard constraints are
-applied later (G06); this module produces non-null proposals only.
+Pure proposal functions. Each takes ``(generator_config, rng, row_index)``;
+only the passed stream is consumed (``formatted_id`` consumes none).
+``categorical`` additionally accepts ``unique``/``already_drawn`` for
+without-replacement selection (exhaustion raises :class:`ExhaustedDomain`
+for the G06 caller to decide retry vs failure); ``template_string``
+additionally takes the row's placeholder values as a dict. Null insertion
+and hard constraints are applied later (G06); this module produces non-null
+proposals only (a template resolving to null is the caller's null signal).
 """
 
 from __future__ import annotations
 
 import random
+import re
+from collections.abc import Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
 from data_pipeline_diagnostics.scenario.generators import (
+    BooleanGenerator,
+    CategoricalGenerator,
     DateRangeGenerator,
     FloatRangeGenerator,
     FormattedIdGenerator,
     GeneratorSpec,
     IntegerRangeGenerator,
+    RandomStringGenerator,
+    TemplateStringGenerator,
     TimestampRangeGenerator,
 )
 
 __all__ = [
+    "ExhaustedDomain",
+    "generate_boolean",
+    "generate_categorical",
     "generate_date",
     "generate_float",
     "generate_formatted_id",
     "generate_integer",
+    "generate_random_string",
     "generate_scalar",
+    "generate_template",
     "generate_timestamp",
+    "render_template",
 ]
+
+
+class ExhaustedDomain(Exception):
+    """A finite generator domain has no selectable value left (e.g. unique
+    categorical with every value already drawn). The caller decides retry
+    vs structured failure; this module never truncates or invents values."""
 
 
 def _check_row_index(row_index: object) -> int:
@@ -100,9 +121,20 @@ def generate_timestamp(
 
 
 def generate_scalar(
-    config: GeneratorSpec, rng: random.Random, row_index: int
-) -> str | int | float | date | datetime:
-    """Dispatch a part-1 generator config to its executor (exhaustive)."""
+    config: GeneratorSpec,
+    rng: random.Random,
+    row_index: int,
+    *,
+    unique: bool = False,
+    already_drawn: Iterable[object] = frozenset(),
+    placeholders: Mapping[str, object] | None = None,
+) -> str | int | float | bool | date | datetime | None:
+    """Dispatch a scalar generator config to its executor (exhaustive).
+
+    ``unique``/``already_drawn`` apply to ``categorical`` without-replacement
+    selection; ``placeholders`` supplies the row values for ``template_string``
+    (required for that kind).
+    """
     match config.kind:
         case "formatted_id":
             return generate_formatted_id(config, rng, row_index)
@@ -114,5 +146,135 @@ def generate_scalar(
             return generate_date(config, rng, row_index)
         case "timestamp_range":
             return generate_timestamp(config, rng, row_index)
+        case "categorical":
+            return generate_categorical(
+                config, rng, row_index, unique=unique, already_drawn=already_drawn
+            )
+        case "boolean":
+            return generate_boolean(config, rng, row_index)
+        case "random_string":
+            return generate_random_string(config, rng, row_index)
+        case "template_string":
+            if placeholders is None:
+                raise ValueError("template_string requires a placeholders mapping")
+            return generate_template(config, rng, row_index, placeholders)
         case _:
             raise ValueError(f"unknown scalar generator kind: {config.kind!r}")
+
+
+# ---------------------------------------------------------------------------
+# Part 2: categorical / boolean / strings / template (§§10.4–10.6)
+# ---------------------------------------------------------------------------
+
+
+def _value_key(value: object) -> tuple[str, object]:
+    """Identity key preserving JSON scalar type (``True`` vs ``1`` distinct)."""
+    return (type(value).__name__, value)
+
+
+def generate_categorical(
+    config: CategoricalGenerator,
+    rng: random.Random,
+    row_index: int,
+    *,
+    unique: bool = False,
+    already_drawn: Iterable[object] = frozenset(),
+) -> str | int | float | bool:
+    """Sample one categorical value, preserving JSON scalar type exactly.
+
+    Without weights every declared value is equally likely. With weights they
+    are normalized by their sum in declaration order; a zero-weight value is
+    never selected. For ``unique`` columns selection is without replacement
+    over the not-yet-drawn values with renormalized weights; an empty
+    remainder raises :class:`ExhaustedDomain` before consuming the stream.
+    """
+    _check_row_index(row_index)
+    drawn = {_value_key(v) for v in already_drawn}
+
+    if config.weights is None:
+        pool = [v for v in config.values if not unique or _value_key(v) not in drawn]
+        if not pool:
+            raise ExhaustedDomain("categorical without-replacement pool exhausted")
+        return pool[rng.randint(0, len(pool) - 1)]
+
+    pool = [
+        (v, w)
+        for v, w in zip(config.values, config.weights, strict=True)
+        if w > 0 and (not unique or _value_key(v) not in drawn)
+    ]
+    if not pool:
+        raise ExhaustedDomain("categorical without-replacement pool exhausted")
+    total = sum(w for _, w in pool)
+    pick = rng.random() * total
+    for value, weight in pool:
+        if pick < weight:
+            return value
+        pick -= weight
+    return pool[-1][0]
+
+
+def generate_boolean(config: BooleanGenerator, rng: random.Random, row_index: int) -> bool:
+    """``True`` when a uniform draw in ``[0, 1)`` is below ``true_probability``."""
+    _check_row_index(row_index)
+    return rng.random() < config.true_probability
+
+
+def generate_random_string(
+    config: RandomStringGenerator, rng: random.Random, row_index: int
+) -> str:
+    """Uniform length from ``[min_length, max_length]``, each character uniform
+    and independent from ``alphabet`` in declaration order."""
+    _check_row_index(row_index)
+    length = rng.randint(config.min_length, config.max_length)
+    return "".join(rng.choice(config.alphabet) for _ in range(length))
+
+
+_PLACEHOLDER_RE = re.compile(r"\{([a-z][a-z0-9_]*)\}")
+
+
+def _template_text(value: object) -> str:
+    """Text form of one placeholder value per the §10.6 table."""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, int):
+        return str(value)
+    if isinstance(value, float):
+        return repr(value)
+    if isinstance(value, str):
+        return value
+    if isinstance(value, datetime):
+        moment = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+        return moment.astimezone(UTC).isoformat()
+    if isinstance(value, date):
+        return value.isoformat()
+    raise TypeError(f"unsupported template placeholder type: {type(value).__name__}")
+
+
+def render_template(template: str, placeholders: Mapping[str, object]) -> str | None:
+    """Pure ``template_string`` render over supplied row values.
+
+    Literal text is copied verbatim; each ``{column}`` is replaced by the
+    §10.6 text form of its value. Any referenced null yields a null result.
+    No escaping, nested lookup, or Jinja evaluation occurs.
+    """
+    texts: dict[str, str] = {}
+    for name in dict.fromkeys(_PLACEHOLDER_RE.findall(template)):
+        value = placeholders[name]
+        if value is None:
+            return None
+        texts[name] = _template_text(value)
+    result = template
+    for name, text in texts.items():
+        result = result.replace("{" + name + "}", text)
+    return result
+
+
+def generate_template(
+    config: TemplateStringGenerator,
+    rng: random.Random,
+    row_index: int,
+    placeholders: Mapping[str, object],
+) -> str | None:
+    """Render a template column for one row (consumes no RNG)."""
+    _check_row_index(row_index)
+    return render_template(config.template, placeholders)
