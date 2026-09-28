@@ -18,9 +18,11 @@ from jinja2 import Environment
 from data_pipeline_diagnostics.generator.dbt_render import (
     LogicalAssertion,
     _deduplicate,
+    _partition_sources,
     collect_assertions,
     render_assertion_macros,
     render_assertions_yml,
+    render_sources_yml,
 )
 from data_pipeline_diagnostics.generator.physical import yaml_string
 from data_pipeline_diagnostics.scenario.parsing import parse_scenario_json
@@ -34,35 +36,43 @@ def _validated(name: str):
     return validate_semantics(parse_scenario_json(json.dumps(data)))
 
 
-def _project_yml(name: str = "education_cohorts_001.json") -> str:
+def _project_files(name: str = "education_cohorts_001.json") -> tuple[str, str]:
+    """Rendered (sources.yml, assertions.yml): source tests live with the
+    single ``raw`` source definition (dbt forbids redefining it per file)."""
     validated = _validated(name)
-    return render_assertions_yml(
-        collect_assertions(validated),
-        raw_tables=[str(t.name) for t in validated.scenario.raw_tables],
+    collected = collect_assertions(validated)
+    raw_tables = [str(t.name) for t in validated.scenario.raw_tables]
+    sources = render_sources_yml(raw_tables, _partition_sources(collected, raw_tables))
+    models = render_assertions_yml(
+        collected,
+        raw_tables=raw_tables,
         staging=[str(m.name) for m in validated.scenario.staging_models],
         intermediates=[str(n) for n in validated.topological_order],
         outputs=[str(m.name) for m in validated.scenario.output_models],
     )
+    return sources, models
 
 
 def test_selection_builtin_vs_custom():
-    text = _project_yml()
-    assert "- not_null:" in text
-    assert "- unique:" in text
-    assert "composite_unique:" in text
-    assert "composite_relationships:" in text
-    assert "row_count_between:" in text
-    assert "- accepted_values:" in text
+    sources, models = _project_files()
+    combined = sources + models
+    assert "- not_null:" in combined
+    assert "- unique:" in combined
+    assert "composite_unique:" in combined
+    assert "composite_relationships:" in combined
+    assert "row_count_between:" in combined
+    assert "- accepted_values:" in combined
 
 
 def test_explicit_accepted_values_on_model():
-    parsed = yaml.safe_load(_project_yml())
-    models = {m["name"]: m for m in parsed["models"]}
-    tests = models["stg_enrollments"]["tests"]
+    _, models = _project_files()
+    parsed = yaml.safe_load(models)
+    by_name = {m["name"]: m for m in parsed["models"]}
+    tests = by_name["stg_enrollments"]["tests"]
     accepted = [t["accepted_values"] for t in tests if "accepted_values" in t]
     assert len(accepted) == 1
-    assert accepted[0]["column_name"] == "status"
-    assert accepted[0]["values"] == ["active", "dropped"]
+    assert accepted[0]["arguments"]["column_name"] == "status"
+    assert accepted[0]["arguments"]["values"] == ["active", "dropped"]
 
 
 def test_range_inclusive_exclusive_and_one_sided():
@@ -126,24 +136,24 @@ def test_dedup_keeps_first_with_origin():
 
 
 def test_severity_error_everywhere_and_no_utils():
-    text = _project_yml()
+    sources, models = _project_files()
     assert "dbt_utils" not in render_assertion_macros()
-    assert "warn" not in text.lower()
-    parsed = yaml.safe_load(text)
-    nodes = [
-        test
-        for section in ("sources", "models")
-        for holder in parsed.get(section, [])
-        for table in (holder.get("tables", [holder]))
-        for test in table.get("tests", [])
-    ]
+    assert "warn" not in (sources + models).lower()
+    nodes = []
+    parsed_sources = yaml.safe_load(sources)
+    for source in parsed_sources.get("sources", []):
+        for table in source.get("tables", []):
+            nodes.extend(table.get("tests", []))
+    for model in yaml.safe_load(models).get("models", []):
+        nodes.extend(model.get("tests", []))
     assert nodes
-    assert all(next(iter(test.values())).get("severity") == "error" for test in nodes)
+    assert all(
+        next(iter(test.values())).get("config", {}).get("severity") == "error" for test in nodes
+    )
 
 
 def test_physical_names_deterministic_and_bounded():
-    first = _project_yml()
-    assert _project_yml() == first
+    assert _project_files() == _project_files()
     long_name = LogicalAssertion(
         name="x" * 100, origin="explicit", type="not_null", model="m", columns=("c",)
     )

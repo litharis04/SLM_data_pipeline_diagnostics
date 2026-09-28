@@ -63,6 +63,7 @@ __all__ = [
     "render_join_sql",
     "render_metric",
     "render_output_sql",
+    "render_sources_yml",
     "render_staging_sql",
     "render_transform_sql",
 ]
@@ -138,19 +139,14 @@ def _profiles_yml() -> str:
     )
 
 
-def _sources_yml(raw_tables: tuple[str, ...]) -> str:
-    lines = [
-        "version: 2",
-        "",
-        "sources:",
-        f"  - name: {RAW_SOURCE_NAME}",
-        f"    schema: {RAW_SCHEMA_NAME}",
-        "    tables:",
-    ]
-    for table in raw_tables:
-        lines.append(f"      - name: {table}")
-        lines.append(f"        identifier: {table}")
-    return "\n".join(lines) + "\n"
+def _partition_sources(
+    assertions: Sequence[LogicalAssertion], raw_tables: Sequence[str]
+) -> dict[str, list[LogicalAssertion]]:
+    return {
+        table: [a for a in assertions if a.model == table]
+        for table in raw_tables
+        if any(a.model == table for a in assertions)
+    }
 
 
 def render_staging_sql(model: StagingModel, source_columns: Sequence[str]) -> str:
@@ -711,10 +707,36 @@ def _yaml_ident_list(columns: Sequence[str]) -> str:
 
 def _emit_test(lines: list[str], test: str, args: list[str], physical: str) -> None:
     lines.append(f"          - {test}:")
-    for arg in args:
-        lines.append(f"              {arg}")
+    if args:
+        lines.append("              arguments:")
+        for arg in args:
+            lines.append(f"                {arg}")
     lines.append(f"              name: {physical}")
-    lines.append("              severity: error")
+    lines.append("              config:")
+    lines.append("                severity: error")
+
+
+def render_sources_yml(
+    raw_tables: Sequence[str], assertions: Mapping[str, list[LogicalAssertion]]
+) -> str:
+    """Single ``raw`` source definition (dbt forbids redefining it per file),
+    with source-attached tests inline."""
+    lines = [
+        "version: 2",
+        "",
+        "sources:",
+        f"  - name: {RAW_SOURCE_NAME}",
+        f"    schema: {RAW_SCHEMA_NAME}",
+        "    tables:",
+    ]
+    for table in raw_tables:
+        lines.append(f"      - name: {table}")
+        lines.append(f"        identifier: {table}")
+        if assertions.get(table):
+            lines.append("        tests:")
+            for assertion in assertions[table]:
+                _emit_assertion(lines, assertion, set(raw_tables))
+    return "\n".join(lines) + "\n"
 
 
 def render_assertions_yml(
@@ -725,41 +747,31 @@ def render_assertions_yml(
     intermediates: Sequence[str],
     outputs: Sequence[str],
 ) -> str:
-    """Lower assertions to dbt generic tests (§15.2 table).
+    """Lower model assertions to dbt generic tests (§15.2 table).
 
-    Raw-table assertions attach to ``source()``; generated models attach to
-    their ``ref()``. One-column ``not_null``/``unique``/``relationships``
-    use dbt built-ins; composite/``row_count``/``column_range`` use the
-    vendored macros. Every node carries an explicit error severity and a
-    deterministic physical name; origin comments keep traceability.
+    Source-attached assertions live in ``sources.yml`` (see
+    :func:`render_sources_yml`); this file holds generated models only.
+    ``raw_tables`` is still needed to resolve relationship targets to
+    ``source()`` vs ``ref()``. One-column ``not_null``/``unique``/
+    ``relationships`` use dbt built-ins; composite/``row_count``/
+    ``column_range`` use the vendored macros. Every node carries an explicit
+    error severity and a deterministic physical name; origin comments keep
+    traceability.
     """
     raw_set = set(raw_tables)
     known = raw_set | set(staging) | set(intermediates) | set(outputs)
-    by_target: dict[tuple[str, str], list[LogicalAssertion]] = {}
     for assertion in assertions:
         if assertion.model not in known:
             raise ValueError(f"assertion {assertion.name!r}: unknown model {assertion.model!r}")
-        section = "source" if assertion.model in raw_set else "model"
-        by_target.setdefault((section, assertion.model), []).append(assertion)
-
+    ordered = [m for m in (*staging, *intermediates, *outputs)]
+    models = [m for m in ordered if any(a.model == m for a in assertions)]
     lines = ["version: 2", ""]
-    source_tables = [t for t in raw_tables if ("source", t) in by_target]
-    if source_tables:
-        lines.append("sources:")
-        lines.append(f"  - name: {RAW_SOURCE_NAME}")
-        lines.append("    tables:")
-        for table in source_tables:
-            lines.append(f"      - name: {table}")
-            lines.append("        tests:")
-            for assertion in by_target[("source", table)]:
-                _emit_assertion(lines, assertion, raw_set)
-    ordered_models = [m for m in (*staging, *intermediates, *outputs) if ("model", m) in by_target]
-    if ordered_models:
+    if models:
         lines.append("models:")
-        for model in ordered_models:
+        for model in models:
             lines.append(f"  - name: {model}")
             lines.append("    tests:")
-            for assertion in by_target[("model", model)]:
+            for assertion in [a for a in assertions if a.model == model]:
                 _emit_assertion(lines, assertion, raw_set)
     return "\n".join(lines) + "\n"
 
@@ -914,12 +926,16 @@ def render_dbt_project(validated: ValidatedScenario, destination: str | Path) ->
         )
     }
 
+    raw_names = [str(t.name) for t in scenario.raw_tables]
+    staging_names = [str(m.name) for m in scenario.staging_models]
+    output_names = [str(m.name) for m in scenario.output_models]
+    collected = collect_assertions(validated)
     payloads: list[tuple[str, str]] = [
         ("dbt_project.yml", _dbt_project_yml()),
         ("profiles.yml", _profiles_yml()),
         (
             "models/sources.yml",
-            _sources_yml(tuple(str(t.name) for t in scenario.raw_tables)),
+            render_sources_yml(raw_names, _partition_sources(collected, raw_names)),
         ),
     ]
     raw_columns = {str(t.name): tuple(str(c.name) for c in t.columns) for t in scenario.raw_tables}
@@ -948,11 +964,11 @@ def render_dbt_project(validated: ValidatedScenario, destination: str | Path) ->
         (
             "models/assertions.yml",
             render_assertions_yml(
-                collect_assertions(validated),
-                raw_tables=[str(t.name) for t in scenario.raw_tables],
-                staging=[str(m.name) for m in scenario.staging_models],
+                collected,
+                raw_tables=raw_names,
+                staging=staging_names,
                 intermediates=ordered_intermediates,
-                outputs=[str(m.name) for m in scenario.output_models],
+                outputs=output_names,
             ),
         )
     )
