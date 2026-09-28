@@ -34,6 +34,7 @@ EXPECTED_FILES = (
     "models/intermediate/j_full.sql",
     "models/output/o_area_by_variety.sql",
     "models/assertions.yml",
+    "macros/generated_assertions.sql",
 )
 
 

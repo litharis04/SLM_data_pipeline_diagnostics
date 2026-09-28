@@ -1,0 +1,169 @@
+"""G16 tests: healthy-assertion lowering (§15).
+
+Text assertions pin the §15.2 lowering table on the real
+``education_cohorts_001`` project (explicit ``accepted_values`` plus derived
+single/composite, relationship and row-count assertions); crafted
+``LogicalAssertion`` inputs pin range bounds, physical naming and
+dedup-by-identity. Runtime behavior runs in G17, not here.
+"""
+
+from __future__ import annotations
+
+import json
+from pathlib import Path
+
+import yaml
+from jinja2 import Environment
+
+from data_pipeline_diagnostics.generator.dbt_render import (
+    LogicalAssertion,
+    _deduplicate,
+    collect_assertions,
+    render_assertion_macros,
+    render_assertions_yml,
+)
+from data_pipeline_diagnostics.generator.physical import yaml_string
+from data_pipeline_diagnostics.scenario.parsing import parse_scenario_json
+from data_pipeline_diagnostics.scenario.semantic import validate_semantics
+
+REPO = Path(__file__).resolve().parents[2]
+
+
+def _validated(name: str):
+    data = json.loads((REPO / "scenarios" / name).read_text())
+    return validate_semantics(parse_scenario_json(json.dumps(data)))
+
+
+def _project_yml(name: str = "education_cohorts_001.json") -> str:
+    validated = _validated(name)
+    return render_assertions_yml(
+        collect_assertions(validated),
+        raw_tables=[str(t.name) for t in validated.scenario.raw_tables],
+        staging=[str(m.name) for m in validated.scenario.staging_models],
+        intermediates=[str(n) for n in validated.topological_order],
+        outputs=[str(m.name) for m in validated.scenario.output_models],
+    )
+
+
+def test_selection_builtin_vs_custom():
+    text = _project_yml()
+    assert "- not_null:" in text
+    assert "- unique:" in text
+    assert "composite_unique:" in text
+    assert "composite_relationships:" in text
+    assert "row_count_between:" in text
+    assert "- accepted_values:" in text
+
+
+def test_explicit_accepted_values_on_model():
+    parsed = yaml.safe_load(_project_yml())
+    models = {m["name"]: m for m in parsed["models"]}
+    tests = models["stg_enrollments"]["tests"]
+    accepted = [t["accepted_values"] for t in tests if "accepted_values" in t]
+    assert len(accepted) == 1
+    assert accepted[0]["column_name"] == "status"
+    assert accepted[0]["values"] == ["active", "dropped"]
+
+
+def test_range_inclusive_exclusive_and_one_sided():
+    inclusive = LogicalAssertion(
+        name="r_inc",
+        origin="explicit",
+        type="column_range",
+        model="stg_x",
+        column="c",
+        min=1,
+        max=10,
+        inclusive=True,
+    )
+    exclusive = LogicalAssertion(
+        name="r_exc",
+        origin="explicit",
+        type="column_range",
+        model="stg_x",
+        column="c",
+        max=10,
+        inclusive=False,
+    )
+    text = render_assertions_yml(
+        [inclusive, exclusive], raw_tables=[], staging=["stg_x"], intermediates=[], outputs=[]
+    )
+    assert "min_value: 1" in text
+    assert "inclusive: true" in text
+    assert "inclusive: false" in text
+    max_only = [line for line in text.splitlines() if "max_value" in line]
+    assert len(max_only) == 2
+    exc_block = next(b for b in text.split("# explicit: ") if b.startswith("r_exc"))
+    assert "min_value" not in exc_block
+    assert "max_value: 10" in exc_block
+
+
+def test_row_count_one_sided():
+    assertion = LogicalAssertion(name="rc", origin="derived", type="row_count", model="o_y", min=1)
+    text = render_assertions_yml(
+        [assertion], raw_tables=[], staging=[], intermediates=[], outputs=["o_y"]
+    )
+    assert "min_value: 1" in text
+    assert "max_value" not in text
+
+
+def test_dedup_keeps_first_with_origin():
+    explicit = LogicalAssertion(
+        name="author_check", origin="explicit", type="unique", model="m", columns=("c",)
+    )
+    derived = LogicalAssertion(
+        name="derived_unique_m", origin="derived", type="unique", model="m", columns=("c",)
+    )
+    assert _deduplicate([explicit, derived]) == [explicit]
+    wider = LogicalAssertion(
+        name="derived_unique_m2",
+        origin="derived",
+        type="unique",
+        model="m",
+        columns=("c", "d"),
+    )
+    assert _deduplicate([explicit, derived, wider]) == [explicit, wider]
+
+
+def test_severity_error_everywhere_and_no_utils():
+    text = _project_yml()
+    assert "dbt_utils" not in render_assertion_macros()
+    assert "warn" not in text.lower()
+    parsed = yaml.safe_load(text)
+    nodes = [
+        test
+        for section in ("sources", "models")
+        for holder in parsed.get(section, [])
+        for table in (holder.get("tables", [holder]))
+        for test in table.get("tests", [])
+    ]
+    assert nodes
+    assert all(next(iter(test.values())).get("severity") == "error" for test in nodes)
+
+
+def test_physical_names_deterministic_and_bounded():
+    first = _project_yml()
+    assert _project_yml() == first
+    long_name = LogicalAssertion(
+        name="x" * 100, origin="explicit", type="not_null", model="m", columns=("c",)
+    )
+    text = render_assertions_yml(
+        [long_name], raw_tables=[], staging=["m"], intermediates=[], outputs=[]
+    )
+    physical = [line for line in text.splitlines() if "name: not_null" in line][0]
+    assert len(physical.split("name: ")[1]) <= 64
+
+
+def test_yaml_string_jinja_round_trip():
+    for payload in ("{{ 7*7 }}", "a{b}c", "O'Brien"):
+        loaded = yaml.safe_load(yaml_string(payload))
+        assert Environment().from_string(loaded).render() == payload
+
+
+def test_macro_semantics_text():
+    macros = render_assertion_macros()
+    assert "IS NOT NULL" in macros
+    assert "count(*) > 1" in macros
+    assert "'<' if inclusive else '<='" in macros
+    assert "min_value is not none" in macros
+    assert "max_value is not none" in macros

@@ -18,6 +18,7 @@ discriminator fields — an unknown variant raises (never passthrough/omit).
 
 from __future__ import annotations
 
+import hashlib
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,8 @@ from data_pipeline_diagnostics.generator.physical import (
     RAW_SOURCE_NAME,
     quote_ident,
     write_text_file,
+    yaml_scalar,
+    yaml_string,
 )
 from data_pipeline_diagnostics.generator.sql_render import (
     HELPER_ROW_NUMBER,
@@ -38,6 +41,7 @@ from data_pipeline_diagnostics.generator.sql_render import (
     render_condition,
     render_expression,
     render_staging_column,
+    typed_scalar_literal,
 )
 from data_pipeline_diagnostics.scenario.expressions import Expression
 from data_pipeline_diagnostics.scenario.intermediate import IntermediateModel
@@ -45,10 +49,14 @@ from data_pipeline_diagnostics.scenario.semantic import ValidatedScenario
 from data_pipeline_diagnostics.scenario.staging import StagingModel
 
 __all__ = [
+    "LogicalAssertion",
     "RenderedDbtProject",
+    "collect_assertions",
     "model_dependencies",
     "model_output_columns",
     "render_aggregate_sql",
+    "render_assertion_macros",
+    "render_assertions_yml",
     "render_dbt_project",
     "render_deduplicate_sql",
     "render_intermediate_sql",
@@ -143,10 +151,6 @@ def _sources_yml(raw_tables: tuple[str, ...]) -> str:
         lines.append(f"      - name: {table}")
         lines.append(f"        identifier: {table}")
     return "\n".join(lines) + "\n"
-
-
-def _assertions_placeholder() -> str:
-    return "version: 2\n\nmodels: []\n"
 
 
 def render_staging_sql(model: StagingModel, source_columns: Sequence[str]) -> str:
@@ -581,6 +585,316 @@ def model_output_columns(
         raise ValueError(f"model {name!r}: unknown model variant")
     return memo[name]
 
+    return memo[name]
+
+
+# ---------------------------------------------------------------------------
+# Healthy-assertion lowering (§15)
+# ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True)
+class LogicalAssertion:
+    """One assertion with traceable origin (explicit author vs derived)."""
+
+    name: str
+    origin: str  # "explicit" | "derived"
+    type: str
+    model: str
+    columns: tuple[str, ...] = ()
+    column: str | None = None
+    values: tuple[object, ...] = ()
+    to_model: str | None = None
+    to_columns: tuple[str, ...] = ()
+    min: object = None
+    max: object = None
+    inclusive: bool = True
+
+    def identity(self) -> tuple:
+        """Effective semantic identity for deduplication (bounds/values/order
+        significant; origin and logical name are not)."""
+        if self.type in ("not_null", "unique"):
+            return (self.model, self.type, self.columns)
+        if self.type == "accepted_values":
+            return (self.model, self.type, self.column, self.values)
+        if self.type == "relationships":
+            return (self.model, self.type, self.columns, self.to_model, self.to_columns)
+        if self.type == "row_count":
+            return (self.model, self.type, self.min, self.max)
+        if self.type == "column_range":
+            return (self.model, self.type, self.column, self.min, self.max, self.inclusive)
+        raise ValueError(f"unknown assertion type: {self.type!r}")
+
+
+def _logical_from_explicit(assertion: object) -> LogicalAssertion:
+    return LogicalAssertion(
+        name=str(assertion.name),
+        origin="explicit",
+        type=str(assertion.type),
+        model=str(assertion.model),
+        columns=tuple(str(c) for c in getattr(assertion, "columns", ())),
+        column=_optional_str(getattr(assertion, "column", None)),
+        values=tuple(getattr(assertion, "values", ())),
+        to_model=_optional_str(getattr(assertion, "to_model", None)),
+        to_columns=tuple(str(c) for c in getattr(assertion, "to_columns", ())),
+        min=getattr(assertion, "min", None),
+        max=getattr(assertion, "max", None),
+        inclusive=bool(getattr(assertion, "inclusive", True)),
+    )
+
+
+def _logical_from_derived(record: Mapping[str, object]) -> LogicalAssertion:
+    columns = record.get("columns", ())
+    to_columns = record.get("to_columns", ())
+    return LogicalAssertion(
+        name=str(record["name"]),
+        origin="derived",
+        type=str(record["type"]),
+        model=str(record["model"]),
+        columns=tuple(str(c) for c in columns),
+        column=None,
+        values=(),
+        to_model=_optional_str(record.get("to_model")),
+        to_columns=tuple(str(c) for c in to_columns),
+        min=record.get("min"),
+        max=record.get("max"),
+        inclusive=True,
+    )
+
+
+def _optional_str(value: object) -> str | None:
+    return None if value is None else str(value)
+
+
+def _deduplicate(logicals: Sequence[LogicalAssertion]) -> list[LogicalAssertion]:
+    """First occurrence wins per semantic identity (explicit lists precede
+    derived facts at the call site); origin stays traceable on survivors."""
+    collected: list[LogicalAssertion] = []
+    seen: set[tuple] = set()
+    for logical in logicals:
+        key = logical.identity()
+        if key in seen:
+            continue
+        seen.add(key)
+        collected.append(logical)
+    return collected
+
+
+def collect_assertions(validated: ValidatedScenario) -> list[LogicalAssertion]:
+    """Explicit + derived assertions deduplicated by semantic identity."""
+    scenario = _require_validated(validated).scenario
+    explicit = [_logical_from_explicit(a) for a in scenario.tests]
+    derived = [_logical_from_derived(record) for record in validated.derived_assertions]
+    return _deduplicate([*explicit, *derived])
+
+
+def _physical_name(assertion_type: str, logical: str, *roles: str) -> str:
+    """Deterministic physical test name from logical name + component roles
+    (stable hash suffix when long — no naming policy)."""
+    base = "__".join((assertion_type, logical, *roles)) if roles else f"{assertion_type}__{logical}"
+    if len(base) <= 64:
+        return base
+    digest = hashlib.sha256(base.encode("utf-8")).hexdigest()[:12]
+    return base[: 64 - 13] + "_" + digest
+
+
+def _target_ref(model: str, raw_tables: set[str]) -> str:
+    if model in raw_tables:
+        return f"source('{RAW_SOURCE_NAME}', '{model}')"
+    return f"ref('{model}')"
+
+
+def _yaml_ident_list(columns: Sequence[str]) -> str:
+    """Flow list of double-quoted quoted-identifiers: ['"a"', '"b"']."""
+    return "[" + ", ".join(f"'{quote_ident(str(col))}'" for col in columns) + "]"
+
+
+def _emit_test(lines: list[str], test: str, args: list[str], physical: str) -> None:
+    lines.append(f"          - {test}:")
+    for arg in args:
+        lines.append(f"              {arg}")
+    lines.append(f"              name: {physical}")
+    lines.append("              severity: error")
+
+
+def render_assertions_yml(
+    assertions: Sequence[LogicalAssertion],
+    *,
+    raw_tables: Sequence[str],
+    staging: Sequence[str],
+    intermediates: Sequence[str],
+    outputs: Sequence[str],
+) -> str:
+    """Lower assertions to dbt generic tests (§15.2 table).
+
+    Raw-table assertions attach to ``source()``; generated models attach to
+    their ``ref()``. One-column ``not_null``/``unique``/``relationships``
+    use dbt built-ins; composite/``row_count``/``column_range`` use the
+    vendored macros. Every node carries an explicit error severity and a
+    deterministic physical name; origin comments keep traceability.
+    """
+    raw_set = set(raw_tables)
+    known = raw_set | set(staging) | set(intermediates) | set(outputs)
+    by_target: dict[tuple[str, str], list[LogicalAssertion]] = {}
+    for assertion in assertions:
+        if assertion.model not in known:
+            raise ValueError(f"assertion {assertion.name!r}: unknown model {assertion.model!r}")
+        section = "source" if assertion.model in raw_set else "model"
+        by_target.setdefault((section, assertion.model), []).append(assertion)
+
+    lines = ["version: 2", ""]
+    source_tables = [t for t in raw_tables if ("source", t) in by_target]
+    if source_tables:
+        lines.append("sources:")
+        lines.append(f"  - name: {RAW_SOURCE_NAME}")
+        lines.append("    tables:")
+        for table in source_tables:
+            lines.append(f"      - name: {table}")
+            lines.append("        tests:")
+            for assertion in by_target[("source", table)]:
+                _emit_assertion(lines, assertion, raw_set)
+    ordered_models = [m for m in (*staging, *intermediates, *outputs) if ("model", m) in by_target]
+    if ordered_models:
+        lines.append("models:")
+        for model in ordered_models:
+            lines.append(f"  - name: {model}")
+            lines.append("    tests:")
+            for assertion in by_target[("model", model)]:
+                _emit_assertion(lines, assertion, raw_set)
+    return "\n".join(lines) + "\n"
+
+
+def _emit_assertion(lines: list[str], assertion: LogicalAssertion, raw_tables: set[str]) -> None:
+    lines.append(f"          # {assertion.origin}: {assertion.name}")
+    match assertion.type:
+        case "not_null":
+            for column in assertion.columns:
+                _emit_test(
+                    lines,
+                    "not_null",
+                    [f"column_name: {column}"],
+                    _physical_name("not_null", assertion.name, column),
+                )
+        case "unique":
+            if len(assertion.columns) == 1:
+                (column,) = assertion.columns
+                _emit_test(
+                    lines,
+                    "unique",
+                    [f"column_name: {column}"],
+                    _physical_name("unique", assertion.name),
+                )
+            else:
+                _emit_test(
+                    lines,
+                    "composite_unique",
+                    [f"column_names: {_yaml_ident_list(assertion.columns)}"],
+                    _physical_name("composite_unique", assertion.name),
+                )
+        case "accepted_values":
+            values = ", ".join(yaml_scalar(v) for v in assertion.values)
+            _emit_test(
+                lines,
+                "accepted_values",
+                [f"column_name: {assertion.column}", f"values: [{values}]"],
+                _physical_name("accepted_values", assertion.name),
+            )
+        case "relationships":
+            to = _target_ref(str(assertion.to_model), raw_tables)
+            if len(assertion.columns) == 1:
+                (column,) = assertion.columns
+                (to_column,) = assertion.to_columns
+                _emit_test(
+                    lines,
+                    "relationships",
+                    [f"column_name: {column}", f"to: {to}", f"field: {to_column}"],
+                    _physical_name("relationships", assertion.name),
+                )
+            else:
+                child = [quote_ident(c) for c in assertion.columns]
+                parent = [quote_ident(c) for c in assertion.to_columns]
+                join_on = " AND ".join(f"child.{c} = parent.{p}" for c, p in zip(child, parent))
+                orphans = (
+                    f"parent.{parent[0]} IS NULL AND NOT ("
+                    + " AND ".join(f"child.{c} IS NULL" for c in child)
+                    + ")"
+                )
+                _emit_test(
+                    lines,
+                    "composite_relationships",
+                    [
+                        f"column_names: {_yaml_ident_list(assertion.columns)}",
+                        f"to: {to}",
+                        f"to_columns: {_yaml_ident_list(assertion.to_columns)}",
+                        f"join_on: {yaml_string(join_on)}",
+                        f"orphan_filter: {yaml_string(orphans)}",
+                    ],
+                    _physical_name("composite_relationships", assertion.name),
+                )
+        case "row_count":
+            args = []
+            if assertion.min is not None:
+                args.append(f"min_value: {assertion.min}")
+            if assertion.max is not None:
+                args.append(f"max_value: {assertion.max}")
+            _emit_test(
+                lines,
+                "row_count_between",
+                args,
+                _physical_name("row_count_between", assertion.name),
+            )
+        case "column_range":
+            args = [f"column_name: {assertion.column}"]
+            if assertion.min is not None:
+                args.append(f"min_value: {typed_scalar_literal(assertion.min)}")
+            if assertion.max is not None:
+                args.append(f"max_value: {typed_scalar_literal(assertion.max)}")
+            args.append(f"inclusive: {'true' if assertion.inclusive else 'false'}")
+            _emit_test(
+                lines,
+                "column_range",
+                args,
+                _physical_name("column_range", assertion.name),
+            )
+        case _:
+            raise ValueError(f"assertion {assertion.name!r}: unknown type {assertion.type!r}")
+
+
+def render_assertion_macros() -> str:
+    """Vendored generic tests (no dbt-utils): exact §15.3 semantics."""
+    return """{% test composite_unique(model, column_names) %}
+select {{ column_names | join(', ') }} from {{ model }}
+where {{ column_names | join(' IS NOT NULL AND ') }} IS NOT NULL
+group by {{ column_names | join(', ') }} having count(*) > 1
+{% endtest %}
+
+{% test composite_relationships(model, column_names, to, to_columns, join_on, orphan_filter) %}
+select {{ column_names | join(', ') }} from {{ model }} as child
+left join (select distinct {{ to_columns | join(', ') }} from {{ to }}) as parent
+  on {{ join_on }}
+where {{ orphan_filter }}
+{% endtest %}
+
+{% test row_count_between(model, min_value=none, max_value=none) %}
+with __counts as (select count(*) as n from {{ model }})
+select n from __counts
+where 1 = 0
+{% if min_value is not none %} or n < {{ min_value }}{% endif %}
+{% if max_value is not none %} or n > {{ max_value }}{% endif %}
+{% endtest %}
+
+{% test column_range(model, column_name, min_value=none, max_value=none, inclusive=true) %}
+select {{ column_name }} from {{ model }}
+where {{ column_name }} is not null
+{% if min_value is not none %}
+  and {{ column_name }} {{ '<' if inclusive else '<=' }} {{ min_value }}
+{% endif %}
+{% if max_value is not none %}
+  and {{ column_name }} {{ '>' if inclusive else '>=' }} {{ max_value }}
+{% endif %}
+{% endtest %}
+"""
+
 
 def render_dbt_project(validated: ValidatedScenario, destination: str | Path) -> RenderedDbtProject:
     """Render the fixed dbt project shell under ``destination`` (the ``dbt/`` dir)."""
@@ -630,7 +944,19 @@ def render_dbt_project(validated: ValidatedScenario, destination: str | Path) ->
         payloads.append(
             (f"models/output/{model.name}.sql", render_output_sql(model, memo[upstream]))
         )
-    payloads.append(("models/assertions.yml", _assertions_placeholder()))
+    payloads.append(
+        (
+            "models/assertions.yml",
+            render_assertions_yml(
+                collect_assertions(validated),
+                raw_tables=[str(t.name) for t in scenario.raw_tables],
+                staging=[str(m.name) for m in scenario.staging_models],
+                intermediates=ordered_intermediates,
+                outputs=[str(m.name) for m in scenario.output_models],
+            ),
+        )
+    )
+    payloads.append(("macros/generated_assertions.sql", render_assertion_macros()))
 
     (project_dir / "macros").mkdir(parents=True, exist_ok=True)
     written: list[str] = []

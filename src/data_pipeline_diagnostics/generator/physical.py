@@ -65,6 +65,8 @@ __all__ = [
     "sql_literal",
     "write_raw_parquet",
     "write_text_file",
+    "yaml_scalar",
+    "yaml_string",
 ]
 
 DUCKDB_TYPE: dict[DataType, str] = {
@@ -177,6 +179,35 @@ def write_text_file(path: str | Path, text: str) -> Path:
         text.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n") + "\n", encoding="utf-8"
     )
     return target
+
+
+def yaml_string(value: str) -> str:
+    """Single-quoted YAML string safe under dbt's Jinja rendering.
+
+    SQL ``||``-chunking is meaningless in YAML, so brace content uses Jinja
+    echo instead: ``{`` becomes ``{{ '{' }}``. After dbt parsing the value is
+    exactly the scenario string (single-brace text never triggers Jinja).
+    The substitution runs in a single pass so echo syntax is never re-escaped.
+    """
+    if type(value) is not str:
+        raise TypeError(f"YAML string needs str, got {type(value).__name__}")
+    echoed = re.sub(
+        r"[{}]", lambda match: "{{ '{' }}" if match.group() == "{" else "{{ '}' }}", value
+    )
+    return "'" + echoed.replace("'", "''") + "'"
+
+
+def yaml_scalar(value: object) -> str:
+    """YAML rendering for a ``ScalarValue`` (bools lowercase, floats round-trip)."""
+    if type(value) is bool:
+        return "true" if value else "false"
+    if type(value) is int:
+        return str(value)
+    if type(value) is float:
+        return repr(value)
+    if type(value) is str:
+        return yaml_string(value)
+    raise TypeError(f"unsupported YAML scalar: {value!r}")
 
 
 @dataclass(frozen=True)
