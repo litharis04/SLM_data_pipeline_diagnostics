@@ -1,11 +1,13 @@
-"""Scalar mini-generator execution, parts 1–2 (GENERATOR_SPEC §§10.1–10.6).
+"""Scalar mini-generator execution, parts 1–2 + Faker (GENERATOR_SPEC §10).
 
 Pure proposal functions. Each takes ``(generator_config, rng, row_index)``;
-only the passed stream is consumed (``formatted_id`` consumes none).
+only the passed stream is consumed (``formatted_id``/``template_string``
+consume none).
 ``categorical`` additionally accepts ``unique``/``already_drawn`` for
 without-replacement selection (exhaustion raises :class:`ExhaustedDomain`
 for the G06 caller to decide retry vs failure); ``template_string``
-additionally takes the row's placeholder values as a dict. Null insertion
+additionally takes the row's placeholder values as a dict. The six Faker
+leaf kinds delegate to :mod:`faker_values` (``de_DE`` only). Null insertion
 and hard constraints are applied later (G06); this module produces non-null
 proposals only (a template resolving to null is the caller's null signal).
 """
@@ -18,6 +20,7 @@ from collections.abc import Iterable, Mapping
 from datetime import UTC, date, datetime, timedelta
 from decimal import ROUND_CEILING, ROUND_FLOOR, Decimal
 
+from data_pipeline_diagnostics.generator.faker_values import generate_faker
 from data_pipeline_diagnostics.scenario.generators import (
     BooleanGenerator,
     CategoricalGenerator,
@@ -158,6 +161,8 @@ def generate_scalar(
             if placeholders is None:
                 raise ValueError("template_string requires a placeholders mapping")
             return generate_template(config, rng, row_index, placeholders)
+        case "person_name" | "email" | "city" | "street_address" | "company_name" | "phone_number":
+            return generate_faker(config, rng, row_index)
         case _:
             raise ValueError(f"unknown scalar generator kind: {config.kind!r}")
 
