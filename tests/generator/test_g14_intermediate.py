@@ -177,9 +177,7 @@ def test_no_wildcard_natural_or_cross():
         assert "CROSS" not in sql
 
 
-def test_aggregate_and_unknown_dispatch():
-    with pytest.raises(ValueError, match="G15"):
-        render_intermediate_sql(SimpleNamespace(operation="aggregate", name="a"), {})
+def test_unknown_operation_dispatch():
     with pytest.raises(ValueError):
         render_intermediate_sql(SimpleNamespace(operation="bogus", name="b"), {})
 

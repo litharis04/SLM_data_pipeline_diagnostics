@@ -3,10 +3,10 @@ models (GENERATOR_SPEC §§6, 13–14).
 
 Renders ``dbt_project.yml``, ``profiles.yml``, ``models/sources.yml``,
 per-model ``.sql`` files, an ``assertions.yml`` placeholder and the
-``macros/`` directory. Staging models render fully (§§14.1–14.3) and so do
-transform/join/deduplicate intermediates (§§14.6–14.7, 14.9); aggregate
-intermediates and outputs arrive in G15 and healthy tests in G16 (their
-stubs carry the correct ``ref(`` skeleton so the shell stays parse-able).
+``macros/`` directory. Staging models render fully (§§14.1–14.3),
+transform/join/deduplicate intermediates render fully (§§14.6–14.7, 14.9),
+and aggregate intermediates and outputs render fully (§14.8); healthy tests
+arrive in G16.
 
 Conventions: fixed names from :mod:`physical`; every model materialized
 ``table`` in schema ``main`` with quoted identifiers; staging uses
@@ -48,10 +48,13 @@ __all__ = [
     "RenderedDbtProject",
     "model_dependencies",
     "model_output_columns",
+    "render_aggregate_sql",
     "render_dbt_project",
     "render_deduplicate_sql",
     "render_intermediate_sql",
     "render_join_sql",
+    "render_metric",
+    "render_output_sql",
     "render_staging_sql",
     "render_transform_sql",
 ]
@@ -144,16 +147,6 @@ def _sources_yml(raw_tables: tuple[str, ...]) -> str:
 
 def _assertions_placeholder() -> str:
     return "version: 2\n\nmodels: []\n"
-
-
-def _downstream_stub(model_name: str, upstream: str) -> str:
-    return (
-        "{{ config(materialization='table') }}\n"
-        "\n"
-        f"-- STUB (G14-G15 render model {model_name})\n"
-        "SELECT *\n"
-        f"FROM {{{{ ref('{upstream}') }}}}\n"
-    )
 
 
 def render_staging_sql(model: StagingModel, source_columns: Sequence[str]) -> str:
@@ -423,7 +416,7 @@ def render_deduplicate_sql(model: object, source_columns: Sequence[str]) -> str:
 def render_intermediate_sql(
     model: IntermediateModel, output_columns: Mapping[str, Sequence[str]]
 ) -> str:
-    """Dispatch one intermediate model (exhaustive; aggregates land in G15).
+    """Dispatch one intermediate model (exhaustive over ``operation``).
 
     ``output_columns`` maps every upstream model name to its output columns
     in order, so source CTEs stay wildcard-free.
@@ -440,9 +433,129 @@ def render_intermediate_sql(
         case "deduplicate":
             return render_deduplicate_sql(model, output_columns[str(model.source)])
         case "aggregate":
-            raise ValueError(f"model {model.name!r}: aggregate models render in G15")
+            return render_aggregate_sql(model, output_columns[str(model.source)])
         case _:
             raise ValueError(f"model {model.name!r}: unknown operation {model.operation!r}")
+
+
+def render_metric(metric: object) -> str:
+    """One metric expression with its alias, exactly per the §14.8 table."""
+    name = quote_ident(str(metric.name))
+    match metric.function:
+        case "count_rows":
+            return f"COUNT(*) AS {name}"
+        case "count":
+            return f"COUNT({quote_ident(str(metric.column))}) AS {name}"
+        case "count_distinct":
+            return f"COUNT(DISTINCT {quote_ident(str(metric.column))}) AS {name}"
+        case "sum":
+            return f"CAST(SUM({quote_ident(str(metric.column))}) AS DOUBLE) AS {name}"
+        case "avg":
+            return f"CAST(AVG({quote_ident(str(metric.column))}) AS DOUBLE) AS {name}"
+        case "min":
+            return f"MIN({quote_ident(str(metric.column))}) AS {name}"
+        case "max":
+            return f"MAX({quote_ident(str(metric.column))}) AS {name}"
+        case "conditional_count":
+            return f"COUNT(*) FILTER (WHERE {render_condition(metric.condition)}) AS {name}"
+        case "conditional_sum":
+            return (
+                f"CAST(SUM({quote_ident(str(metric.column))}) "
+                f"FILTER (WHERE {render_condition(metric.condition)}) AS DOUBLE) AS {name}"
+            )
+        case _:
+            raise ValueError(f"metric {metric.name!r}: unknown function {metric.function!r}")
+
+
+def _check_grouped_namespace(
+    model_name: str, group_by: object, metrics: object, filters: object, source_columns: object
+) -> None:
+    """Defensive check: group sources, metric columns and every condition
+    reference source columns only (the semantic layer owns this invariant)."""
+    available = {str(col) for col in source_columns}
+    refs: set[str] = set()
+    for entry in group_by:
+        refs.add(str(entry.source))
+    for metric in metrics:
+        if getattr(metric, "column", None) is not None:
+            refs.add(str(metric.column))
+        if getattr(metric, "condition", None) is not None:
+            _condition_columns(metric.condition, into=refs)
+    for condition in filters:
+        _condition_columns(condition, into=refs)
+    unknown = refs - available
+    if unknown:
+        raise ValueError(f"model {model_name!r}: references unknown {sorted(unknown)}")
+
+
+def _render_grouped(
+    *,
+    model_name: str,
+    source_ref: str,
+    source_columns: Sequence[str],
+    group_by: object,
+    metrics: object,
+    filters: object,
+) -> str:
+    """Shared aggregate/output shape: filters pre-aggregation (conjunction,
+    TRUE-only), then grouping by every declared source with target aliases
+    and metrics in declaration order. ``grain``/``dimensions`` are metadata
+    only and never change this SQL."""
+    _check_grouped_namespace(model_name, group_by, metrics, filters, source_columns)
+    group_selects = [
+        f"{quote_ident(str(entry.source))} AS {quote_ident(str(entry.target))}"
+        for entry in group_by
+    ]
+    group_keys = ", ".join(quote_ident(str(entry.source)) for entry in group_by)
+    metric_selects = [render_metric(metric) for metric in metrics]
+    select_list = ",\n".join(f"        {item}" for item in (*group_selects, *metric_selects))
+    passthrough = ", ".join(quote_ident(str(col)) for col in source_columns)
+    phases = [
+        f"{quote_ident('source')} AS (\n"
+        f"    SELECT {passthrough} FROM {{{{ ref('{source_ref}') }}}}"
+        f"\n)"
+    ]
+    previous = "source"
+    if filters:
+        where = " AND ".join(render_condition(c) for c in filters)
+        phases.append(
+            f"{quote_ident('filtered')} AS (\n"
+            f"    SELECT {passthrough} FROM {quote_ident('source')}\n"
+            f"    WHERE {where}\n)"
+        )
+        previous = "filtered"
+    return (
+        "{{ config(materialization='table') }}\n"
+        "\n"
+        "WITH " + ",\n".join(phases) + "\n"
+        f"SELECT\n{select_list}\n"
+        f"    FROM {quote_ident(previous)}\n"
+        f"    GROUP BY {group_keys}\n"
+    )
+
+
+def render_aggregate_sql(model: object, source_columns: Sequence[str]) -> str:
+    """Aggregate intermediate: filters pre-aggregation, then grouping."""
+    return _render_grouped(
+        model_name=str(model.name),
+        source_ref=str(model.source),
+        source_columns=source_columns,
+        group_by=model.group_by,
+        metrics=model.metrics,
+        filters=model.filters,
+    )
+
+
+def render_output_sql(model: object, source_columns: Sequence[str]) -> str:
+    """Output model: same grouped shape over exactly one intermediate source."""
+    return _render_grouped(
+        model_name=str(model.name),
+        source_ref=str(model.source),
+        source_columns=source_columns,
+        group_by=model.group_by,
+        metrics=model.metrics,
+        filters=model.filters,
+    )
 
 
 def model_output_columns(
@@ -512,8 +625,10 @@ def render_dbt_project(validated: ValidatedScenario, destination: str | Path) ->
         payloads.append((f"models/intermediate/{name}.sql", render_intermediate_sql(model, memo)))
     for model in scenario.output_models:
         upstream = model_dependencies(model)[0]
+        if upstream in by_name:
+            model_output_columns(by_name[upstream], by_name, memo)
         payloads.append(
-            (f"models/output/{model.name}.sql", _downstream_stub(str(model.name), upstream))
+            (f"models/output/{model.name}.sql", render_output_sql(model, memo[upstream]))
         )
     payloads.append(("models/assertions.yml", _assertions_placeholder()))
 
