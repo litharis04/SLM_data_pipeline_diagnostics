@@ -163,15 +163,17 @@ def _validate_build(
         unique_id = str(result.get("unique_id", ""))
         status = str(result.get("status", ""))
         ok = status in _OK_STATUSES
+        # Skipped nodes are cascade collateral, never the root cause.
+        hard_fail = status in ("fail", "error")
         if unique_id.startswith("test."):
             tests_total += 1
             tests_ok += ok
-            failed_test = failed_test or not ok
+            failed_test = failed_test or hard_fail
         elif unique_id.startswith("model."):
             models_total += 1
             models_ok += ok
             model_ids.add(unique_id)
-            failed_model = failed_model or not ok
+            failed_model = failed_model or hard_fail
     manifest_models = {
         unique_id
         for unique_id, node in dict(manifest.get("nodes", {})).items()

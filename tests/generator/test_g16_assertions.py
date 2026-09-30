@@ -177,3 +177,85 @@ def test_macro_semantics_text():
     assert "'<' if inclusive else '<='" in macros
     assert "min_value is not none" in macros
     assert "max_value is not none" in macros
+
+
+def _render_macro_body(name: str, **kwargs: object) -> str:
+    """Render one vendored {% test %} block as plain Jinja (dbt's test tags
+    stripped) so its SQL executes directly in DuckDB."""
+    source = render_assertion_macros()
+    start = source.index(f"{{% test {name}(")
+    end = source.index("{% endtest %}", start)
+    body = "\n".join(
+        line
+        for line in source[start:end].splitlines()
+        if not line.strip().startswith("{% test ") and line.strip() != "{% endtest %}"
+    )
+    # Mirror dbt's macro-signature defaults (plain Jinja has none).
+    defaults = {"min_value": None, "max_value": None, "inclusive": True}
+    return Environment().from_string(body).render(**{**defaults, **kwargs})
+
+
+def _macro_db():
+    import duckdb
+
+    db = duckdb.connect()
+    db.execute("SET TimeZone = 'UTC'")
+    db.execute("CREATE TABLE child (a VARCHAR, b INTEGER, v DOUBLE)")
+    db.execute("CREATE TABLE parent (x VARCHAR, y INTEGER)")
+    return db
+
+
+def test_macro_execution_both_directions():
+    db = _macro_db()
+    try:
+        db.execute("INSERT INTO child VALUES ('k', 1, 1.5), ('k', 2, 2.5)")
+        db.execute("INSERT INTO parent VALUES ('k', 1), ('k', 2)")
+        unique_sql = _render_macro_body(
+            "composite_unique", model='"child"', column_names=['"a"', '"b"']
+        )
+        assert db.execute(unique_sql).fetchall() == []
+        db.execute("INSERT INTO child VALUES ('k', 1, 9.9)")
+        assert len(db.execute(unique_sql).fetchall()) == 1
+        db.execute("DELETE FROM child WHERE v = 9.9")
+
+        rel_sql = _render_macro_body(
+            "composite_relationships",
+            model='"child"',
+            column_names=['"a"', '"b"'],
+            to='"parent"',
+            to_columns=['"x"', '"y"'],
+            join_on='child."a" = parent."x" AND child."b" = parent."y"',
+            orphan_filter='parent."x" IS NULL AND NOT (child."a" IS NULL AND child."b" IS NULL)',
+        )
+        assert db.execute(rel_sql).fetchall() == []
+        db.execute("INSERT INTO child VALUES ('orphan', 99, 0.0)")
+        orphans = db.execute(rel_sql).fetchall()
+        assert orphans == [("orphan", 99)]
+        db.execute("INSERT INTO child VALUES (NULL, NULL, 0.0)")
+        assert db.execute(rel_sql).fetchall() == [("orphan", 99)]
+
+        count_sql = _render_macro_body("row_count_between", model='"child"', min_value=2)
+        assert db.execute(count_sql).fetchall() == []
+        over = _render_macro_body("row_count_between", model='"child"', min_value=2, max_value=3)
+        assert db.execute(over).fetchall() != []
+
+        range_sql = _render_macro_body(
+            "column_range",
+            model='"child"',
+            column_name='"b"',
+            min_value=1,
+            max_value=2,
+            inclusive=True,
+        )
+        assert db.execute(range_sql).fetchall() == [(99,)]
+        exclusive = _render_macro_body(
+            "column_range",
+            model='"child"',
+            column_name='"b"',
+            min_value=1,
+            max_value=2,
+            inclusive=False,
+        )
+        assert len(db.execute(exclusive).fetchall()) == 3
+    finally:
+        db.close()

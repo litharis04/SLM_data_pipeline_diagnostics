@@ -7,26 +7,29 @@ with ordered target bindings, hard constraints and stream names from a
 metadata.
 
 Execution (:func:`execute_raw_plan`) wires the G03–G07 executors under the
-plan with no new value semantics: row counts (G07 conditioning), leaf
-columns (G06 nulls + uniqueness), templates in placeholder order (G04
-render), FK groups from caller-built target universes (G07 sampling), and a
-final primary-key verification. Table-level retry on PK collision is
-deliberately absent: a violation raises ``GenerationFailure`` (never an
-invalid row); retry budgets belong to the named-stream mechanisms.
+plan: row counts (G07 conditioning), leaf columns (G06 nulls + uniqueness),
+templates in placeholder order (G04 render), FK groups from caller-built
+target universes (G07 sampling), composite PKs via joint tuple sampling
+below, and a final primary-key verification. Residual exhaustion raises
+``GenerationFailure`` (never an invalid row); retry budgets belong to the
+named-stream mechanisms.
 """
 
 from __future__ import annotations
 
+import itertools
+import math
 import re
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 
 from data_pipeline_diagnostics.generator.raw_constraints import (
+    RETRY_LIMIT,
     GenerationFailure,
     generate_composite_null_mask,
     generate_scalar_column,
 )
-from data_pipeline_diagnostics.generator.raw_values import generate_template
+from data_pipeline_diagnostics.generator.raw_values import generate_scalar, generate_template
 from data_pipeline_diagnostics.generator.relationships import (
     CountLink,
     direct_fk_plan,
@@ -39,6 +42,7 @@ from data_pipeline_diagnostics.generator.rng import (
     foreign_key_nulls_stream_name,
     foreign_key_stream_name,
     nulls_stream_name,
+    pk_stream_name,
     stream,
     values_stream_name,
 )
@@ -53,6 +57,7 @@ __all__ = [
     "RawPlan",
     "TablePlan",
     "build_raw_plan",
+    "composite_pk_tier",
     "execute_raw_plan",
     "generate_raw_data",
 ]
@@ -143,6 +148,52 @@ def _dependent_unique(
         return True
     unique = set(unique_columns)
     return any(col in unique for col in dependent_columns)
+
+
+def composite_pk_tier(table: TablePlan, groups: Sequence[FkGroupPlan]) -> str | None:
+    """Joint-sampling tier for one table's composite PK: ``None`` (existing
+    single-column paths suffice — non-composite PK or an injective member
+    such as ``formatted_id``/``unique``), ``"exact"`` (joint product shuffle:
+    every component is a categorical leaf or a member of an FK group fully
+    inside the PK, with group ``without_replacement`` flags occurring only
+    single-block), or ``"retry"`` (joint bounded tuple retry for open-domain
+    members such as ranges, Faker kinds, or partially covered groups)."""
+    pk = list(table.primary_key)
+    if len(pk) <= 1:
+        return None
+    by_name = {c.name: c for c in table.columns}
+    if any(by_name[col].config.kind == "formatted_id" or by_name[col].unique for col in pk):
+        return None
+    by_dep: dict[str, FkGroupPlan] = {}
+    for group in groups:
+        for col in group.dependent_columns:
+            by_dep[col] = group
+    exact = True
+    seen_groups: set[tuple[str, str, str]] = set()
+    n_blocks = 0
+    flagged = False
+    for col in pk:
+        cplan = by_name[col]
+        if cplan.kind == "foreign_key":
+            group = by_dep.get(col)
+            if group is None or not set(group.dependent_columns) <= set(pk):
+                exact = False
+                break
+            key = (group.relationship, group.dependent_table, group.target_side)
+            if key not in seen_groups:
+                seen_groups.add(key)
+                n_blocks += 1
+                flagged = flagged or group.without_replacement
+        elif cplan.kind == "leaf" and cplan.config.kind == "categorical":
+            n_blocks += 1
+        else:
+            exact = False
+            break
+    if not exact:
+        return "retry"
+    if flagged and n_blocks > 1:
+        return "retry"
+    return "exact"
 
 
 def build_raw_plan(validated: ValidatedScenario) -> RawPlan:
@@ -536,73 +587,335 @@ def _generate_table(
     finished: Mapping[str, list[dict[str, object]]],
     groups: Mapping[tuple[str, str, str], FkGroupPlan],
 ) -> list[dict[str, object]]:
+    table_groups = [g for g in groups.values() if g.dependent_table == table.name]
+    tier = composite_pk_tier(table, table_groups)
+    if tier is None:
+        rows = _generate_table_legacy(scenario_id, data_seed, table, count, finished, groups)
+    else:
+        rows = _generate_joint_table(scenario_id, data_seed, table, count, finished, groups, tier)
+    _verify_primary_key(table.name, table.primary_key, rows)
+    return rows
+
+
+def _assign_leaf_column(
+    scenario_id: str,
+    data_seed: int,
+    table: TablePlan,
+    cplan: ColumnPlan,
+    count: int,
+    rows: list[dict[str, object]],
+) -> None:
+    column = RawColumn(
+        name=cplan.name,  # type: ignore[arg-type]
+        type=cplan.type,
+        nullable=cplan.nullable,
+        null_probability=cplan.null_probability,
+        unique=cplan.unique,
+        generator=cplan.config,
+    )
+    single_pk = len(table.primary_key) == 1 and table.primary_key[0] == cplan.name
+    values = generate_scalar_column(
+        scenario_id=scenario_id,
+        data_seed=data_seed,
+        table=table.name,
+        column=column,
+        row_count=count,
+        force_non_null=cplan.name in table.primary_key,
+        enforce_unique=True if (cplan.unique or single_pk) else None,
+    )
+    for row, value in zip(rows, values):
+        row[cplan.name] = value
+
+
+def _assign_group_block(
+    scenario_id: str,
+    data_seed: int,
+    table: TablePlan,
+    group: FkGroupPlan,
+    count: int,
+    finished: Mapping[str, list[dict[str, object]]],
+    rows: list[dict[str, object]],
+    sampled: set[tuple[str, str, str]],
+) -> None:
+    key = (group.relationship, table.name, group.target_side)
+    if key in sampled:
+        return
+    target_rows = finished[group.target_table]
+    universe = _target_universe(target_rows, group.target_columns)
+    if any(col in table.primary_key for col in group.dependent_columns):
+        terms = tuple((False, 0.0) for _ in group.null_terms)
+    else:
+        terms = group.null_terms
+    null_mask = generate_composite_null_mask(
+        scenario_id=scenario_id,
+        data_seed=data_seed,
+        relationship=group.relationship,
+        dependent_table=table.name,
+        target_side=group.target_side,
+        row_count=count,
+        components=list(terms),
+    )
+    tuples = sample_fk_tuples(
+        scenario_id=scenario_id,
+        data_seed=data_seed,
+        relationship=group.relationship,
+        dependent_table=table.name,
+        target_side=group.target_side,
+        universe=universe,
+        row_count=count,
+        null_mask=null_mask,
+        without_replacement=group.without_replacement,
+    )
+    width = len(group.dependent_columns)
+    for row, item in zip(rows, tuples):
+        values = item if item is not None else (None,) * width
+        for col_name, value in zip(group.dependent_columns, values):
+            row[col_name] = value
+    sampled.add(key)
+
+
+def _generate_table_legacy(
+    scenario_id: str,
+    data_seed: int,
+    table: TablePlan,
+    count: int,
+    finished: Mapping[str, list[dict[str, object]]],
+    groups: Mapping[tuple[str, str, str], FkGroupPlan],
+) -> list[dict[str, object]]:
     rows: list[dict[str, object]] = [{} for _ in range(count)]
     sampled: set[tuple[str, str, str]] = set()
     for cplan in table.columns:
         if cplan.kind == "leaf":
-            column = RawColumn(
-                name=cplan.name,  # type: ignore[arg-type]
-                type=cplan.type,
-                nullable=cplan.nullable,
-                null_probability=cplan.null_probability,
-                unique=cplan.unique,
-                generator=cplan.config,
-            )
-            single_pk = len(table.primary_key) == 1 and table.primary_key[0] == cplan.name
-            values = generate_scalar_column(
-                scenario_id=scenario_id,
-                data_seed=data_seed,
-                table=table.name,
-                column=column,
-                row_count=count,
-                force_non_null=cplan.name in table.primary_key,
-                enforce_unique=True if (cplan.unique or single_pk) else None,
-            )
-            for row, value in zip(rows, values):
-                row[cplan.name] = value
+            _assign_leaf_column(scenario_id, data_seed, table, cplan, count, rows)
         elif cplan.kind == "template":
             rng = stream(scenario_id, data_seed, cplan.value_stream)
             for i, row in enumerate(rows):
                 row[cplan.name] = generate_template(cplan.config, rng, i, row)  # type: ignore[arg-type]
         else:
             key = (cplan.relationship or "", table.name, cplan.target_side or "")
-            if key in sampled:
-                continue
-            group = groups[key]
-            target_rows = finished[group.target_table]
-            universe = _target_universe(target_rows, group.target_columns)
-            if any(col in table.primary_key for col in group.dependent_columns):
-                terms = tuple((False, 0.0) for _ in group.null_terms)
-            else:
-                terms = group.null_terms
-            null_mask = generate_composite_null_mask(
-                scenario_id=scenario_id,
-                data_seed=data_seed,
-                relationship=group.relationship,
-                dependent_table=table.name,
-                target_side=group.target_side,
-                row_count=count,
-                components=list(terms),
+            _assign_group_block(
+                scenario_id, data_seed, table, groups[key], count, finished, rows, sampled
             )
-            tuples = sample_fk_tuples(
-                scenario_id=scenario_id,
-                data_seed=data_seed,
-                relationship=group.relationship,
-                dependent_table=table.name,
-                target_side=group.target_side,
-                universe=universe,
-                row_count=count,
-                null_mask=null_mask,
-                without_replacement=group.without_replacement,
-            )
-            width = len(group.dependent_columns)
-            for row, item in zip(rows, tuples):
-                values = item if item is not None else (None,) * width
-                for col_name, value in zip(group.dependent_columns, values):
-                    row[col_name] = value
-            sampled.add(key)
-    _verify_primary_key(table.name, table.primary_key, rows)
     return rows
+
+
+def _generate_joint_table(
+    scenario_id: str,
+    data_seed: int,
+    table: TablePlan,
+    count: int,
+    finished: Mapping[str, list[dict[str, object]]],
+    groups: Mapping[tuple[str, str, str], FkGroupPlan],
+    tier: str,
+) -> list[dict[str, object]]:
+    """Joint composite-PK generation: non-PK units first (existing paths),
+    then the PK tuple jointly (exact shuffle or bounded retry), then
+    non-PK templates. PK members are always non-null, so no null-stream
+    draws occur inside the joint phases."""
+    rows: list[dict[str, object]] = [{} for _ in range(count)]
+    pk_set = set(table.primary_key)
+    touching = {
+        (group.relationship, table.name, group.target_side)
+        for group in groups.values()
+        if group.dependent_table == table.name and set(group.dependent_columns) & pk_set
+    }
+    sampled: set[tuple[str, str, str]] = set()
+    for cplan in table.columns:
+        if cplan.name in pk_set:
+            continue
+        if cplan.kind == "leaf":
+            _assign_leaf_column(scenario_id, data_seed, table, cplan, count, rows)
+        elif cplan.kind == "template":
+            continue  # phase C: needs PK values for placeholders
+        else:
+            key = (cplan.relationship or "", table.name, cplan.target_side or "")
+            if key in touching:
+                continue  # assigned with its PK siblings in phase B
+            _assign_group_block(
+                scenario_id, data_seed, table, groups[key], count, finished, rows, sampled
+            )
+    if tier == "exact":
+        _assign_exact_pk_tuples(scenario_id, data_seed, table, count, finished, groups, rows)
+    else:
+        _assign_retry_pk_tuples(scenario_id, data_seed, table, count, finished, groups, rows)
+    for cplan in table.columns:
+        if cplan.kind == "template" and cplan.name not in pk_set:
+            rng = stream(scenario_id, data_seed, cplan.value_stream)
+            for i, row in enumerate(rows):
+                row[cplan.name] = generate_template(cplan.config, rng, i, row)  # type: ignore[arg-type]
+    return rows
+
+
+def _pk_block_layout(
+    table: TablePlan, groups: Mapping[tuple[str, str, str], FkGroupPlan]
+) -> tuple[list[tuple[str, object]], dict[str, int]]:
+    """Order joint blocks by first PK appearance; map each PK column to its
+    flat position inside a concatenated block tuple."""
+    pk_set = set(table.primary_key)
+    by_name = {c.name: c for c in table.columns}
+    by_dep: dict[str, FkGroupPlan] = {}
+    for group in groups.values():
+        if group.dependent_table == table.name:
+            for col in group.dependent_columns:
+                by_dep[col] = group
+    blocks: list[tuple[str, object]] = []
+    seen: set[tuple[str, str, str]] = set()
+    for col in table.primary_key:
+        cplan = by_name[col]
+        if cplan.kind == "foreign_key":
+            group = by_dep[col]
+            key = (group.relationship, table.name, group.target_side)
+            if key not in seen:
+                seen.add(key)
+                blocks.append(("group", group))
+        else:
+            blocks.append(("leaf", cplan))
+    flat_pos: dict[str, int] = {}
+    pos = 0
+    for kind, obj in blocks:
+        if kind == "group":
+            for col in obj.dependent_columns:
+                if col in pk_set:
+                    flat_pos[col] = pos
+                pos += 1
+        else:
+            flat_pos[obj.name] = pos
+            pos += 1
+    return blocks, flat_pos
+
+
+def _assign_exact_pk_tuples(
+    scenario_id: str,
+    data_seed: int,
+    table: TablePlan,
+    count: int,
+    finished: Mapping[str, list[dict[str, object]]],
+    groups: Mapping[tuple[str, str, str], FkGroupPlan],
+    rows: list[dict[str, object]],
+) -> None:
+    blocks, flat_pos = _pk_block_layout(table, groups)
+    pools: list[list[object]] = []
+    for kind, obj in blocks:
+        if kind == "group":
+            pools.append(_target_universe(finished[obj.target_table], obj.target_columns))
+        else:
+            pools.append(list(obj.config.values))
+    capacity = math.prod(len(pool) for pool in pools)
+    if count > capacity:
+        raise GenerationFailure(
+            table=table.name,
+            column=None,
+            reason="composite-pk-domain-exhausted",
+            detail=f"need {count} distinct keys from {capacity} combinations "
+            f"for PK {list(table.primary_key)}",
+        )
+    prng = stream(scenario_id, data_seed, pk_stream_name(table.name))
+    combos = list(itertools.product(*pools))
+    prng.shuffle(combos)
+    for i, row in enumerate(rows):
+        chosen = combos[i]
+        flat: list[object] = []
+        for (kind, _), part in zip(blocks, chosen):
+            flat.extend(list(part) if kind == "group" else [part])
+        for col in table.primary_key:
+            row[col] = flat[flat_pos[col]]
+
+
+def _assign_retry_pk_tuples(
+    scenario_id: str,
+    data_seed: int,
+    table: TablePlan,
+    count: int,
+    finished: Mapping[str, list[dict[str, object]]],
+    groups: Mapping[tuple[str, str, str], FkGroupPlan],
+    rows: list[dict[str, object]],
+) -> None:
+    pk = list(table.primary_key)
+    pk_set = set(pk)
+    by_name = {c.name: c for c in table.columns}
+    ordered_group_keys: list[tuple[str, str, str]] = []
+    for cplan in table.columns:
+        if cplan.kind != "foreign_key" or cplan.name not in pk_set:
+            continue
+        key = (cplan.relationship or "", table.name, cplan.target_side or "")
+        if key not in ordered_group_keys:
+            ordered_group_keys.append(key)
+    table_groups = {key: groups[key] for key in ordered_group_keys}
+    universes: dict[tuple[str, str, str], list[tuple[object, ...]]] = {}
+    for key, group in table_groups.items():
+        universe = _target_universe(finished[group.target_table], group.target_columns)
+        if not universe:
+            raise GenerationFailure(
+                table=table.name,
+                column=None,
+                reason="empty-target-universe",
+                detail=f"relationship {group.relationship!r}: no target key universe "
+                "for a non-null PK tuple",
+            )
+        universes[key] = universe
+    group_rng = {
+        key: stream(scenario_id, data_seed, table_groups[key].value_stream)
+        for key in ordered_group_keys
+    }
+    group_used = {key: set() for key in ordered_group_keys if table_groups[key].without_replacement}
+    leaf_rng = {
+        cplan.name: stream(scenario_id, data_seed, cplan.value_stream)
+        for cplan in table.columns
+        if cplan.name in pk_set and cplan.kind == "leaf"
+    }
+    pk_templates = [c for c in table.columns if c.name in pk_set and c.kind == "template"]
+    tmpl_rng = {c.name: stream(scenario_id, data_seed, c.value_stream) for c in pk_templates}
+    sibling_cols = sorted(
+        {
+            col
+            for key in ordered_group_keys
+            for col in table_groups[key].dependent_columns
+            if col not in pk_set
+        }
+    )
+    seen: set[tuple[object, ...]] = set()
+    for i, row in enumerate(rows):
+        for _ in range(RETRY_LIMIT):
+            picks: dict[tuple[str, str, str], tuple[int, tuple[object, ...]]] = {}
+            feasible = True
+            for key in ordered_group_keys:
+                universe = universes[key]
+                index = group_rng[key].randint(0, len(universe) - 1)
+                if key in group_used and index in group_used[key]:
+                    feasible = False
+                    break
+                picks[key] = (index, universe[index])
+            if not feasible:
+                continue
+            candidate: dict[str, object] = {}
+            for key in ordered_group_keys:
+                _, tup = picks[key]
+                for col, val in zip(table_groups[key].dependent_columns, tup):
+                    candidate[col] = val
+            for name in pk:
+                if name in candidate or by_name[name].kind == "template":
+                    continue
+                candidate[name] = generate_scalar(by_name[name].config, leaf_rng[name], i)
+            merged = {**row, **candidate}
+            for cplan in pk_templates:
+                merged[cplan.name] = generate_template(
+                    cplan.config, tmpl_rng[cplan.name], i, merged
+                )  # type: ignore[arg-type]
+            key_tuple = tuple(merged[col] for col in pk)
+            if key_tuple in seen:
+                continue
+            for gkey in group_used:
+                group_used[gkey].add(picks[gkey][0])
+            seen.add(key_tuple)
+            row.update({col: merged[col] for col in list(pk) + sibling_cols})
+            break
+        else:
+            raise GenerationFailure(
+                table=table.name,
+                column=None,
+                reason="composite-pk-unresolvable",
+                detail=f"row {i}: no unseen PK tuple within {RETRY_LIMIT} attempts",
+            )
 
 
 def _target_universe(

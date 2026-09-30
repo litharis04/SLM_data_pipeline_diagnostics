@@ -871,7 +871,7 @@ group by {{ column_names | join(', ') }} having count(*) > 1
 {% endtest %}
 
 {% test composite_relationships(model, column_names, to, to_columns, join_on, orphan_filter) %}
-select {{ column_names | join(', ') }} from {{ model }} as child
+select {% for column in column_names %}child.{{ column }}{% if not loop.last %}, {% endif %}{% endfor %} from {{ model }} as child
 left join (select distinct {{ to_columns | join(', ') }} from {{ to }}) as parent
   on {{ join_on }}
 where {{ orphan_filter }}
@@ -888,12 +888,11 @@ where 1 = 0
 {% test column_range(model, column_name, min_value=none, max_value=none, inclusive=true) %}
 select {{ column_name }} from {{ model }}
 where {{ column_name }} is not null
-{% if min_value is not none %}
-  and {{ column_name }} {{ '<' if inclusive else '<=' }} {{ min_value }}
-{% endif %}
-{% if max_value is not none %}
-  and {{ column_name }} {{ '>' if inclusive else '>=' }} {{ max_value }}
-{% endif %}
+  and (
+    1 = 0
+    {% if min_value is not none %} or {{ column_name }} {{ '<' if inclusive else '<=' }} {{ min_value }}{% endif %}
+    {% if max_value is not none %} or {{ column_name }} {{ '>' if inclusive else '>=' }} {{ max_value }}{% endif %}
+  )
 {% endtest %}
 """
 

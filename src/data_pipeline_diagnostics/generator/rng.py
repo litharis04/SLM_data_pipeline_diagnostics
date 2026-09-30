@@ -3,7 +3,9 @@
 All stochastic choices in later generator code MUST come from :func:`stream`.
 A single mutable scenario-wide RNG is prohibited; each stream is an isolated
 ``random.Random`` instance seeded from its own subseed, so adding or changing
-one column MUST NOT shift unrelated streams.
+one column MUST NOT shift unrelated streams. Besides the five §8.2
+namespaces, the raw executor allocates ``pk/<table>`` for joint
+composite-PK shuffles (additive per the spec's "at minimum" wording).
 """
 
 from __future__ import annotations
@@ -17,6 +19,7 @@ __all__ = [
     "foreign_key_nulls_stream_name",
     "foreign_key_stream_name",
     "nulls_stream_name",
+    "pk_stream_name",
     "rows_stream_name",
     "stream",
     "subseed",
@@ -73,6 +76,11 @@ def stream(scenario_id: str, data_seed: int, stream_name: str) -> random.Random:
 def rows_stream_name(table: str) -> str:
     """Row-count stream for one raw table: ``rows/<table>``."""
     return f"rows/{_check_text(table, 'table')}"
+
+
+def pk_stream_name(table: str) -> str:
+    """Joint primary-key shuffle stream for one raw table: ``pk/<table>``."""
+    return f"pk/{_check_text(table, 'table')}"
 
 
 def values_stream_name(table: str, column: str) -> str:

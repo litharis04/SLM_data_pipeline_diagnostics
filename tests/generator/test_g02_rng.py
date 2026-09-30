@@ -15,6 +15,7 @@ from data_pipeline_diagnostics.generator.rng import (
     foreign_key_nulls_stream_name,
     foreign_key_stream_name,
     nulls_stream_name,
+    pk_stream_name,
     rows_stream_name,
     stream,
     subseed,
@@ -68,3 +69,4 @@ def test_stream_namespaces():
     assert nulls_stream_name("t", "c") == "nulls/t/c"
     assert foreign_key_stream_name("r", "d", "left") == "foreign_key/r/d/left"
     assert foreign_key_nulls_stream_name("r", "d", "left") == "nulls/foreign_key/r/d/left"
+    assert pk_stream_name("t") == "pk/t"

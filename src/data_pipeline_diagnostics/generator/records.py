@@ -39,8 +39,12 @@ from data_pipeline_diagnostics.generator.physical import (
     quote_ident,
 )
 from data_pipeline_diagnostics.generator.raw_constraints import GenerationFailure
-from data_pipeline_diagnostics.generator.raw_plan import RawPlan, build_raw_plan
-from data_pipeline_diagnostics.generator.rng import STREAM_SCHEME
+from data_pipeline_diagnostics.generator.raw_plan import (
+    RawPlan,
+    build_raw_plan,
+    composite_pk_tier,
+)
+from data_pipeline_diagnostics.generator.rng import STREAM_SCHEME, pk_stream_name
 from data_pipeline_diagnostics.generator.versions import (
     DBT_RENDERER_VERSION,
     GENERATOR_CONTRACT_VERSION,
@@ -107,22 +111,38 @@ def identity_digest(validated: ValidatedScenario, data_seed: int) -> str:
 def plan_stream_inventory(plan: RawPlan) -> list[str]:
     """Every randomness stream the plan defines (deterministic superset of
     consumed streams: untouched streams cost nothing, and every allocated
-    subseed stays reconstructible)."""
+    subseed stays reconstructible). Joint composite-PK tables contribute
+    ``pk/<table>`` (exact tier only) while their shuffle-assigned members
+    contribute no value streams."""
     tables = {table.name: table for table in plan.tables}
+    tiers = {
+        table.name: composite_pk_tier(
+            table, [g for g in plan.fk_groups if g.dependent_table == table.name]
+        )
+        for table in plan.tables
+    }
     streams: set[str] = set()
     for table in plan.tables:
         if table.rows.min != table.rows.max:
             streams.add(f"rows/{table.name}")
     for table in plan.tables:
+        exact_joint = tiers[table.name] == "exact"
         primary = set(table.primary_key)
         for column in table.columns:
             if column.kind == "leaf":
+                if exact_joint and column.name in primary:
+                    continue
                 streams.add(column.value_stream)
                 if column.nullable and column.name not in primary:
                     streams.add(column.null_stream)
             elif column.kind == "template":
                 streams.add(column.value_stream)
+        if exact_joint:
+            streams.add(pk_stream_name(table.name))
     for group in plan.fk_groups:
+        table = tables[group.dependent_table]
+        if tiers[table.name] == "exact" and set(group.dependent_columns) <= set(table.primary_key):
+            continue
         streams.add(group.value_stream)
         forced = bool(set(group.dependent_columns) & set(tables[group.dependent_table].primary_key))
         if not forced and any(nullable for nullable, _ in group.null_terms):
