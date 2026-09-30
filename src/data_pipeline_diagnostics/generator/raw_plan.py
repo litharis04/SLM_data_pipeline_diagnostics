@@ -196,6 +196,48 @@ def composite_pk_tier(table: TablePlan, groups: Sequence[FkGroupPlan]) -> str | 
     return "exact"
 
 
+def _pk_capacity_upper(
+    table: TablePlan,
+    groups: Sequence[FkGroupPlan],
+    tables: Mapping[str, TablePlan],
+) -> int | None:
+    """Static upper bound on distinct composite-PK tuples, or None when the
+    table needs no cap (non-composite or injective-member PK) or the bound
+    is unknowable (faker/random/template/float/timestamp members).
+
+    Categorical contributes its value count, integer/date ranges their exact
+    spans, booleans 2, and FK components their target's ``rows.max``
+    (universes never exceed target row counts — optimistic by design; a
+    shrunken runtime universe still fails loudly at generation)."""
+    if composite_pk_tier(table, groups) is None:
+        return None
+    by_name = {c.name: c for c in table.columns}
+    by_dep: dict[str, FkGroupPlan] = {}
+    for group in groups:
+        for col in group.dependent_columns:
+            by_dep[col] = group
+    bound = 1
+    for col in table.primary_key:
+        cplan = by_name[col]
+        if cplan.kind == "foreign_key":
+            bound *= tables[by_dep[col].target_table].rows.max
+        elif cplan.kind == "leaf":
+            kind = cplan.config.kind
+            if kind == "categorical":
+                bound *= len(cplan.config.values)
+            elif kind == "integer_range":
+                bound *= cplan.config.max - cplan.config.min + 1
+            elif kind == "date_range":
+                bound *= (cplan.config.max - cplan.config.min).days + 1
+            elif kind == "boolean":
+                bound *= 2
+            else:
+                return None
+        else:
+            return None
+    return bound
+
+
 def build_raw_plan(validated: ValidatedScenario) -> RawPlan:
     """Build the immutable raw execution plan (pure: no RNG, no I/O)."""
     scenario = _require_validated(validated).scenario
@@ -562,11 +604,22 @@ def execute_raw_plan(plan: RawPlan, data_seed: int) -> dict[str, list[dict[str, 
     """Execute the plan's units in order (wires G03–G07, no new semantics)."""
     if type(data_seed) is not int or not 0 <= data_seed <= 2**63 - 1:
         raise ValueError(f"data_seed must be a strict int in [0, 2**63 - 1], got {data_seed!r}")
+    tables_by_name = {table.name: table for table in plan.tables}
+    caps = {}
+    for table in plan.tables:
+        cap = _pk_capacity_upper(
+            table,
+            [g for g in plan.fk_groups if g.dependent_table == table.name],
+            tables_by_name,
+        )
+        if cap is not None:
+            caps[table.name] = cap
     counts = sample_row_counts(
         scenario_id=plan.scenario_id,
         data_seed=data_seed,
         rows={table.name: table.rows for table in plan.tables},
         links=list(plan.count_links),
+        caps=caps,
     )
     groups = {(g.relationship, g.dependent_table, g.target_side): g for g in plan.fk_groups}
     tables: dict[str, list[dict[str, object]]] = {}

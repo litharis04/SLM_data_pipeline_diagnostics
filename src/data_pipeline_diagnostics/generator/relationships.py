@@ -2,9 +2,10 @@
 
 Row counts come from per-table ``rows/<table>`` streams (exact when
 ``min == max``). When sampled counts make a one-to-one (or another
-without-replacement) constraint impossible, only the involved tables'
-streams are resampled, deterministically, up to ``ROW_COUNT_RETRY_LIMIT``
-rounds; unresolvable combinations raise :class:`GenerationFailure` — the
+without-replacement) constraint impossible, or exceed a table's
+composite-PK tuple capacity, only the involved tables' streams are
+resampled, deterministically, up to ``ROW_COUNT_RETRY_LIMIT`` rounds;
+unresolvable combinations raise :class:`GenerationFailure` — the
 seed is never switched.
 
 FK tuples sample from the caller-built target universe (distinct,
@@ -95,14 +96,30 @@ def sample_row_counts(
     data_seed: int,
     rows: Mapping[str, RowCount],
     links: Sequence[CountLink] = (),
+    caps: Mapping[str, int] | None = None,
 ) -> dict[str, int]:
-    """Sample per-table row counts with deterministic 1:1 conditioning.
+    """Sample per-table row counts with deterministic conditioning.
 
     Tables with ``min == max`` are exact (no stream). Each ranged table draws
-    from its own ``rows/<table>`` stream; on a link violation only the
-    involved tables' streams advance. Unknown link tables are a caller bug
-    (``ValueError``); exhausted conditioning is ``GenerationFailure``.
+    from its own ``rows/<table>`` stream; on a link violation or capacity
+    overrun only the involved tables' streams advance. ``caps`` bounds
+    per-table counts by composite-PK tuple capacity (a table needing more
+    distinct keys than its domain allows is resampled, not failed outright —
+    §9.3); a range that cannot satisfy its cap fails fast as a range-level
+    pigeonhole. Unknown link/cap tables are a caller bug (``ValueError``);
+    exhausted conditioning is ``GenerationFailure``.
     """
+    capmap = dict(caps or {})
+    for table, cap in capmap.items():
+        if table not in rows:
+            raise ValueError(f"capacity cap references unknown table {table!r}")
+        if rows[table].min > cap:
+            raise GenerationFailure(
+                table=table,
+                column=None,
+                reason="row-count-capacity-exceeded",
+                detail=f"rows.min {rows[table].min} exceeds PK capacity {cap}",
+            )
     for link in links:
         for table in (link.dependent_table, link.target_table):
             if table not in rows:
@@ -122,10 +139,20 @@ def sample_row_counts(
         violated = [
             link for link in links if counts[link.dependent_table] > counts[link.target_table]
         ]
-        if not violated:
+        overcap = sorted(table for table, cap in capmap.items() if counts[table] > cap)
+        if not violated and not overcap:
             return counts
+        for table in overcap:
+            if table not in streams:
+                raise GenerationFailure(
+                    table=table,
+                    column=None,
+                    reason="row-count-capacity-exceeded",
+                    detail=f"exact count {counts[table]} exceeds PK capacity {capmap[table]}",
+                )
         involved = sorted(
             {table for link in violated for table in (link.dependent_table, link.target_table)}
+            | set(overcap)
         )
         if not any(table in streams for table in involved):
             break
