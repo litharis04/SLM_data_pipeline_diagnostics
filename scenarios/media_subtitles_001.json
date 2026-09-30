@@ -157,6 +157,18 @@
           "nullable": false,
           "type": "string",
           "unique": false
+        },
+        {
+          "generator": {
+            "digits": 1,
+            "kind": "formatted_id",
+            "prefix": "B-"
+          },
+          "name": "booth_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
         }
       ],
       "name": "raw_studios",

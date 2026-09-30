@@ -21,6 +21,7 @@ from data_pipeline_diagnostics.generator.raw_constraints import (
 from data_pipeline_diagnostics.scenario.generators import (
     CategoricalGenerator,
     ForeignKeyGenerator,
+    FormattedIdGenerator,
     IntegerRangeGenerator,
     TemplateStringGenerator,
 )
@@ -185,3 +186,16 @@ def test_context_kinds_rejected():
     tpl_col = _col(generator=TemplateStringGenerator(template="id-{x}"))
     with pytest.raises(ValueError):
         _call(tpl_col, 5)
+
+
+def test_formatted_id_overflow_structured():
+    col = _col(
+        nullable=False,
+        null_probability=0.0,
+        generator=FormattedIdGenerator(prefix="S-", digits=1, start=1),
+    )
+    with pytest.raises(GenerationFailure) as exc_info:
+        _call(col, 18)
+    assert exc_info.value.reason == "formatted-id-overflow"
+    assert exc_info.value.table == "orders"
+    assert exc_info.value.column == "status"

@@ -36,6 +36,7 @@ from data_pipeline_diagnostics.scenario.generators import (
 
 __all__ = [
     "ExhaustedDomain",
+    "GenerationFailure",
     "generate_boolean",
     "generate_categorical",
     "generate_date",
@@ -56,6 +57,28 @@ class ExhaustedDomain(Exception):
     vs structured failure; this module never truncates or invents values."""
 
 
+class GenerationFailure(Exception):
+    """Structured raw-generation failure (no truncation, no invalid rows).
+
+    ``reason`` is a stable machine-readable category (e.g.
+    ``"unique-domain-exhausted"``) for ``failure_record.json`` mapping;
+    ``detail`` carries the human-readable context. Defined here (rather than
+    in :mod:`raw_constraints`) so leaf generators can raise it directly
+    without a circular import; re-exported from ``raw_constraints`` for
+    existing importers.
+    """
+
+    def __init__(self, *, table: str, column: str | None, reason: str, detail: str = "") -> None:
+        self.table = table
+        self.column = column
+        self.reason = reason
+        self.detail = detail
+        message = f"{table}.{column or '*'}: {reason}"
+        if detail:
+            message += f": {detail}"
+        super().__init__(message)
+
+
 def _check_row_index(row_index: object) -> int:
     if type(row_index) is not int or row_index < 0:
         raise ValueError(f"row_index must be a non-negative int, got {row_index!r}")
@@ -68,7 +91,12 @@ def generate_formatted_id(config: FormattedIdGenerator, rng: random.Random, row_
     number = config.start + row_index
     digits = str(number)
     if len(digits) > config.digits:
-        raise ValueError(f"formatted_id overflow: {number} exceeds {config.digits} digit capacity")
+        raise GenerationFailure(
+            table="*",
+            column=None,
+            reason="formatted-id-overflow",
+            detail=f"{number} exceeds {config.digits} digit capacity",
+        )
     return f"{config.prefix}{digits.zfill(config.digits)}"
 
 

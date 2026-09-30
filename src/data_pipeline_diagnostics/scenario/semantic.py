@@ -1265,6 +1265,20 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:
                         f"unique column '{col.name}' capacity {cap} < max rows {max_rows}",
                         related=col.name,
                     )
+        # Guard (T08): formatted_id capacity for EVERY column, not just key
+        # members — proposals are generated per row index, so insufficient
+        # width overflows deterministically on every seed (no false positives).
+        for col in tbl.columns:
+            if getattr(col.generator, "kind", None) == "formatted_id":
+                cap = _generator_capacity(col)
+                if cap is not None and cap < max_rows:
+                    _add_issue(
+                        issues,
+                        ErrorCode.INVALID_PK,
+                        f"{base}.columns[{col.name}]",
+                        f"formatted_id capacity {cap} < max rows {max_rows}",
+                        related=col.name,
+                    )
         # generator/type compatibility etc.
         for cidx, col in enumerate(tbl.columns):
             cpath = f"{base}.columns[{cidx}]"
@@ -2365,6 +2379,33 @@ def validate_semantics(scenario: Scenario) -> ValidatedScenario:
                                 f"grain {m.grain} is not possible for {join_type} {card} join ({orient}); expected {expected}",
                                 related=m.grain[0] if m.grain else "",
                             )
+                        # Guard (T08): grain nullability under LEFT joins — a grain
+                        # component traceable only to the nullable (right) side is
+                        # NULL on unmatched rows, so its derived not_null test
+                        # cannot hold on any seed. Projected targets carry their
+                        # side directly; derived columns resolve through the
+                        # projected namespace they are evaluated against.
+                        if join_type == "left":
+                            _proj_side = {jc.target: jc.side for jc in m.columns}
+                            for gcol in m.grain:
+                                _sides: set[str] = set()
+                                if gcol in _proj_side:
+                                    _sides.add(_proj_side[gcol])
+                                else:
+                                    for dc in m.derived_columns:
+                                        if dc.name == gcol:
+                                            for ec in _collect_expression_columns(dc.expression):
+                                                if ec in _proj_side:
+                                                    _sides.add(_proj_side[ec])
+                                if _sides and _sides <= {"right"}:
+                                    _add_issue(
+                                        issues,
+                                        ErrorCode.NULLABLE_GRAIN,
+                                        f"intermediate_models[{name}].grain",
+                                        f"grain '{gcol}' traces only to the nullable "
+                                        f"right side of a left join",
+                                        related=gcol,
+                                    )
             out_schema = {}
             out_lineage = {}
             for jc in m.columns:

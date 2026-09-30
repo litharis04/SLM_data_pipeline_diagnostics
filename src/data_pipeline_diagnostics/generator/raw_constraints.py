@@ -33,6 +33,7 @@ from collections.abc import Sequence
 
 from data_pipeline_diagnostics.generator.raw_values import (
     ExhaustedDomain,
+    GenerationFailure,
     generate_scalar,
 )
 from data_pipeline_diagnostics.generator.rng import (
@@ -54,25 +55,6 @@ __all__ = [
 ]
 
 RETRY_LIMIT = 1000
-
-
-class GenerationFailure(Exception):
-    """Structured raw-generation failure (no truncation, no invalid rows).
-
-    ``reason`` is a stable machine-readable category (e.g.
-    ``"unique-domain-exhausted"``) for future ``failure_record.json``
-    mapping; ``detail`` carries the human-readable context.
-    """
-
-    def __init__(self, *, table: str, column: str | None, reason: str, detail: str = "") -> None:
-        self.table = table
-        self.column = column
-        self.reason = reason
-        self.detail = detail
-        message = f"{table}.{column or '*'}: {reason}"
-        if detail:
-            message += f": {detail}"
-        super().__init__(message)
 
 
 def generate_scalar_null_mask(
@@ -167,6 +149,19 @@ def generate_scalar_column(
             f"column {table}.{column.name}: kind {column.generator.kind!r} "
             "needs relationship/row context (G07/G08), not a scalar column call"
         )
+    if column.generator.kind == "formatted_id":
+        # Exact pre-check (overflow ⟺ row_count > capacity, since indices run
+        # 0..row_count-1): structured failure with table/column context instead
+        # of the leaf-level bare raise. Unreachable from validated scenarios
+        # (semantic capacity guard owns it); defense in depth.
+        gen = column.generator
+        if row_count > 10**gen.digits - gen.start:
+            raise GenerationFailure(
+                table=table,
+                column=str(column.name),
+                reason="formatted-id-overflow",
+                detail=f"row_count {row_count} exceeds capacity {10**gen.digits - gen.start}",
+            )
     unique = column.unique if enforce_unique is None else enforce_unique
     if type(unique) is not bool:
         raise TypeError(f"enforce_unique must be bool or None, got {unique!r}")

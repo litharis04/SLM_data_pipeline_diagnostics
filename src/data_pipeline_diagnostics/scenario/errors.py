@@ -68,6 +68,7 @@ class ErrorCode:
     IMPOSSIBLE_JOIN_GRAIN = "E133"
     NON_DETERMINISTIC_DEDUP = "E134"
     RAW_FK_CYCLE = "E135"
+    NULLABLE_GRAIN = "E136"
     # generic
     UNKNOWN = "E999"
 

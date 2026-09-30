@@ -13,6 +13,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 import pytest
 
 from data_pipeline_diagnostics.generator.raw_values import (
+    GenerationFailure,
     generate_date,
     generate_float,
     generate_formatted_id,
@@ -46,8 +47,9 @@ def test_formatted_id_zero_pad_and_prefix():
 
 def test_formatted_id_overflow_raises():
     cfg = FormattedIdGenerator(prefix="X", digits=2, start=99)
-    with pytest.raises(ValueError):
+    with pytest.raises(GenerationFailure) as exc:
         generate_formatted_id(cfg, _stream("id"), 1)
+    assert exc.value.reason == "formatted-id-overflow"
 
 
 def test_formatted_id_consumes_no_rng():

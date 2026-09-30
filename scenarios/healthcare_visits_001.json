@@ -52,7 +52,7 @@
             "right": "patient_id"
           }
         ],
-        "type": "inner"
+        "type": "left"
       },
       "left": "stg_visits",
       "name": "j_visits_patients",
@@ -115,7 +115,7 @@
             "right": "visit_id"
           }
         ],
-        "type": "left"
+        "type": "inner"
       },
       "left": "stg_visits",
       "name": "j_visits_rx",

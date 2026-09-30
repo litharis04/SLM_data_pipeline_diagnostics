@@ -1310,3 +1310,115 @@ def test_compiler_accepts_only_validated():
     assert (
         validated.staging_schemas["stg_a"]["id"] == validated.intermediate_schemas["trans_a"]["id"]
     )
+
+
+# ---------------------------------------------------------------------------
+# T08 static guards: formatted_id capacity (all columns), LEFT-grain nullability
+# ---------------------------------------------------------------------------
+
+
+def _raw_with_tag(rows_max: int) -> dict:
+    return {
+        "name": "raw_a",
+        "rows": {"min": 1, "max": rows_max},
+        "columns": (
+            {"name": "id", "type": "integer", "generator": _INT_GEN},
+            {
+                "name": "tag",
+                "type": "string",
+                "generator": {"kind": "formatted_id", "digits": 1, "prefix": "T-"},
+            },
+        ),
+        "primary_key": ("id",),
+    }
+
+
+def test_formatted_id_capacity_all_columns():
+    base = _base_scenario()
+    base["raw_tables"] = (
+        _raw_with_tag(10),
+        base["raw_tables"][1],
+        base["raw_tables"][2],
+    )
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any(
+        i.code == ErrorCode.INVALID_PK and "formatted_id capacity" in i.message
+        for i in exc.value.issues
+    )
+
+
+def test_formatted_id_capacity_boundary_passes():
+    base = _base_scenario()
+    base["raw_tables"] = (
+        _raw_with_tag(9),
+        base["raw_tables"][1],
+        base["raw_tables"][2],
+    )
+    s = Scenario.model_validate(base)
+    validate_semantics(s)
+
+
+def _left_join_base() -> dict:
+    base = _base_scenario()
+    base["intermediate_models"] = (
+        base["intermediate_models"][0],
+        {
+            "operation": "join",
+            "name": "join_a",
+            "left": "stg_a",
+            "right": "stg_b",
+            "join": {"type": "left", "on": ({"left": "id", "right": "a_id"},)},
+            "columns": (
+                {"side": "left", "source": "id", "target": "id"},
+                {"side": "right", "source": "id", "target": "rid"},
+            ),
+            "grain": ("id", "rid"),
+        },
+    )
+    return base
+
+
+def test_left_join_nullable_grain():
+    s = Scenario.model_validate(_left_join_base())
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    assert any(i.code == ErrorCode.NULLABLE_GRAIN and i.related == "rid" for i in exc.value.issues)
+
+
+def test_left_join_derived_grain_component():
+    base = _left_join_base()
+    join = dict(base["intermediate_models"][1])
+    join["derived_columns"] = (
+        {
+            "name": "d",
+            "type": "string",
+            "expression": {"kind": "column", "column": "rid"},
+        },
+    )
+    join["grain"] = ("id", "rid", "d")
+    base["intermediate_models"] = (base["intermediate_models"][0], join)
+    s = Scenario.model_validate(base)
+    with pytest.raises(SemanticValidationError) as exc:
+        validate_semantics(s)
+    flagged = {i.related for i in exc.value.issues if i.code == ErrorCode.NULLABLE_GRAIN}
+    assert flagged == {"rid", "d"}
+
+
+def test_left_join_left_only_grain_passes():
+    base = _base_scenario()
+    base["intermediate_models"] = (
+        base["intermediate_models"][0],
+        {
+            "operation": "join",
+            "name": "join_a",
+            "left": "stg_b",
+            "right": "stg_a",
+            "join": {"type": "left", "on": ({"left": "a_id", "right": "id"},)},
+            "columns": ({"side": "left", "source": "id", "target": "id"},),
+            "grain": ("id",),
+        },
+    )
+    s = Scenario.model_validate(base)
+    validate_semantics(s)
