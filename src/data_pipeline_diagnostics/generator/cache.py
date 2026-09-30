@@ -127,19 +127,21 @@ def verify_cache_entry(entry_dir: str | Path, digest: str) -> dict | None:
 def _read_failure(tmp: Path) -> GenerationFailure:
     try:
         record = json.loads((tmp / "failure_record.json").read_text(encoding="utf-8"))
-        return GenerationFailure(
+        exc = GenerationFailure(
             table="*",
             column=None,
             reason=str(record.get("category", "build-failed")),
             detail=str(record.get("message", "")),
         )
     except Exception:
-        return GenerationFailure(
+        exc = GenerationFailure(
             table="*",
             column=None,
             reason="build-failed",
             detail=f"see {tmp}",
         )
+    exc.workspace = tmp  # handoff for failure reporting; preserved sibling temp dir
+    return exc
 
 
 def prepare_clean_instance(
