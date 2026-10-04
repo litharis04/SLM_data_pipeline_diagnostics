@@ -412,6 +412,18 @@ are implementation-versioned and MUST NOT depend on wall-clock time.
 Failure to find a materializable combination is a clean-instance failure and exposes a contract,
 scenario, or generator defect. It is not permission to switch `data_seed`.
 
+Before drawing row-count proposals, the generator MUST compute reachable upper bounds for every
+constrained table (`_reachable_uppers`) from constant caps, link lower-bound inequalities, and
+dependent capacities (`bound = multiplier × Π counts[parent]`). If the declared ranges contain
+no combination satisfying those upper bounds, sampling MUST fail early with
+`row-count-capacity-exceeded` before any RNG draw. A sampled combination that violates a
+supported bound is resampled using only the involved row-count streams, preserving unrelated
+streams. If the retry budget is exhausted while a satisfying combination exists, the
+deterministic fallback (`_apply_count_fallback`) MUST pin every involved table to its verified
+reachable upper (clamped into `[rows.min, rows.max]`) instead of raising; only genuinely
+materializable combinations (e.g. exact child counts that force a parent to its maximum) use
+this path, and the fallback performs no RNG draws for pinned tables.
+
 ### 9.4. Row identity and ordering
 
 Each raw table has an internal zero-based row index used during generation. It MUST NOT be written

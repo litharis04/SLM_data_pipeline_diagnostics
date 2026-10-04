@@ -90,6 +90,123 @@ def resolve_relationships(
     return _resolve_relationships(list(relationships), dict(raw_by_name))
 
 
+def _capacity_bound(cap: object, counts: Mapping[str, int]) -> int:
+    """Evaluate one dependent capacity descriptor against sampled counts."""
+    bound = cap.multiplier
+    for parent in cap.parent_tables:
+        bound *= counts[parent]
+    return bound
+
+
+def _reachable_uppers(
+    rows: Mapping[str, RowCount],
+    links: Sequence[CountLink],
+    capmap: Mapping[str, int],
+    capacities: Sequence[object],
+) -> dict[str, int]:
+    """Greatest per-table counts satisfying all supported count constraints,
+    computed without RNG draws. Starts from declared maxima (plus static
+    caps) and tightens monotonically to a fixpoint; strictly decreasing
+    naturals bounded below by zero always terminate. Deterministic: the
+    fixpoint is unique and constraints are visited in input order."""
+    upper = {table: spec.max for table, spec in rows.items()}
+    for table, cap in capmap.items():
+        upper[table] = min(upper[table], cap)
+    changed = True
+    while changed:
+        changed = False
+        for link in links:
+            dep, tgt = link.dependent_table, link.target_table
+            if upper[dep] > upper[tgt]:
+                upper[dep] = upper[tgt]
+                changed = True
+        for cap in capacities:
+            bound = cap.multiplier
+            for parent in cap.parent_tables:
+                bound *= upper[parent]
+            if upper[cap.dependent_table] > bound:
+                upper[cap.dependent_table] = bound
+                changed = True
+    return upper
+
+
+def _apply_count_fallback(
+    counts: dict[str, int],
+    upper: Mapping[str, int],
+    rows: Mapping[str, RowCount],
+    links: Sequence[CountLink],
+    capmap: Mapping[str, int],
+    capacities: Sequence[object],
+) -> None:
+    """Constructive fallback after exhausted resampling: set the counts of
+    every table in the violated connected components to the previously
+    computed reachable upper counts. The component union is built over ALL
+    supported count constraints (static-only caps form isolated vertices);
+    untouched counts keep their sampled proposals and no RNG draws occur.
+    Exact counts and declared intervals are preserved: every table reaching
+    this point passed the ``upper >= rows.min`` pre-check, and exact tables
+    have ``upper ==`` their fixed count. Verifies everything before
+    generating values; a residual violation is a defensive failure."""
+    adjacency: dict[str, set[str]] = {table: set() for table in rows}
+    for link in links:
+        adjacency[link.dependent_table].add(link.target_table)
+        adjacency[link.target_table].add(link.dependent_table)
+    for cap in capacities:
+        for parent in cap.parent_tables:
+            adjacency[cap.dependent_table].add(parent)
+            adjacency[parent].add(cap.dependent_table)
+    seeds: set[str] = set()
+    for link in links:
+        if counts[link.dependent_table] > counts[link.target_table]:
+            seeds.add(link.dependent_table)
+            seeds.add(link.target_table)
+    for table, cap in capmap.items():
+        if counts[table] > cap:
+            seeds.add(table)
+    for cap in capacities:
+        bound = cap.multiplier
+        for parent in cap.parent_tables:
+            bound *= counts[parent]
+        if counts[cap.dependent_table] > bound:
+            seeds.add(cap.dependent_table)
+            seeds.update(cap.parent_tables)
+    component: set[str] = set()
+    stack = sorted(seeds)
+    while stack:
+        node = stack.pop()
+        if node in component:
+            continue
+        component.add(node)
+        stack.extend(sorted(adjacency[node] - component))
+    for table in component:
+        counts[table] = upper[table]
+    for table, cap in capmap.items():
+        if counts[table] > cap:
+            raise GenerationFailure(
+                table=table,
+                column=None,
+                reason="row-count-capacity-exceeded",
+                detail=f"reachable upper counts still violate PK capacity {cap} for {table}",
+            )
+    for cap in capacities:
+        if counts[cap.dependent_table] > _capacity_bound(cap, counts):
+            raise GenerationFailure(
+                table=cap.dependent_table,
+                column=None,
+                reason="row-count-capacity-exceeded",
+                detail=f"reachable upper counts still violate PK capacity for {cap.dependent_table}",
+            )
+    violated = [link for link in links if counts[link.dependent_table] > counts[link.target_table]]
+    if violated:
+        raise GenerationFailure(
+            table="*",
+            column=None,
+            reason="row-count-unresolvable",
+            detail="no materializable row-count combination for "
+            + ", ".join(sorted({link.relationship for link in violated})),
+        )
+
+
 def sample_row_counts(
     *,
     scenario_id: str,
@@ -97,22 +214,45 @@ def sample_row_counts(
     rows: Mapping[str, RowCount],
     links: Sequence[CountLink] = (),
     caps: Mapping[str, int] | None = None,
+    capacity_constraints: Sequence[object] = (),
 ) -> dict[str, int]:
     """Sample per-table row counts with deterministic conditioning.
 
     Tables with ``min == max`` are exact (no stream). Each ranged table draws
-    from its own ``rows/<table>`` stream; on a link violation or capacity
-    overrun only the involved tables' streams advance. ``caps`` bounds
-    per-table counts by composite-PK tuple capacity (a table needing more
-    distinct keys than its domain allows is resampled, not failed outright —
-    §9.3); a range that cannot satisfy its cap fails fast as a range-level
-    pigeonhole. Unknown link/cap tables are a caller bug (``ValueError``);
-    exhausted conditioning is ``GenerationFailure``.
+    from its own ``rows/<table>`` stream; on a link violation, capacity
+    overrun, or dependent-capacity violation, only the involved tables'
+    streams advance. ``caps`` bounds per-table counts by composite-PK tuple
+    capacity (a table needing more distinct keys than its domain allows is
+    resampled, not failed outright — §9.3); a range that cannot satisfy its
+    cap fails fast as a range-level pigeonhole. ``capacity_constraints``
+    accepts dependent capacity descriptors with ``dependent_table: str``,
+    ``multiplier: int`` and ``parent_tables: tuple[str, ...]`` attributes,
+    evaluated as ``counts[dependent] <= multiplier * prod(counts[parent])``
+    against sampled (not declared-maximum) parent counts. Unknown
+    link/cap/capacity tables are a caller bug (``ValueError``); exhausted
+    conditioning falls back to verified reachable upper counts, and only a
+    still-violated combination raises ``GenerationFailure``.
     """
     capmap = dict(caps or {})
-    for table, cap in capmap.items():
+    capacities = list(capacity_constraints)
+    for table in capmap:
         if table not in rows:
             raise ValueError(f"capacity cap references unknown table {table!r}")
+    for link in links:
+        for table in (link.dependent_table, link.target_table):
+            if table not in rows:
+                raise ValueError(
+                    f"count link {link.relationship!r} references unknown table {table!r}"
+                )
+    for cap in capacities:
+        if cap.dependent_table not in rows:
+            raise ValueError(
+                f"capacity constraint references unknown table {cap.dependent_table!r}"
+            )
+        for parent in cap.parent_tables:
+            if parent not in rows:
+                raise ValueError(f"capacity constraint references unknown parent table {parent!r}")
+    for table, cap in capmap.items():
         if rows[table].min > cap:
             raise GenerationFailure(
                 table=table,
@@ -120,12 +260,25 @@ def sample_row_counts(
                 reason="row-count-capacity-exceeded",
                 detail=f"rows.min {rows[table].min} exceeds PK capacity {cap}",
             )
-    for link in links:
-        for table in (link.dependent_table, link.target_table):
-            if table not in rows:
-                raise ValueError(
-                    f"count link {link.relationship!r} references unknown table {table!r}"
-                )
+    upper = _reachable_uppers(rows, links, capmap, [])
+    for table in rows:
+        if upper[table] < rows[table].min:
+            raise GenerationFailure(
+                table=table,
+                column=None,
+                reason="row-count-unresolvable",
+                detail=f"rows.min {rows[table].min} exceeds reachable upper {upper[table]} "
+                "under CountLink ranges",
+            )
+    upper = _reachable_uppers(rows, links, capmap, capacities)
+    for table in rows:
+        if upper[table] < rows[table].min:
+            raise GenerationFailure(
+                table=table,
+                column=None,
+                reason="row-count-capacity-exceeded",
+                detail=f"rows.min {rows[table].min} exceeds reachable PK capacity {upper[table]}",
+            )
     streams = {}
     counts: dict[str, int] = {}
     for table, spec in rows.items():
@@ -140,7 +293,11 @@ def sample_row_counts(
             link for link in links if counts[link.dependent_table] > counts[link.target_table]
         ]
         overcap = sorted(table for table, cap in capmap.items() if counts[table] > cap)
-        if not violated and not overcap:
+        violated_caps = []
+        for cap in capacities:
+            if counts[cap.dependent_table] > _capacity_bound(cap, counts):
+                violated_caps.append(cap)
+        if not violated and not overcap and not violated_caps:
             return counts
         for table in overcap:
             if table not in streams:
@@ -153,6 +310,11 @@ def sample_row_counts(
         involved = sorted(
             {table for link in violated for table in (link.dependent_table, link.target_table)}
             | set(overcap)
+            | {
+                table
+                for cap in violated_caps
+                for table in (cap.dependent_table, *cap.parent_tables)
+            }
         )
         if not any(table in streams for table in involved):
             break
@@ -160,13 +322,8 @@ def sample_row_counts(
             if table in streams:
                 rng, spec = streams[table]
                 counts[table] = rng.randint(spec.min, spec.max)
-    raise GenerationFailure(
-        table="*",
-        column=None,
-        reason="row-count-unresolvable",
-        detail="no materializable row-count combination for "
-        + ", ".join(sorted({link.relationship for link in violated})),
-    )
+    _apply_count_fallback(counts, upper, rows, links, capmap, capacities)
+    return counts
 
 
 def direct_fk_plan(resolved: ResolvedRelationship, *, unique_dependent: bool = False) -> FkPlan:

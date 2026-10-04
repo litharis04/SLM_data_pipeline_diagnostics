@@ -196,19 +196,30 @@ def composite_pk_tier(table: TablePlan, groups: Sequence[FkGroupPlan]) -> str | 
     return "exact"
 
 
-def _pk_capacity_upper(
+@dataclass(frozen=True)
+class _PkCapacity:
+    """Dependent row-count capacity bound: ``counts[dependent_table]`` must
+    satisfy ``<= multiplier * prod(counts[parent])``. One parent-table
+    factor per atomic FK group — distinct groups contribute separately,
+    including multiple groups targeting the same table (no dedup by name).
+    Constant scalar pools (categorical size, inclusive integer/date span,
+    2 for boolean) fold into ``multiplier``. Bounds never replace the
+    runtime FK/PK checks, which stay authoritative."""
+
+    dependent_table: str
+    multiplier: int
+    parent_tables: tuple[str, ...]
+
+
+def _pk_capacity(
     table: TablePlan,
     groups: Sequence[FkGroupPlan],
-    tables: Mapping[str, TablePlan],
-) -> int | None:
-    """Static upper bound on distinct composite-PK tuples, or None when the
-    table needs no cap (non-composite or injective-member PK) or the bound
-    is unknowable (faker/random/template/float/timestamp members).
-
-    Categorical contributes its value count, integer/date ranges their exact
-    spans, booleans 2, and FK components their target's ``rows.max``
-    (universes never exceed target row counts — optimistic by design; a
-    shrunken runtime universe still fails loudly at generation)."""
+) -> _PkCapacity | None:
+    """Build the dependent capacity descriptor for one table's composite PK,
+    or None when no finite bound applies: non-composite or injective-member
+    PK (existing single-column paths suffice), or an unknown factor
+    (faker/random/template/float/timestamp leaf kinds) that must not produce
+    a guessed finite bound."""
     if composite_pk_tier(table, groups) is None:
         return None
     by_name = {c.name: c for c in table.columns}
@@ -216,26 +227,38 @@ def _pk_capacity_upper(
     for group in groups:
         for col in group.dependent_columns:
             by_dep[col] = group
-    bound = 1
+    multiplier = 1
+    parents: list[str] = []
+    seen_groups: set[tuple[str, str, str]] = set()
     for col in table.primary_key:
         cplan = by_name[col]
         if cplan.kind == "foreign_key":
-            bound *= tables[by_dep[col].target_table].rows.max
+            group = by_dep.get(col)
+            if group is None:
+                return None
+            key = (group.relationship, group.dependent_table, group.target_side)
+            if key not in seen_groups:
+                seen_groups.add(key)
+                parents.append(group.target_table)
         elif cplan.kind == "leaf":
             kind = cplan.config.kind
             if kind == "categorical":
-                bound *= len(cplan.config.values)
+                multiplier *= len(cplan.config.values)
             elif kind == "integer_range":
-                bound *= cplan.config.max - cplan.config.min + 1
+                multiplier *= cplan.config.max - cplan.config.min + 1
             elif kind == "date_range":
-                bound *= (cplan.config.max - cplan.config.min).days + 1
+                multiplier *= (cplan.config.max - cplan.config.min).days + 1
             elif kind == "boolean":
-                bound *= 2
+                multiplier *= 2
             else:
                 return None
         else:
             return None
-    return bound
+    return _PkCapacity(
+        dependent_table=table.name,
+        multiplier=multiplier,
+        parent_tables=tuple(parents),
+    )
 
 
 def build_raw_plan(validated: ValidatedScenario) -> RawPlan:
@@ -604,22 +627,26 @@ def execute_raw_plan(plan: RawPlan, data_seed: int) -> dict[str, list[dict[str, 
     """Execute the plan's units in order (wires G03–G07, no new semantics)."""
     if type(data_seed) is not int or not 0 <= data_seed <= 2**63 - 1:
         raise ValueError(f"data_seed must be a strict int in [0, 2**63 - 1], got {data_seed!r}")
-    tables_by_name = {table.name: table for table in plan.tables}
     caps = {}
+    capacities = []
     for table in plan.tables:
-        cap = _pk_capacity_upper(
+        desc = _pk_capacity(
             table,
             [g for g in plan.fk_groups if g.dependent_table == table.name],
-            tables_by_name,
         )
-        if cap is not None:
-            caps[table.name] = cap
+        if desc is None:
+            continue
+        if not desc.parent_tables:
+            caps[table.name] = desc.multiplier
+        else:
+            capacities.append(desc)
     counts = sample_row_counts(
         scenario_id=plan.scenario_id,
         data_seed=data_seed,
         rows={table.name: table.rows for table in plan.tables},
         links=list(plan.count_links),
         caps=caps,
+        capacity_constraints=capacities,
     )
     groups = {(g.relationship, g.dependent_table, g.target_side): g for g in plan.fk_groups}
     tables: dict[str, list[dict[str, object]]] = {}

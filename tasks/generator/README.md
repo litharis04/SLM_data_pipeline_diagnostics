@@ -30,7 +30,8 @@ Exact module splits MAY change; public function names MUST NOT (spec §4.4).
 
 ## Execution order
 
-Sequential, in numeric order. Each task is scoped to ~10 minutes for a lightweight agent:
+Sequential, in numeric order. G01–G19 are scoped to ~10 minutes for a lightweight agent;
+the full-corpus gates in G20 and follow-up repairs may require longer or split sessions:
 
 1. G01–G02: scaffold, API boundary, determinism foundation.
 2. G03–G07: raw-data execution (values, Faker, constraints, relationships).
@@ -39,9 +40,11 @@ Sequential, in numeric order. Each task is scoped to ~10 minutes for a lightweig
 5. G12–G16: SQL rendering + assertion lowering.
 6. G17–G19: clean control, records, cache.
 7. G20: end-to-end minimum gate (§21.0) + full-corpus dataset-build run (§21.4).
+8. [G21](g21_dependent_rowcounts.md): dependent row-count capacities, deterministic
+   conditioning/fallback, raw-version bump, and corpus regression rebuild.
 
-Later tasks consume earlier modules; do not skip ahead. G20 is the only task that runs dbt
-against the full 144-scenario corpus.
+Later tasks consume earlier modules; do not skip ahead. G20 performs the initial full-corpus
+dbt gate; G21 repeats it to verify the version-changing row-count repair.
 
 ## Shared working rules
 
