@@ -212,6 +212,23 @@ def test_descriptor_counts_fk_tuple_once():
     assert desc.parent_tables == ("u", "u")
     assert desc.multiplier == 2
 
+    composite_cols = [
+        fkcol("a", "r1", "left"),
+        fkcol("b", "r1", "left"),
+        leaf("c", CategoricalGenerator(values=("x", "y"))),
+    ]
+    composite_table = TablePlan(
+        name="t",
+        rows=RowCount(min=1, max=10),
+        columns=tuple(composite_cols),
+        declaration_column_order=("a", "b", "c"),
+        primary_key=("a", "b", "c"),
+    )
+    composite_desc = _pk_capacity(composite_table, [group("r1", "t", "left", ["a", "b"], "u")])
+    assert composite_desc is not None
+    assert composite_desc.parent_tables == ("u",)
+    assert composite_desc.multiplier == 2
+
 
 def test_descriptor_unknown_domain_has_no_bound():
     cols = [
@@ -346,6 +363,48 @@ def test_fallback_performs_no_draws(monkeypatch):
     upper = {"child": 3600, "p1": 60, "p2": 60}
     _apply_count_fallback(counts, upper, rows, [], {}, caps)
     assert counts == {"child": 3600, "p1": 60, "p2": 60}
+
+
+def _stub_always_max_rng(calls):
+    """RNG stub whose every draw returns the interval maximum (always violating
+    a tight dependent capacity), recording each draw in ``calls``."""
+
+    class _StubRng:
+        def randint(self, low, high):
+            calls.append((low, high))
+            return high
+
+    return lambda *args, **kwargs: _StubRng()
+
+
+def test_resampling_budget_counts_rng_draws(monkeypatch):
+    calls = []
+    monkeypatch.setattr(relationships_module, "stream", _stub_always_max_rng(calls))
+    monkeypatch.setattr(relationships_module, "ROW_COUNT_RETRY_LIMIT", 3)
+    rows = {"dep": RowCount(min=1, max=200), "parent": RowCount(min=30, max=30)}
+    counts = sample_row_counts(
+        scenario_id="g21-budget",
+        data_seed=11,
+        rows=rows,
+        capacity_constraints=[_PkCapacity("dep", 3, ("parent",))],
+    )
+    assert counts == {"dep": 90, "parent": 30}
+    assert len(calls) == 4
+
+
+def test_zero_retry_limit_falls_back_without_resampling(monkeypatch):
+    calls = []
+    monkeypatch.setattr(relationships_module, "stream", _stub_always_max_rng(calls))
+    monkeypatch.setattr(relationships_module, "ROW_COUNT_RETRY_LIMIT", 0)
+    rows = {"dep": RowCount(min=1, max=200), "parent": RowCount(min=30, max=30)}
+    counts = sample_row_counts(
+        scenario_id="g21-budget-zero",
+        data_seed=11,
+        rows=rows,
+        capacity_constraints=[_PkCapacity("dep", 3, ("parent",))],
+    )
+    assert counts == {"dep": 90, "parent": 30}
+    assert len(calls) == 1
 
 
 def test_invalid_capacity_references():

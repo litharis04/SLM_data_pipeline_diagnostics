@@ -122,7 +122,7 @@ def _dbt_project_yml() -> str:
         "log-path: logs\n"
         "models:\n"
         f"  {DBT_PROJECT_NAME}:\n"
-        "    +materialization: table\n"
+        "    +materialized: table\n"
     )
 
 
@@ -199,7 +199,7 @@ def render_staging_sql(model: StagingModel, source_columns: Sequence[str]) -> st
             raise ValueError(f"model {name!r}: unknown row operation {operation.op!r}")
         previous = phase
     return (
-        "{{ config(materialization='table') }}\n"
+        "{{ config(materialized='table') }}\n"
         "\n"
         "WITH " + ",\n".join(phases) + "\n"
         f"SELECT {', '.join(targets)} FROM {quote_ident(previous)}\n"
@@ -315,7 +315,7 @@ def render_transform_sql(model: object, source_columns: Sequence[str]) -> str:
     phases, previous = _filtered_tail(phases, previous, model.filters, output)
     targets = ", ".join(output)
     return (
-        "{{ config(materialization='table') }}\n"
+        "{{ config(materialized='table') }}\n"
         "\n"
         "WITH " + ",\n".join(phases) + "\n"
         f"SELECT {targets} FROM {quote_ident(previous)}\n"
@@ -380,7 +380,7 @@ def render_join_sql(
     phases, previous = _filtered_tail(phases, previous, model.filters, output)
     targets = ", ".join(output)
     return (
-        "{{ config(materialization='table') }}\n"
+        "{{ config(materialized='table') }}\n"
         "\n"
         "WITH " + ",\n".join(phases) + "\n"
         f"SELECT {targets} FROM {quote_ident(previous)}\n"
@@ -397,7 +397,7 @@ def render_deduplicate_sql(model: object, source_columns: Sequence[str]) -> str:
     keys = ", ".join(quote_ident(str(key)) for key in model.keys)
     targets = ", ".join(quote_ident(str(col)) for col in source_columns)
     return (
-        "{{ config(materialization='table') }}\n"
+        "{{ config(materialized='table') }}\n"
         "\n"
         f"WITH {quote_ident('source')} AS (\n"
         f"    SELECT {targets} FROM {{{{ ref('{model.source}') }}}}"
@@ -525,7 +525,7 @@ def _render_grouped(
         )
         previous = "filtered"
     return (
-        "{{ config(materialization='table') }}\n"
+        "{{ config(materialized='table') }}\n"
         "\n"
         "WITH " + ",\n".join(phases) + "\n"
         f"SELECT\n{select_list}\n"

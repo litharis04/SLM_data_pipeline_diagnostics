@@ -219,7 +219,7 @@ def test_full_staging_model_snapshot():
     source_columns = tuple(str(c.name) for c in raw_table.columns)
     assert (
         render_staging_sql(model, source_columns)
-        == """{{ config(materialization='table') }}
+        == """{{ config(materialized='table') }}
 
 WITH "base" AS (
     SELECT "student_id", "course_id", "enrolled", "status" FROM {{ source('raw', 'raw_enrollments') }}

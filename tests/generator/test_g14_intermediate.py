@@ -61,7 +61,7 @@ def test_transform_with_derived_and_filter_snapshot():
     columns = _output_map(validated)
     assert (
         render_transform_sql(model, columns["stg_messungen"])
-        == """{{ config(materialization='table') }}
+        == """{{ config(materialized='table') }}
 
 WITH "source" AS (
     SELECT "mess_id", "zaehler_id", "beginnt", "endet", "kwh" FROM {{ ref('stg_messungen') }}
@@ -127,7 +127,7 @@ def test_deduplicate_model_snapshot():
     )
     assert (
         render_deduplicate_sql(_intermediate(validated, "d_limits"), source_columns)
-        == """{{ config(materialization='table') }}
+        == """{{ config(materialized='table') }}
 
 WITH "source" AS (
     SELECT "limit_id", "customer_id", "active_flag", "max_amount", "used", "reviewed" FROM {{ ref('stg_limits') }}

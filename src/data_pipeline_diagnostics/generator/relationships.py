@@ -288,7 +288,7 @@ def sample_row_counts(
             rng = stream(scenario_id, data_seed, rows_stream_name(table))
             streams[table] = (rng, spec)
             counts[table] = rng.randint(spec.min, spec.max)
-    for _ in range(ROW_COUNT_RETRY_LIMIT + 1):
+    for resample_round in range(ROW_COUNT_RETRY_LIMIT + 1):
         violated = [
             link for link in links if counts[link.dependent_table] > counts[link.target_table]
         ]
@@ -317,6 +317,8 @@ def sample_row_counts(
             }
         )
         if not any(table in streams for table in involved):
+            break
+        if resample_round >= ROW_COUNT_RETRY_LIMIT:
             break
         for table in involved:
             if table in streams:

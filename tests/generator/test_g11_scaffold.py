@@ -79,7 +79,7 @@ def test_sources_and_profile_content(tmp_path):
     project = (project_dir / "dbt_project.yml").read_text(encoding="utf-8")
     assert "name: dpd_pipeline" in project
     assert "profile: dpd_pipeline" in project
-    assert "+materialization: table" in project
+    assert "+materialized: table" in project
     assert "http://" not in project and "https://" not in project
 
 

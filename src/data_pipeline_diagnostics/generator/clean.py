@@ -200,6 +200,12 @@ def _validate_build(
         return CleanBuildResult(success=False, category=category, **base)
     if project_name != "dpd_pipeline" or not manifest_models or not manifest_models <= model_ids:
         return CleanBuildResult(success=False, category="manifest-mismatch", **base)
+    nodes = manifest.get("nodes", {})
+    for unique_id in sorted(manifest_models):
+        node = nodes.get(unique_id) if isinstance(nodes, dict) else None
+        config = node.get("config") if isinstance(node, dict) else None
+        if not isinstance(config, dict) or config.get("materialized") != "table":
+            return CleanBuildResult(success=False, category="manifest-mismatch", **base)
     return CleanBuildResult(success=True, category=None, **base)
 
 

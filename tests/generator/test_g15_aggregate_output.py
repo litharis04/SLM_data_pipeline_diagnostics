@@ -92,7 +92,7 @@ def test_aggregate_snapshot_with_filter_and_conditionals():
     )
     assert (
         render_aggregate_sql(model, columns[str(model.source)])
-        == """{{ config(materialization='table') }}
+        == """{{ config(materialized='table') }}
 
 WITH "source" AS (
     SELECT "fahrt_id", "status", "betrag", "fahrzeug_id", "depot_id" FROM {{ ref('j_fahrt_fahrzeug') }}
@@ -120,7 +120,7 @@ def test_output_snapshot_group_targets_first():
     rendered = render_output_sql(model, columns[str(model.source)])
     assert (
         rendered
-        == """{{ config(materialization='table') }}
+        == """{{ config(materialized='table') }}
 
 WITH "source" AS (
     SELECT "planting_id", "area_ha", "variety_name" FROM {{ ref('j_full') }}

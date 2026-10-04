@@ -79,6 +79,39 @@ def test_green_builds_end_to_end(green_dir):
     assert any(u.startswith("model.dpd_pipeline.out_") for u in manifest["nodes"])
 
 
+def test_green_models_materialized_as_tables(green_dir):
+    validated = _validated(MINIMAL)
+    expected = {
+        str(m.name)
+        for m in (
+            *validated.scenario.staging_models,
+            *validated.scenario.intermediate_models,
+            *validated.scenario.output_models,
+        )
+    }
+    assert expected
+    manifest = json.loads((green_dir / "dbt" / "target" / "manifest.json").read_text())
+    nodes = manifest["nodes"]
+    for name in expected:
+        unique_id = f"model.dpd_pipeline.{name}"
+        assert unique_id in nodes, name
+        assert nodes[unique_id]["config"]["materialized"] == "table", name
+    db = duckdb.connect(str(green_dir / "pipeline.duckdb"), read_only=True)
+    try:
+        db.execute("SET TimeZone = 'UTC'")
+        relations = {
+            row[0]: row[1]
+            for row in db.execute(
+                "SELECT table_name, table_type FROM information_schema.tables "
+                "WHERE table_schema = 'main' ORDER BY table_name"
+            ).fetchall()
+        }
+    finally:
+        db.close()
+    assert expected <= set(relations)
+    assert all(relations[name] == "BASE TABLE" for name in expected)
+
+
 def test_failing_build_records_no_success(fail_dir):
     assert not (fail_dir / "SUCCESS").exists()
     record = json.loads((fail_dir / "failure_record.json").read_text())
