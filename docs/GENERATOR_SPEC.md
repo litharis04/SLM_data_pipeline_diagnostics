@@ -16,7 +16,7 @@ scenario. It specifies:
 - the instance record needed to reproduce and inspect a materialized pipeline.
 
 The result of this subsystem is a successful, immutable clean baseline for one exact pipeline
-instance. The downstream fault subsystem may copy or reconstruct that baseline, but it may not
+instance. Callers may copy or reconstruct that baseline, but they may not
 mutate the cached baseline itself.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
@@ -99,9 +99,7 @@ Those views MAY be computed privately by the component that needs them.
 `data_seed`, output/cache location, and runtime configuration are supplied outside the scenario.
 Version 1 accepts `data_seed` as a non-negative integer not greater than `2^63 - 1`.
 
-`data_seed` controls clean raw-data variation only. It is distinct from every future
-fault-injection seed and MUST NOT control fault selection, oracle decisions, diagnostic-tool
-order, or hidden metadata.
+`data_seed` controls raw-data variation only.
 
 ## 4. Component architecture
 
@@ -142,7 +140,7 @@ contain only facts needed to produce raw tables, such as:
 - deterministic random-stream names.
 
 Only the raw executor consumes `RawPlan`. It is neither a public artifact nor a cache identity,
-and it MUST NOT contain dbt models, SQL, tests, filesystem paths, or downstream fault metadata.
+and it MUST NOT contain dbt models, SQL, tests, or filesystem paths.
 
 ### 4.2. dbt renderer
 
@@ -223,7 +221,7 @@ serialization. The DuckDB session timezone MUST be UTC.
 ### 5.3. Layer agreement
 
 The raw generator MUST write exactly the declared raw columns, in declaration order, using the
-mapping above. It MUST NOT add an index, lineage, seed, or fault-label column.
+mapping above. It MUST NOT add an index, lineage, or seed column.
 
 The loader MUST create the `raw` schema and load each Parquet file into the exact corresponding
 raw relation. The dbt source file MUST refer to those exact relations. Staging and downstream
@@ -275,7 +273,7 @@ deterministic.
 
 ### 7.1. Scenario identifier versus content identity
 
-`scenario_id` is a human-readable scenario identity and the grouping key used by dataset splits.
+`scenario_id` is a human-readable scenario identity.
 It does not prove that the file contents are unchanged.
 
 The canonical scenario hash MUST be the lowercase SHA-256 hexadecimal digest returned by the
@@ -358,14 +356,9 @@ their names and generator configurations remain unchanged.
 
 ### 8.3. Meaning of seed variation
 
-The generator guarantees reproducibility, not training novelty. Two different seeds MAY produce
-the same value by chance, and a scenario containing deterministic generators may have few or no
-data differences. The generator MUST NOT randomize logs, dbt execution order, diagnostic-tool
-calls, or oracle actions merely to manufacture diversity.
-
-The fault catalog decides whether a fault context is seed-sensitive. Dataset construction keeps
-multiple seed variants only when their realized diagnostic evidence or justified decisions are
-materially different. This empirical selection is outside the compiler.
+The generator guarantees reproducibility. Two different seeds MAY produce the same value by
+chance, and a scenario containing deterministic generators may have few or no data differences.
+The generator MUST NOT randomize logs or dbt execution order merely to manufacture diversity.
 
 ## 9. Raw planning and execution order
 
@@ -664,7 +657,7 @@ The generated profile contains only the relative local DuckDB path and fixed ada
 it MUST NOT contain credentials or secrets.
 
 One thread is part of the deterministic execution profile. It avoids concurrency-dependent log
-ordering and makes diagnostic evidence easier to reproduce.
+ordering and makes execution evidence easier to reproduce.
 
 ### 13.2. References and order
 
@@ -963,15 +956,13 @@ MUST be logically reproducible for an identical instance identity.
 
 ## 17. Failure semantics
 
-Any failure before `SUCCESS` prevents cache publication and downstream fault injection. The
-system MUST NOT:
+Any failure before `SUCCESS` prevents cache publication. The system MUST NOT:
 
 - choose another `data_seed`;
 - silently omit the scenario or failed assertion;
 - weaken a test or change error severity;
 - coerce invalid values with `TRY_CAST`;
-- create orphan keys or truncate rows;
-- continue emitting trajectories merely to reach a target count; or
+- create orphan keys or truncate rows; or
 - mark a partial directory as a clean baseline.
 
 The failed workspace SHOULD be preserved or copied to a failure-artifact location. A structured
@@ -998,7 +989,7 @@ optional):
 
 `command` is the subprocess argv (empty when no subprocess was involved); `exit_status` is
 null in the same case; `paths` entries are instance-relative paths or null when the file is
-unavailable. It MUST NOT contain a hidden fault label because clean preparation has no fault.
+unavailable.
 Large logs and tracebacks belong in separate files rather than inline JSON.
 
 A failure for a `ValidatedScenario` is evidence of a compiler/generator/runtime defect, an
@@ -1090,11 +1081,11 @@ The record SHOULD additionally include:
 - realized row counts for materialized dbt models; and
 - deterministic logical table checksums used by reproducibility tests.
 
-These crosswalks aid diagnostics but do not replace `ValidatedScenario` or dbt's manifest.
+These crosswalks aid pipeline inspection but do not replace `ValidatedScenario` or dbt's manifest.
 
 Absolute paths and timestamps MAY be recorded in an explicitly volatile observability section,
 but they MUST NOT affect `instance_digest` or logical-equivalence checks. The record MUST NOT
-inline raw rows, full logs, secrets, fault configuration, hidden labels, or oracle-only metadata.
+inline raw rows, full logs, or secrets.
 
 ### 18.3. Publication order
 
@@ -1116,13 +1107,13 @@ A miss builds in a sibling temporary directory. Publication MUST be atomic or ra
 workers cannot expose a partial entry. A failed or mismatched entry is never repaired in place or
 reused as success.
 
-The cached baseline is immutable. The fault subsystem receives an isolated copy, copy-on-write
-clone, or deterministic reconstruction. Fault injection, dbt reruns under a fault, and diagnostic
-logs MUST occur outside the cached clean directory.
+The cached baseline is immutable. Callers receive an isolated copy, copy-on-write clone, or
+deterministic reconstruction. Workspace edits, dbt reruns, and their logs MUST occur outside the
+cached clean directory.
 
 ## 20. Deliberate non-goals
 
-The implementation MUST remain proportionate to a finite, one-time dataset-generation project.
+The implementation MUST remain proportionate to a local, scenario-driven pipeline generator.
 The following are restated here only as scope reminders; each points to the normative section
 that already prohibits or bounds it, and no item below adds or removes a requirement:
 
@@ -1137,7 +1128,7 @@ that already prohibits or bounds it, and no item below adds or removes a require
 - a separate compiler manifest in addition to `instance_record.json` and dbt's manifest
   (see section 18.1);
 - a service-backed cache or distributed scheduler (see sections 7.2 and 19); or
-- proof that every new `data_seed` creates novel diagnostic evidence (see section 8.3).
+- proof that every new `data_seed` creates distinct data (see section 8.3).
 
 Cheap internal assertions and clear failures at component boundaries are permitted. They MUST
 not become a hidden second validity language or silently narrow the accepted corpus.
@@ -1146,12 +1137,12 @@ not become a hidden second validity language or silently narrow the accepted cor
 
 The implementation is conforming only when automated tests cover sections 21.1–21.4.
 Purpose-built fixtures are the conformance gate: corpus execution supplements those
-fixtures and verifies that the actual dataset source is materializable; it does not replace
+fixtures and verifies that the scenario corpus is materializable; it does not replace
 feature-level tests.
 
 ### 21.0. Minimum gate
 
-The minimum gate that unblocks downstream work (see section 22) is:
+The minimum gate for generator integration (see section 22) is:
 
 - one positive fixture per closed-union variant (generator kind, staging operation,
   expression, condition, intermediate operation, metric, assertion type);
@@ -1164,7 +1155,7 @@ The minimum gate that unblocks downstream work (see section 22) is:
 
 The remaining items in sections 21.1–21.4 are the full conformance target and SHOULD be
 completed in the same proportions as the generator is extended; they MUST be complete before
-the one-time dataset generation run finishes.
+the corpus-build gate is complete.
 
 ### 21.1. Raw generation
 
@@ -1209,19 +1200,19 @@ the one-time dataset generation run finishes.
 - changes to canonical scenario content, `data_seed`, generator versions, or compatibility
   versions produce cache misses;
 - a failed build never produces `SUCCESS`;
-- a cached baseline remains unchanged after a fault-workspace copy is modified; and
-- before the one-time dataset generation run, every accepted corpus scenario completes at
-  least one clean seed (dataset-build gate; not part of the section 22 readiness gate).
+- a cached baseline remains unchanged after a working copy is modified; and
+- every accepted corpus scenario completes at least one clean seed for the corpus-build gate
+  (not part of the section 22 readiness gate).
 
 Purpose-built fixtures MUST cover the complete language. Corpus execution supplements those
-fixtures and verifies that the actual dataset source is materializable; it does not replace
+fixtures and verifies that the scenario corpus is materializable; it does not replace
 feature-level tests.
 
-Tests MUST run without network access and without a long cloud job.
+Tests MUST run without network access.
 
 ## 22. Readiness criteria
 
-The pipeline generator is ready for downstream use only when:
+The pipeline generator is ready for use only when:
 
 - the core API rejects a bare `Scenario` and accepts `ValidatedScenario`;
 - all version-1 constructs have deterministic raw or SQL semantics;
@@ -1235,9 +1226,8 @@ The pipeline generator is ready for downstream use only when:
 
 Readiness does not require the full corpus clean-control run: per `PIPELINE_SPEC.md` §5 the
 compiler lifecycle and the corpus lifecycle are separate. The full-corpus clean-control run
-is the dataset-build gate from section 21.4 and MUST complete before the one-time dataset
-generation run, but it MUST NOT block downstream fault-subsystem development against
-fixture-built baselines.
+is the corpus-build gate from section 21.4 and MUST complete before that corpus build is
+declared complete, but it MUST NOT block integration work against fixture-built baselines.
 
 Any disagreement among this document, `PIPELINE_SPEC.md`, `SCENARIO_SPEC.md`, the implemented
 validator, and the compiler MUST be resolved explicitly. The generator MUST not compensate for a

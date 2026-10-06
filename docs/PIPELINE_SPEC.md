@@ -5,18 +5,16 @@ Status: draft.
 ## 1. Purpose
 
 This document defines the top-level architecture and responsibility boundaries of the
-synthetic data pipeline used by the SFT fault-diagnosis project. It connects the scenario
-language, scenario authoring, deterministic compilation, clean pipeline materialization,
-and the downstream fault subsystem.
+synthetic data pipeline generator. It connects the scenario language, scenario authoring,
+deterministic compilation, and reproducible local pipeline materialization.
 
 A candidate may be accepted into the scenario corpus only after it has passed both local
 Pydantic validation and global semantic validation. Executing dbt is not an additional scenario
 validation stage. Execution applies to a concrete pipeline instance, which is identified by
 the validated scenario, a data seed, and the compiler/runtime versions.
 
-Before downstream code creates fault variants for a concrete instance, it MUST establish one
-successful clean control for that instance and MUST reuse the resulting cached clean baseline
-for every fault variant with the same identity.
+A concrete instance MUST pass a successful clean control before it is returned for use.
+Repeated preparation requests with the same identity MUST reuse the verified cached baseline.
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are normative.
 
@@ -39,17 +37,14 @@ This specification defines:
 - clean-control, caching, and failure semantics;
 - determinism and runtime provenance requirements;
 - the top-level structural-diversity requirement for the scenario corpus; and
-- the boundary between scenario coverage and downstream supervision sampling.
+- the boundary between scenario coverage and concrete pipeline instances.
 
 This specification does not define:
 
 - individual Pydantic fields, unions, validators, or the complete `scenario.json` vocabulary;
 - the detailed scenario-authoring prompt, coverage algorithm, or coverage quotas;
 - the execution algorithm of each raw-data mini-generator;
-- SQL templates, dbt project layout, or renderer internals;
-- fault families, fault applicability, or fault-injection mechanics;
-- detailed diagnostic-tool and oracle behavior;
-- SFT serialization, training hyperparameters, or evaluation thresholds.
+- SQL templates, dbt project layout, or renderer internals.
 
 Those details belong to the specifications named below.
 
@@ -61,10 +56,8 @@ Those details belong to the specifications named below.
 | `SCENARIO_SPEC.md` | Defines the complete Pydantic scenario language and the invariants enforced by local and semantic validation. |
 | Pydantic scenario code | Executable authority for JSON parsing and structural/local validation; source of generated JSON Schema. |
 | Semantic validator code | Executable authority for graph-wide and cross-object validation; produces `ValidatedScenario`. |
-| `SCENARIO_AUTHORING.md` | Defines the complete agent or human workflow for producing a useful, diverse corpus from the implemented scenario language. |
+| `SCENARIO_AUTHORING.md` | Defines the complete LLM or human workflow for producing a useful, diverse corpus from the implemented scenario language. |
 | `GENERATOR_SPEC.md` | Defines deterministic raw generation, SQL/dbt rendering, materialization, clean execution, cache layout, and generated artifacts. |
-| Downstream fault specifications | Define fault applicability, assignment, injection, reset, and validation without changing scenario validity. |
-| `TRAINING.md` and `EVALUATION.md` | Define trajectory selection, dataset serialization, grouped splits, learning-curve procedure, training, and metrics. |
 
 If the Pydantic or semantic-validator implementation disagrees with `SCENARIO_SPEC.md`, the
 implementation is defective and MUST be corrected. `SCENARIO_AUTHORING.md` MUST NOT introduce
@@ -104,15 +97,14 @@ canonical scenario content + data_seed + compiler/generator versions + runtime c
 `data_seed` is supplied outside `scenario.json` and controls every stochastic choice in raw
 generation. Changing only the seed creates a different instance of the same scenario.
 
-A **clean instance** is an instance materialized and executed without an injected fault. A
-**faulty instance** is derived from the corresponding clean baseline by the downstream fault
-subsystem.
+A **clean instance** is an instance that has been materialized and passed its raw-data checks,
+dbt build, and blocking tests.
 
 ### 4.4. Clean baseline and instance record
 
 A clean baseline is the immutable or reproducibly reconstructible set of raw data, generated
 dbt artifacts, database state, and execution evidence for one pipeline-instance identity. It
-exists to provide the counterfactual from which one or more fault variants are created.
+supports reproducible inspection and reuse of the prepared pipeline.
 
 Each successful clean control MUST produce a machine-readable instance record containing at
 least:
@@ -126,8 +118,7 @@ least:
 - successful clean-control status.
 
 The instance record contains the runtime provenance needed to reproduce the concrete pipeline
-instance. Infrastructure-only metadata and future hidden fault metadata MUST remain separable
-from the observations exposed to a diagnostic model.
+instance.
 
 ## 5. Required lifecycles
 
@@ -178,21 +169,20 @@ selected corpus scenarios MAY supplement them.
 
 ### 5.4. Pipeline-instance preparation
 
-When downstream work first requests a particular pipeline-instance identity:
+When a caller first requests a particular pipeline-instance identity:
 
 1. look for an exact successful clean baseline in the cache;
 2. if none exists, compile the `ValidatedScenario` into a raw-data plan and dbt project;
 3. materialize and load raw data using `data_seed`;
 4. execute the unmodified pipeline and its generated and explicit healthy assertions;
 5. on success, record and cache the clean baseline; and
-6. give downstream fault injection an isolated copy or reproducible reconstruction of that
-   baseline.
+6. give the caller an isolated copy or reproducible reconstruction of that baseline.
 
-Later fault variants with the same identity MUST reuse the successful baseline when its cache
-identity and artifact integrity still match. Fault injection MUST NOT mutate the cached clean
+Repeated requests with the same identity MUST reuse the successful baseline when its cache
+identity and artifact integrity still match. Callers MUST NOT mutate the cached clean
 baseline itself.
 
-Pipeline-instance preparation occurs on demand when downstream work first requests an exact
+Pipeline-instance preparation occurs on demand when a caller first requests an exact
 instance identity.
 
 ## 6. Compiler and generator responsibilities
@@ -220,7 +210,7 @@ validation stages; data-dependent postconditions — explicit `accepted_values`/
 bounds, `map_values(on_unmapped="error")` coverage, cast-format conformance, and filters that
 must retain rows — are evaluated only at clean-control time (see `GENERATOR_SPEC.md` §11.4).
 A data-dependent clean failure does not invalidate the scenario and is not normal corpus
-filtering: it aborts the current downstream build per section 7 and is fixed at the
+filtering: it aborts the current pipeline-instance build per section 7 and is fixed at the
 responsible layer (scenario edit with revalidation, or generator/runtime fix with retry of
 the same identity). A counterexample that no seed can satisfy exposes a defect or an omitted
 contract invariant.
@@ -233,13 +223,11 @@ contract invariant.
 | Cross-object semantics | Semantic validation | Every structurally valid candidate | Correct or abandon the current candidate. |
 | Corpus usefulness and diversity | Coverage document plus fresh-session independent audit | Update after each accepted scenario; audit after reported quota completion and after every remediation pass | Coverage remains incomplete or the corpus returns to authoring. |
 | Compiler implementation | Compiler conformance and integration tests | On relevant implementation or dependency changes | Compiler, generator, template, or contract defect. |
-| Concrete clean instance | Cached clean control | Once on first use of an exact instance identity | The dataset build aborts pending a project fix. |
-| Fault reproducibility and diagnosis | Downstream fault and oracle checks | For generated fault variants | Downstream defect or unsuitable fault assignment. |
+| Concrete clean instance | Cached clean control | Once on first use of an exact instance identity | The instance build aborts pending a fix. |
 
-A clean-control failure MUST stop the current downstream dataset build. The system MUST NOT
-silently discard the scenario, choose another seed, weaken an assertion, continue accepting
-other generated trajectories, or emit trajectories from the failed baseline merely to
-preserve a target example count.
+A clean-control failure MUST stop the current pipeline-instance build. The system MUST NOT
+silently discard the scenario, choose another seed, weaken an assertion, or report the failed
+instance as successful.
 
 The failure record MUST preserve enough context to reproduce and classify the problem. The
 project MUST correct the responsible specification, semantic invariant, compiler/generator
@@ -265,9 +253,6 @@ and is not duplicated here.
 A cache entry MUST NOT be reused after any identity component changes or when artifact
 integrity cannot be verified. Volatile metadata such as timestamps and absolute paths MAY be
 recorded, but MUST NOT change logical content identity.
-
-One clean baseline MAY serve any number of fault variants. The association between the clean
-identity and each hidden fault configuration belongs to the downstream fault subsystem.
 
 ## 9. Determinism and reproducibility
 
@@ -302,46 +287,14 @@ only in domain, names, literals, or seed do not provide new structural coverage.
 `SCENARIO_AUTHORING.md` defines how these dimensions become coverage targets and corpus
 completion criteria.
 
-After fault applicability is specified, the applicability audit defined by
-`SCENARIO_AUTHORING.md` MUST evaluate the validated corpus and add any missing fault-context
-requirements. Those deficits reopen scenario authoring and the independent-audit cycle.
+## 11. Corpus and instance boundary
 
-## 11. Corpus-to-supervision boundary
+Scenario coverage establishes a pool of valid pipeline contexts. Coverage targets and claims
+count distinct validated scenarios, not their materialized seed variants. Changing `data_seed`
+creates another pipeline instance of the same scenario rather than new structural coverage.
 
-Scenario coverage establishes a pool of valid pipeline contexts. Coverage targets and claims are
-constraints on that pool; downstream code MUST derive SFT allocation independently from them.
-
-Trajectory allocation follows this hierarchy:
-
-```text
-fault family
-  -> fault subtype
-  -> injection site or layer
-  -> observed symptom class
-  -> scenario context
-  -> data_seed
-```
-
-The fault and training specifications assign quotas in that order. Per-scenario trajectory counts
-are a result of applicable fault strata rather than the primary balancing unit. Each stratum MUST
-limit correlated repetitions from the same scenario and fault site so that they do not dominate
-the training mixture.
-
-The fault catalog MUST classify each fault subtype or applicability stratum by whether changing
-`data_seed` can materially change diagnostic observations or decision states. A seed-invariant
-case contributes one seed variant to SFT. A seed-sensitive case MAY contribute multiple variants
-after each has produced a valid manifestation with materially different observable evidence or a
-different justified diagnostic decision. Additional reproducible seeds MAY be reserved for
-robustness evaluation.
-
-Train, validation, and test assignment occurs at `scenario_id` granularity before fault and seed
-expansion. Every trajectory derived from the same scenario, across all faults and seeds, MUST stay
-in one partition.
-
-Training-set size is selected using nested, fault-balanced subsets and a fixed held-out scenario
-partition. `TRAINING.md` and `EVALUATION.md` MUST define an approximately geometric learning curve
-and a predeclared stopping rule over macro fault-diagnosis and tool-use metrics. Further generation
-targets the underperforming strata identified by that evaluation.
+Corpus acceptance does not establish the success of a particular pipeline instance. Each
+requested instance follows the preparation and clean-control lifecycle in section 5.4.
 
 ## 12. Exit conditions
 
@@ -351,12 +304,12 @@ for inclusion in the corpus immediately after it reaches `ValidatedScenario`. Th
 whole is complete only after the independent audit defined by `SCENARIO_AUTHORING.md` verifies
 every scenario, claim, count, requirement, and quota without finding an error.
 
-The pipeline-generation subsystem is ready for downstream use when the compiler and raw-data
+The pipeline-generation subsystem is ready for use when the compiler and raw-data
 generator implement the full validated language, the conformance suite passes, and at least
 one representative instance can be reproduced end to end. The exact readiness gate is the
 minimum conformance gate defined by `GENERATOR_SPEC.md` §21.0–§22; the full-corpus
-clean-control run belongs to the dataset-build gate, not to readiness.
+clean-control run belongs to the corpus-build gate, not to readiness.
 
-A concrete `(scenario, data_seed)` instance is eligible for fault injection only after its
-clean control succeeds and its exact baseline is recorded or cached. No downstream component
+A concrete `(scenario, data_seed)` instance is ready for use only after its
+clean control succeeds and its exact baseline is recorded or cached. No caller
 may use a bare `Scenario`, a partially validated candidate, or a failed clean baseline.
