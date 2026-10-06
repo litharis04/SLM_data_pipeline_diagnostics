@@ -19,4 +19,7 @@ wheels/
 .opencode
 
 # Tasks
-/tasks
+/tasks/*
+
+# Corpus clean-build scratch cache (run logs under artifacts/ are committed)
+/artifacts/corpus_cache/

@@ -478,6 +478,15 @@
         "luxury",
         "mid"
       ]
+    },
+    {
+      "columns": [
+        "office_id",
+        "city"
+      ],
+      "model": "stg_offices",
+      "name": "office_identity",
+      "type": "unique"
     }
   ]
 }

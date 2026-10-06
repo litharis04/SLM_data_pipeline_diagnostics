@@ -1,0 +1,4350 @@
+{
+ "ok": 432,
+ "total": 432,
+ "results": [
+  {
+   "scenario": "agriculture_coop_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_plantings": 458,
+    "raw_seeds": 19,
+    "raw_varieties": 5
+   }
+  },
+  {
+   "scenario": "agriculture_coop_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_plantings": 305,
+    "raw_seeds": 46,
+    "raw_varieties": 5
+   }
+  },
+  {
+   "scenario": "agriculture_coop_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_plantings": 384,
+    "raw_seeds": 31,
+    "raw_varieties": 5
+   }
+  },
+  {
+   "scenario": "agriculture_exports_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_coops": 5,
+    "raw_grades": 9,
+    "raw_lots": 43,
+    "raw_shipments": 204
+   }
+  },
+  {
+   "scenario": "agriculture_exports_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_coops": 5,
+    "raw_grades": 9,
+    "raw_lots": 35,
+    "raw_shipments": 204
+   }
+  },
+  {
+   "scenario": "agriculture_exports_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_coops": 5,
+    "raw_grades": 9,
+    "raw_lots": 29,
+    "raw_shipments": 145
+   }
+  },
+  {
+   "scenario": "agriculture_harvest_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_farms": 12,
+    "raw_fields": 50,
+    "raw_harvests": 275
+   }
+  },
+  {
+   "scenario": "agriculture_harvest_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_farms": 12,
+    "raw_fields": 46,
+    "raw_harvests": 168
+   }
+  },
+  {
+   "scenario": "agriculture_harvest_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_farms": 12,
+    "raw_fields": 46,
+    "raw_harvests": 261
+   }
+  },
+  {
+   "scenario": "agriculture_harvests_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_ernten": 397,
+    "raw_felder": 26,
+    "raw_hoefe": 10
+   }
+  },
+  {
+   "scenario": "agriculture_harvests_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_ernten": 456,
+    "raw_felder": 20,
+    "raw_hoefe": 10
+   }
+  },
+  {
+   "scenario": "agriculture_harvests_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_ernten": 398,
+    "raw_felder": 24,
+    "raw_hoefe": 10
+   }
+  },
+  {
+   "scenario": "agriculture_irrigation_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_crops": 4,
+    "raw_plantings": 89,
+    "raw_plots": 20,
+    "raw_soil": 20
+   }
+  },
+  {
+   "scenario": "agriculture_irrigation_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_crops": 4,
+    "raw_plantings": 148,
+    "raw_plots": 20,
+    "raw_soil": 20
+   }
+  },
+  {
+   "scenario": "agriculture_irrigation_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_crops": 4,
+    "raw_plantings": 139,
+    "raw_plots": 20,
+    "raw_soil": 20
+   }
+  },
+  {
+   "scenario": "agriculture_livestock_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_animals": 53,
+    "raw_pens": 8,
+    "raw_weights": 423
+   }
+  },
+  {
+   "scenario": "agriculture_livestock_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_animals": 112,
+    "raw_pens": 8,
+    "raw_weights": 301
+   }
+  },
+  {
+   "scenario": "agriculture_livestock_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_animals": 104,
+    "raw_pens": 8,
+    "raw_weights": 455
+   }
+  },
+  {
+   "scenario": "agriculture_organic_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_buyers": 8,
+    "raw_farms": 10,
+    "raw_lots": 291
+   }
+  },
+  {
+   "scenario": "agriculture_organic_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_buyers": 8,
+    "raw_farms": 10,
+    "raw_lots": 188
+   }
+  },
+  {
+   "scenario": "agriculture_organic_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_buyers": 8,
+    "raw_farms": 10,
+    "raw_lots": 443
+   }
+  },
+  {
+   "scenario": "agriculture_soil_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_labs": 6,
+    "raw_plots": 28,
+    "raw_soils": 365
+   }
+  },
+  {
+   "scenario": "agriculture_soil_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_labs": 6,
+    "raw_plots": 36,
+    "raw_soils": 446
+   }
+  },
+  {
+   "scenario": "agriculture_soil_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_labs": 6,
+    "raw_plots": 32,
+    "raw_soils": 280
+   }
+  },
+  {
+   "scenario": "agriculture_yield_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_farms": 8,
+    "raw_fields": 48,
+    "raw_harvests": 169
+   }
+  },
+  {
+   "scenario": "agriculture_yield_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_farms": 8,
+    "raw_fields": 36,
+    "raw_harvests": 201
+   }
+  },
+  {
+   "scenario": "agriculture_yield_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_farms": 8,
+    "raw_fields": 38,
+    "raw_harvests": 341
+   }
+  },
+  {
+   "scenario": "education_admissions_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_applications": 264,
+    "raw_programs": 8,
+    "raw_reviewers": 12
+   }
+  },
+  {
+   "scenario": "education_admissions_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_applications": 383,
+    "raw_programs": 8,
+    "raw_reviewers": 12
+   }
+  },
+  {
+   "scenario": "education_admissions_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_applications": 481,
+    "raw_programs": 8,
+    "raw_reviewers": 12
+   }
+  },
+  {
+   "scenario": "education_assessments_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_attempts": 147,
+    "raw_courses": 17,
+    "raw_levels": 2
+   }
+  },
+  {
+   "scenario": "education_assessments_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_attempts": 278,
+    "raw_courses": 11,
+    "raw_levels": 2
+   }
+  },
+  {
+   "scenario": "education_assessments_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_attempts": 187,
+    "raw_courses": 9,
+    "raw_levels": 2
+   }
+  },
+  {
+   "scenario": "education_cohorts_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_courses": 10,
+    "raw_enrollments": 240,
+    "raw_students": 40,
+    "raw_transcripts": 106
+   }
+  },
+  {
+   "scenario": "education_cohorts_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_courses": 10,
+    "raw_enrollments": 240,
+    "raw_students": 40,
+    "raw_transcripts": 72
+   }
+  },
+  {
+   "scenario": "education_cohorts_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_courses": 10,
+    "raw_enrollments": 240,
+    "raw_students": 40,
+    "raw_transcripts": 113
+   }
+  },
+  {
+   "scenario": "education_courses_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_courses": 29,
+    "raw_enrollments": 355,
+    "raw_schools": 8
+   }
+  },
+  {
+   "scenario": "education_courses_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_courses": 36,
+    "raw_enrollments": 170,
+    "raw_schools": 8
+   }
+  },
+  {
+   "scenario": "education_courses_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_courses": 30,
+    "raw_enrollments": 195,
+    "raw_schools": 8
+   }
+  },
+  {
+   "scenario": "education_enrollments_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_departments": 4,
+    "raw_enrollments": 180,
+    "raw_terms": 12
+   }
+  },
+  {
+   "scenario": "education_enrollments_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_departments": 4,
+    "raw_enrollments": 188,
+    "raw_terms": 12
+   }
+  },
+  {
+   "scenario": "education_enrollments_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_departments": 4,
+    "raw_enrollments": 187,
+    "raw_terms": 12
+   }
+  },
+  {
+   "scenario": "education_grants_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_donors": 20,
+    "raw_funds": 8,
+    "raw_grants": 317
+   }
+  },
+  {
+   "scenario": "education_grants_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_donors": 20,
+    "raw_funds": 8,
+    "raw_grants": 197
+   }
+  },
+  {
+   "scenario": "education_grants_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_donors": 20,
+    "raw_funds": 8,
+    "raw_grants": 411
+   }
+  },
+  {
+   "scenario": "education_libraries_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_books": 71,
+    "raw_libraries": 6,
+    "raw_loans": 568,
+    "raw_members": 40
+   }
+  },
+  {
+   "scenario": "education_libraries_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_books": 41,
+    "raw_libraries": 6,
+    "raw_loans": 486,
+    "raw_members": 40
+   }
+  },
+  {
+   "scenario": "education_libraries_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_books": 69,
+    "raw_libraries": 6,
+    "raw_loans": 344,
+    "raw_members": 40
+   }
+  },
+  {
+   "scenario": "education_scholarships_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_awards": 473,
+    "raw_donors": 15,
+    "raw_funds": 34
+   }
+  },
+  {
+   "scenario": "education_scholarships_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_awards": 310,
+    "raw_donors": 15,
+    "raw_funds": 26
+   }
+  },
+  {
+   "scenario": "education_scholarships_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_awards": 284,
+    "raw_donors": 15,
+    "raw_funds": 17
+   }
+  },
+  {
+   "scenario": "education_terms_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_courses": 12,
+    "raw_enrollments": 418,
+    "raw_students": 20
+   }
+  },
+  {
+   "scenario": "education_terms_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_courses": 12,
+    "raw_enrollments": 211,
+    "raw_students": 20
+   }
+  },
+  {
+   "scenario": "education_terms_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_courses": 12,
+    "raw_enrollments": 192,
+    "raw_students": 20
+   }
+  },
+  {
+   "scenario": "energy_blackouts_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_events": 476,
+    "raw_lines": 16,
+    "raw_regions": 6
+   }
+  },
+  {
+   "scenario": "energy_blackouts_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_events": 289,
+    "raw_lines": 13,
+    "raw_regions": 6
+   }
+  },
+  {
+   "scenario": "energy_blackouts_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_events": 349,
+    "raw_lines": 19,
+    "raw_regions": 6
+   }
+  },
+  {
+   "scenario": "energy_dispatch_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 45,
+    "raw_readings": 164,
+    "raw_substations": 8
+   }
+  },
+  {
+   "scenario": "energy_dispatch_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 28,
+    "raw_readings": 266,
+    "raw_substations": 8
+   }
+  },
+  {
+   "scenario": "energy_dispatch_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 19,
+    "raw_readings": 312,
+    "raw_substations": 8
+   }
+  },
+  {
+   "scenario": "energy_grid_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 30,
+    "raw_readings": 374,
+    "raw_substations": 8
+   }
+  },
+  {
+   "scenario": "energy_grid_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 25,
+    "raw_readings": 447,
+    "raw_substations": 8
+   }
+  },
+  {
+   "scenario": "energy_grid_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 24,
+    "raw_readings": 583,
+    "raw_substations": 8
+   }
+  },
+  {
+   "scenario": "energy_meters_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_households": 15,
+    "raw_meters": 45,
+    "raw_readings": 207
+   }
+  },
+  {
+   "scenario": "energy_meters_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_households": 15,
+    "raw_meters": 26,
+    "raw_readings": 111
+   }
+  },
+  {
+   "scenario": "energy_meters_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_households": 15,
+    "raw_meters": 39,
+    "raw_readings": 256
+   }
+  },
+  {
+   "scenario": "energy_meters_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_messungen": 479,
+    "raw_sites": 10,
+    "raw_zaehler": 24
+   }
+  },
+  {
+   "scenario": "energy_meters_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_messungen": 164,
+    "raw_sites": 10,
+    "raw_zaehler": 30
+   }
+  },
+  {
+   "scenario": "energy_meters_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_messungen": 173,
+    "raw_sites": 10,
+    "raw_zaehler": 22
+   }
+  },
+  {
+   "scenario": "energy_outages_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 29,
+    "raw_outages": 194,
+    "raw_substations": 6
+   }
+  },
+  {
+   "scenario": "energy_outages_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 26,
+    "raw_outages": 103,
+    "raw_substations": 6
+   }
+  },
+  {
+   "scenario": "energy_outages_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_feeders": 15,
+    "raw_outages": 225,
+    "raw_substations": 6
+   }
+  },
+  {
+   "scenario": "energy_retail_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_meters": 34,
+    "raw_readings": 165,
+    "raw_utilities": 6
+   }
+  },
+  {
+   "scenario": "energy_retail_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_meters": 28,
+    "raw_readings": 301,
+    "raw_utilities": 6
+   }
+  },
+  {
+   "scenario": "energy_retail_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_meters": 31,
+    "raw_readings": 238,
+    "raw_utilities": 6
+   }
+  },
+  {
+   "scenario": "energy_tariffs_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 20,
+    "raw_meters": 20,
+    "raw_readings": 294
+   }
+  },
+  {
+   "scenario": "energy_tariffs_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 20,
+    "raw_meters": 20,
+    "raw_readings": 386
+   }
+  },
+  {
+   "scenario": "energy_tariffs_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 20,
+    "raw_meters": 20,
+    "raw_readings": 249
+   }
+  },
+  {
+   "scenario": "energy_trading_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 30,
+    "raw_deliveries": 385,
+    "raw_desks": 6,
+    "raw_schedules": 30
+   }
+  },
+  {
+   "scenario": "energy_trading_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 30,
+    "raw_deliveries": 212,
+    "raw_desks": 6,
+    "raw_schedules": 30
+   }
+  },
+  {
+   "scenario": "energy_trading_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 30,
+    "raw_deliveries": 289,
+    "raw_desks": 6,
+    "raw_schedules": 30
+   }
+  },
+  {
+   "scenario": "finance_audits_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_audits": 50,
+    "raw_branches": 8,
+    "raw_findings": 343
+   }
+  },
+  {
+   "scenario": "finance_audits_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_audits": 46,
+    "raw_branches": 8,
+    "raw_findings": 481
+   }
+  },
+  {
+   "scenario": "finance_audits_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_audits": 54,
+    "raw_branches": 8,
+    "raw_findings": 369
+   }
+  },
+  {
+   "scenario": "finance_branches_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 36,
+    "raw_branches": 10,
+    "raw_transactions": 538
+   }
+  },
+  {
+   "scenario": "finance_branches_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 22,
+    "raw_branches": 10,
+    "raw_transactions": 327
+   }
+  },
+  {
+   "scenario": "finance_branches_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 41,
+    "raw_branches": 10,
+    "raw_transactions": 429
+   }
+  },
+  {
+   "scenario": "finance_cards_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_auths": 468,
+    "raw_cards": 30,
+    "raw_limits": 90
+   }
+  },
+  {
+   "scenario": "finance_cards_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_auths": 577,
+    "raw_cards": 30,
+    "raw_limits": 79
+   }
+  },
+  {
+   "scenario": "finance_cards_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_auths": 411,
+    "raw_cards": 30,
+    "raw_limits": 61
+   }
+  },
+  {
+   "scenario": "finance_fx_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_deals": 225,
+    "raw_desks": 6,
+    "raw_traders": 27
+   }
+  },
+  {
+   "scenario": "finance_fx_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_deals": 393,
+    "raw_desks": 6,
+    "raw_traders": 27
+   }
+  },
+  {
+   "scenario": "finance_fx_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_deals": 277,
+    "raw_desks": 6,
+    "raw_traders": 29
+   }
+  },
+  {
+   "scenario": "finance_ledger_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 20,
+    "raw_entries": 475,
+    "raw_merchants": 15
+   }
+  },
+  {
+   "scenario": "finance_ledger_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 20,
+    "raw_entries": 321,
+    "raw_merchants": 15
+   }
+  },
+  {
+   "scenario": "finance_ledger_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 20,
+    "raw_entries": 333,
+    "raw_merchants": 15
+   }
+  },
+  {
+   "scenario": "finance_limits_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_customers": 20,
+    "raw_limits": 73,
+    "raw_transactions": 443
+   }
+  },
+  {
+   "scenario": "finance_limits_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_customers": 20,
+    "raw_limits": 79,
+    "raw_transactions": 348
+   }
+  },
+  {
+   "scenario": "finance_limits_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_customers": 20,
+    "raw_limits": 62,
+    "raw_transactions": 237
+   }
+  },
+  {
+   "scenario": "finance_positions_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 25,
+    "raw_instruments": 8,
+    "raw_positions": 231
+   }
+  },
+  {
+   "scenario": "finance_positions_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 25,
+    "raw_instruments": 8,
+    "raw_positions": 259
+   }
+  },
+  {
+   "scenario": "finance_positions_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 25,
+    "raw_instruments": 8,
+    "raw_positions": 86
+   }
+  },
+  {
+   "scenario": "finance_settlements_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 15,
+    "raw_batches": 496,
+    "raw_counterparties": 12
+   }
+  },
+  {
+   "scenario": "finance_settlements_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 15,
+    "raw_batches": 350,
+    "raw_counterparties": 12
+   }
+  },
+  {
+   "scenario": "finance_settlements_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 15,
+    "raw_batches": 257,
+    "raw_counterparties": 12
+   }
+  },
+  {
+   "scenario": "finance_treasury_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 20,
+    "raw_counterparties": 15,
+    "raw_payments": 598
+   }
+  },
+  {
+   "scenario": "finance_treasury_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 20,
+    "raw_counterparties": 15,
+    "raw_payments": 217
+   }
+  },
+  {
+   "scenario": "finance_treasury_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_accounts": 20,
+    "raw_counterparties": 15,
+    "raw_payments": 207
+   }
+  },
+  {
+   "scenario": "healthcare_appointments_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_appointments": 125,
+    "raw_doctors": 10,
+    "raw_patients": 30
+   }
+  },
+  {
+   "scenario": "healthcare_appointments_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_appointments": 100,
+    "raw_doctors": 10,
+    "raw_patients": 30
+   }
+  },
+  {
+   "scenario": "healthcare_appointments_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_appointments": 106,
+    "raw_doctors": 10,
+    "raw_patients": 30
+   }
+  },
+  {
+   "scenario": "healthcare_dosage_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_admins": 171,
+    "raw_medications": 23,
+    "raw_units": 4
+   }
+  },
+  {
+   "scenario": "healthcare_dosage_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_admins": 330,
+    "raw_medications": 32,
+    "raw_units": 4
+   }
+  },
+  {
+   "scenario": "healthcare_dosage_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_admins": 269,
+    "raw_medications": 16,
+    "raw_units": 4
+   }
+  },
+  {
+   "scenario": "healthcare_labs_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_labs": 301,
+    "raw_orders": 94,
+    "raw_patients": 25
+   }
+  },
+  {
+   "scenario": "healthcare_labs_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_labs": 384,
+    "raw_orders": 74,
+    "raw_patients": 25
+   }
+  },
+  {
+   "scenario": "healthcare_labs_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_labs": 196,
+    "raw_orders": 149,
+    "raw_patients": 25
+   }
+  },
+  {
+   "scenario": "healthcare_outreach_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_campaigns": 8,
+    "raw_outreaches": 455,
+    "raw_patients": 30
+   }
+  },
+  {
+   "scenario": "healthcare_outreach_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_campaigns": 8,
+    "raw_outreaches": 404,
+    "raw_patients": 30
+   }
+  },
+  {
+   "scenario": "healthcare_outreach_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_campaigns": 8,
+    "raw_outreaches": 367,
+    "raw_patients": 30
+   }
+  },
+  {
+   "scenario": "healthcare_protocols_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_arms": 23,
+    "raw_enrollments": 368,
+    "raw_protocols": 8
+   }
+  },
+  {
+   "scenario": "healthcare_protocols_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_arms": 20,
+    "raw_enrollments": 500,
+    "raw_protocols": 8
+   }
+  },
+  {
+   "scenario": "healthcare_protocols_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_arms": 22,
+    "raw_enrollments": 397,
+    "raw_protocols": 8
+   }
+  },
+  {
+   "scenario": "healthcare_screenings_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_programs": 10,
+    "raw_screenings": 344,
+    "raw_sites": 8
+   }
+  },
+  {
+   "scenario": "healthcare_screenings_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_programs": 10,
+    "raw_screenings": 303,
+    "raw_sites": 8
+   }
+  },
+  {
+   "scenario": "healthcare_screenings_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_programs": 10,
+    "raw_screenings": 460,
+    "raw_sites": 8
+   }
+  },
+  {
+   "scenario": "healthcare_transfers_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_hospitals": 8,
+    "raw_transfers": 481,
+    "raw_wards": 28
+   }
+  },
+  {
+   "scenario": "healthcare_transfers_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_hospitals": 8,
+    "raw_transfers": 475,
+    "raw_wards": 26
+   }
+  },
+  {
+   "scenario": "healthcare_transfers_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_hospitals": 8,
+    "raw_transfers": 265,
+    "raw_wards": 21
+   }
+  },
+  {
+   "scenario": "healthcare_trials_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_arms": 26,
+    "raw_enrollments": 210,
+    "raw_trials": 8
+   }
+  },
+  {
+   "scenario": "healthcare_trials_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_arms": 32,
+    "raw_enrollments": 363,
+    "raw_trials": 8
+   }
+  },
+  {
+   "scenario": "healthcare_trials_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_arms": 20,
+    "raw_enrollments": 236,
+    "raw_trials": 8
+   }
+  },
+  {
+   "scenario": "healthcare_visits_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_doctors": 6,
+    "raw_patients": 40,
+    "raw_rx": 211,
+    "raw_visits": 162
+   }
+  },
+  {
+   "scenario": "healthcare_visits_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_doctors": 6,
+    "raw_patients": 40,
+    "raw_rx": 163,
+    "raw_visits": 145
+   }
+  },
+  {
+   "scenario": "healthcare_visits_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_doctors": 6,
+    "raw_patients": 40,
+    "raw_rx": 46,
+    "raw_visits": 123
+   }
+  },
+  {
+   "scenario": "hospitality_bookings_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_buchungen": 443,
+    "raw_gaeste": 515,
+    "raw_hotels": 10
+   }
+  },
+  {
+   "scenario": "hospitality_bookings_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_buchungen": 352,
+    "raw_gaeste": 420,
+    "raw_hotels": 10
+   }
+  },
+  {
+   "scenario": "hospitality_bookings_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_buchungen": 413,
+    "raw_gaeste": 542,
+    "raw_hotels": 10
+   }
+  },
+  {
+   "scenario": "hospitality_boutique_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_guests": 30,
+    "raw_rooms": 12,
+    "raw_stays": 450
+   }
+  },
+  {
+   "scenario": "hospitality_boutique_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_guests": 30,
+    "raw_rooms": 12,
+    "raw_stays": 211
+   }
+  },
+  {
+   "scenario": "hospitality_boutique_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_guests": 30,
+    "raw_rooms": 12,
+    "raw_stays": 497
+   }
+  },
+  {
+   "scenario": "hospitality_events_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_events": 191,
+    "raw_organizers": 10,
+    "raw_venues": 12
+   }
+  },
+  {
+   "scenario": "hospitality_events_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_events": 321,
+    "raw_organizers": 10,
+    "raw_venues": 12
+   }
+  },
+  {
+   "scenario": "hospitality_events_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_events": 443,
+    "raw_organizers": 10,
+    "raw_venues": 12
+   }
+  },
+  {
+   "scenario": "hospitality_loyalty_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_members": 30,
+    "raw_redemptions": 214,
+    "raw_rewards": 10
+   }
+  },
+  {
+   "scenario": "hospitality_loyalty_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_members": 30,
+    "raw_redemptions": 298,
+    "raw_rewards": 10
+   }
+  },
+  {
+   "scenario": "hospitality_loyalty_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_members": 30,
+    "raw_redemptions": 245,
+    "raw_rewards": 10
+   }
+  },
+  {
+   "scenario": "hospitality_rates_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 338,
+    "raw_hotels": 8,
+    "raw_types": 23
+   }
+  },
+  {
+   "scenario": "hospitality_rates_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 162,
+    "raw_hotels": 8,
+    "raw_types": 22
+   }
+  },
+  {
+   "scenario": "hospitality_rates_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 380,
+    "raw_hotels": 8,
+    "raw_types": 17
+   }
+  },
+  {
+   "scenario": "hospitality_revenue_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_properties": 4,
+    "raw_rooms": 16,
+    "raw_stays": 197
+   }
+  },
+  {
+   "scenario": "hospitality_revenue_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_properties": 4,
+    "raw_rooms": 14,
+    "raw_stays": 226
+   }
+  },
+  {
+   "scenario": "hospitality_revenue_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_properties": 4,
+    "raw_rooms": 35,
+    "raw_stays": 109
+   }
+  },
+  {
+   "scenario": "hospitality_spa_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 376,
+    "raw_centers": 6,
+    "raw_therapists": 34
+   }
+  },
+  {
+   "scenario": "hospitality_spa_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 191,
+    "raw_centers": 6,
+    "raw_therapists": 26
+   }
+  },
+  {
+   "scenario": "hospitality_spa_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 294,
+    "raw_centers": 6,
+    "raw_therapists": 14
+   }
+  },
+  {
+   "scenario": "hospitality_staffing_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_assignments": 458,
+    "raw_hotels": 8,
+    "raw_shifts": 26
+   }
+  },
+  {
+   "scenario": "hospitality_staffing_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_assignments": 493,
+    "raw_hotels": 8,
+    "raw_shifts": 52
+   }
+  },
+  {
+   "scenario": "hospitality_staffing_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_assignments": 182,
+    "raw_hotels": 8,
+    "raw_shifts": 60
+   }
+  },
+  {
+   "scenario": "hospitality_stays_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 98,
+    "raw_guests": 30,
+    "raw_room_nights": 60
+   }
+  },
+  {
+   "scenario": "hospitality_stays_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 138,
+    "raw_guests": 30,
+    "raw_room_nights": 60
+   }
+  },
+  {
+   "scenario": "hospitality_stays_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_bookings": 77,
+    "raw_guests": 30,
+    "raw_room_nights": 60
+   }
+  },
+  {
+   "scenario": "hr_attrition_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_departments": 5,
+    "raw_employees": 47,
+    "raw_reviews": 229
+   }
+  },
+  {
+   "scenario": "hr_attrition_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_departments": 5,
+    "raw_employees": 66,
+    "raw_reviews": 191
+   }
+  },
+  {
+   "scenario": "hr_attrition_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_departments": 5,
+    "raw_employees": 57,
+    "raw_reviews": 113
+   }
+  },
+  {
+   "scenario": "hr_benefits_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_employees": 20,
+    "raw_enrollments": 480,
+    "raw_plans": 8
+   }
+  },
+  {
+   "scenario": "hr_benefits_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_employees": 20,
+    "raw_enrollments": 267,
+    "raw_plans": 8
+   }
+  },
+  {
+   "scenario": "hr_benefits_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_employees": 20,
+    "raw_enrollments": 335,
+    "raw_plans": 8
+   }
+  },
+  {
+   "scenario": "hr_bonuses_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_boni": 419,
+    "raw_mitarbeiter": 20,
+    "raw_positionen": 50
+   }
+  },
+  {
+   "scenario": "hr_bonuses_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_boni": 208,
+    "raw_mitarbeiter": 20,
+    "raw_positionen": 60
+   }
+  },
+  {
+   "scenario": "hr_bonuses_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_boni": 317,
+    "raw_mitarbeiter": 20,
+    "raw_positionen": 55
+   }
+  },
+  {
+   "scenario": "hr_compensation_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 20,
+    "raw_employees": 20,
+    "raw_payroll": 160
+   }
+  },
+  {
+   "scenario": "hr_compensation_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 20,
+    "raw_employees": 20,
+    "raw_payroll": 226
+   }
+  },
+  {
+   "scenario": "hr_compensation_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 20,
+    "raw_employees": 20,
+    "raw_payroll": 248
+   }
+  },
+  {
+   "scenario": "hr_onboarding_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_hires": 44,
+    "raw_offices": 8,
+    "raw_tasks": 155
+   }
+  },
+  {
+   "scenario": "hr_onboarding_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_hires": 53,
+    "raw_offices": 8,
+    "raw_tasks": 272
+   }
+  },
+  {
+   "scenario": "hr_onboarding_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_hires": 82,
+    "raw_offices": 8,
+    "raw_tasks": 426
+   }
+  },
+  {
+   "scenario": "hr_recruiting_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_candidates": 72,
+    "raw_interviews": 66,
+    "raw_requisitions": 6
+   }
+  },
+  {
+   "scenario": "hr_recruiting_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_candidates": 57,
+    "raw_interviews": 100,
+    "raw_requisitions": 6
+   }
+  },
+  {
+   "scenario": "hr_recruiting_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_candidates": 49,
+    "raw_interviews": 160,
+    "raw_requisitions": 6
+   }
+  },
+  {
+   "scenario": "hr_referrals_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_employees": 20,
+    "raw_hires": 141,
+    "raw_referrals": 75
+   }
+  },
+  {
+   "scenario": "hr_referrals_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_employees": 20,
+    "raw_hires": 125,
+    "raw_referrals": 59
+   }
+  },
+  {
+   "scenario": "hr_referrals_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_employees": 20,
+    "raw_hires": 184,
+    "raw_referrals": 81
+   }
+  },
+  {
+   "scenario": "hr_reviews_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_departments": 5,
+    "raw_employees": 45,
+    "raw_reviews": 372
+   }
+  },
+  {
+   "scenario": "hr_reviews_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_departments": 5,
+    "raw_employees": 59,
+    "raw_reviews": 398
+   }
+  },
+  {
+   "scenario": "hr_reviews_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_departments": 5,
+    "raw_employees": 42,
+    "raw_reviews": 350
+   }
+  },
+  {
+   "scenario": "hr_shifts_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_attendance": 467,
+    "raw_departments": 5,
+    "raw_employees": 36,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "hr_shifts_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_attendance": 208,
+    "raw_departments": 5,
+    "raw_employees": 29,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "hr_shifts_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_attendance": 467,
+    "raw_departments": 5,
+    "raw_employees": 49,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "insurance_claims_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_claims": 237,
+    "raw_holders": 25,
+    "raw_policies": 50
+   }
+  },
+  {
+   "scenario": "insurance_claims_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_claims": 489,
+    "raw_holders": 25,
+    "raw_policies": 59
+   }
+  },
+  {
+   "scenario": "insurance_claims_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_claims": 168,
+    "raw_holders": 25,
+    "raw_policies": 71
+   }
+  },
+  {
+   "scenario": "insurance_claims_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_kunden": 20,
+    "raw_policen": 50,
+    "raw_schaeden": 385
+   }
+  },
+  {
+   "scenario": "insurance_claims_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_kunden": 20,
+    "raw_policen": 52,
+    "raw_schaeden": 382
+   }
+  },
+  {
+   "scenario": "insurance_claims_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_kunden": 20,
+    "raw_policen": 47,
+    "raw_schaeden": 326
+   }
+  },
+  {
+   "scenario": "insurance_fleet_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_claims": 485,
+    "raw_policies": 36,
+    "raw_terms": 95
+   }
+  },
+  {
+   "scenario": "insurance_fleet_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_claims": 435,
+    "raw_policies": 37,
+    "raw_terms": 105
+   }
+  },
+  {
+   "scenario": "insurance_fleet_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_claims": 204,
+    "raw_policies": 46,
+    "raw_terms": 81
+   }
+  },
+  {
+   "scenario": "insurance_network_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 498,
+    "raw_plans": 8,
+    "raw_providers": 12
+   }
+  },
+  {
+   "scenario": "insurance_network_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 233,
+    "raw_plans": 8,
+    "raw_providers": 12
+   }
+  },
+  {
+   "scenario": "insurance_network_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_contracts": 338,
+    "raw_plans": 8,
+    "raw_providers": 12
+   }
+  },
+  {
+   "scenario": "insurance_policies_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_holders": 20,
+    "raw_policies": 60,
+    "raw_schedules": 60
+   }
+  },
+  {
+   "scenario": "insurance_policies_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_holders": 20,
+    "raw_policies": 60,
+    "raw_schedules": 60
+   }
+  },
+  {
+   "scenario": "insurance_policies_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_holders": 20,
+    "raw_policies": 60,
+    "raw_schedules": 60
+   }
+  },
+  {
+   "scenario": "insurance_premiums_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_claims": 433,
+    "raw_holders": 12,
+    "raw_policies": 29
+   }
+  },
+  {
+   "scenario": "insurance_premiums_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_claims": 590,
+    "raw_holders": 12,
+    "raw_policies": 67
+   }
+  },
+  {
+   "scenario": "insurance_premiums_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_claims": 373,
+    "raw_holders": 12,
+    "raw_policies": 29
+   }
+  },
+  {
+   "scenario": "insurance_reports_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_claims": 479,
+    "raw_policies": 34
+   }
+  },
+  {
+   "scenario": "insurance_reports_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_claims": 202,
+    "raw_policies": 43
+   }
+  },
+  {
+   "scenario": "insurance_reports_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_claims": 493,
+    "raw_policies": 57
+   }
+  },
+  {
+   "scenario": "insurance_settlements_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_claims": 384,
+    "raw_holders": 15,
+    "raw_policies": 52
+   }
+  },
+  {
+   "scenario": "insurance_settlements_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_claims": 239,
+    "raw_holders": 15,
+    "raw_policies": 26
+   }
+  },
+  {
+   "scenario": "insurance_settlements_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_claims": 195,
+    "raw_holders": 15,
+    "raw_policies": 34
+   }
+  },
+  {
+   "scenario": "insurance_underwriting_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_applicants": 37,
+    "raw_policies": 85
+   }
+  },
+  {
+   "scenario": "insurance_underwriting_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_applicants": 37,
+    "raw_policies": 152
+   }
+  },
+  {
+   "scenario": "insurance_underwriting_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_applicants": 38,
+    "raw_policies": 85
+   }
+  },
+  {
+   "scenario": "logistics_brokers_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_brokers": 12,
+    "raw_lanes": 10,
+    "raw_shipments": 575
+   }
+  },
+  {
+   "scenario": "logistics_brokers_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_brokers": 12,
+    "raw_lanes": 10,
+    "raw_shipments": 506
+   }
+  },
+  {
+   "scenario": "logistics_brokers_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_brokers": 12,
+    "raw_lanes": 10,
+    "raw_shipments": 319
+   }
+  },
+  {
+   "scenario": "logistics_customs_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_calls": 296,
+    "raw_ports": 6,
+    "raw_vessels": 20
+   }
+  },
+  {
+   "scenario": "logistics_customs_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_calls": 415,
+    "raw_ports": 6,
+    "raw_vessels": 20
+   }
+  },
+  {
+   "scenario": "logistics_customs_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_calls": 165,
+    "raw_ports": 6,
+    "raw_vessels": 20
+   }
+  },
+  {
+   "scenario": "logistics_deliveries_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_deliveries": 159,
+    "raw_hubs": 8,
+    "raw_routes": 46
+   }
+  },
+  {
+   "scenario": "logistics_deliveries_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_deliveries": 413,
+    "raw_hubs": 8,
+    "raw_routes": 19
+   }
+  },
+  {
+   "scenario": "logistics_deliveries_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_deliveries": 488,
+    "raw_hubs": 8,
+    "raw_routes": 36
+   }
+  },
+  {
+   "scenario": "logistics_fleet_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_depots": 5,
+    "raw_shipments": 216,
+    "raw_vehicles": 11
+   }
+  },
+  {
+   "scenario": "logistics_fleet_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_depots": 5,
+    "raw_shipments": 205,
+    "raw_vehicles": 24
+   }
+  },
+  {
+   "scenario": "logistics_fleet_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_depots": 5,
+    "raw_shipments": 218,
+    "raw_vehicles": 15
+   }
+  },
+  {
+   "scenario": "logistics_forwarders_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_containers": 333,
+    "raw_forwarders": 12,
+    "raw_shipments": 38
+   }
+  },
+  {
+   "scenario": "logistics_forwarders_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_containers": 422,
+    "raw_forwarders": 12,
+    "raw_shipments": 55
+   }
+  },
+  {
+   "scenario": "logistics_forwarders_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_containers": 365,
+    "raw_forwarders": 12,
+    "raw_shipments": 49
+   }
+  },
+  {
+   "scenario": "logistics_quays_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_berths": 10,
+    "raw_calls": 212,
+    "raw_terminals": 10
+   }
+  },
+  {
+   "scenario": "logistics_quays_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_berths": 10,
+    "raw_calls": 335,
+    "raw_terminals": 10
+   }
+  },
+  {
+   "scenario": "logistics_quays_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_berths": 10,
+    "raw_calls": 251,
+    "raw_terminals": 10
+   }
+  },
+  {
+   "scenario": "logistics_routes_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_assignments": 200,
+    "raw_drivers": 20,
+    "raw_route_days": 25
+   }
+  },
+  {
+   "scenario": "logistics_routes_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_assignments": 283,
+    "raw_drivers": 20,
+    "raw_route_days": 25
+   }
+  },
+  {
+   "scenario": "logistics_routes_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_assignments": 257,
+    "raw_drivers": 20,
+    "raw_route_days": 25
+   }
+  },
+  {
+   "scenario": "logistics_tracking_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_carriers": 12,
+    "raw_hubs": 8,
+    "raw_shipments": 232
+   }
+  },
+  {
+   "scenario": "logistics_tracking_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_carriers": 12,
+    "raw_hubs": 8,
+    "raw_shipments": 452
+   }
+  },
+  {
+   "scenario": "logistics_tracking_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_carriers": 12,
+    "raw_hubs": 8,
+    "raw_shipments": 474
+   }
+  },
+  {
+   "scenario": "logistics_yards_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_haulers": 15,
+    "raw_moves": 491,
+    "raw_yards": 8
+   }
+  },
+  {
+   "scenario": "logistics_yards_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_haulers": 15,
+    "raw_moves": 487,
+    "raw_yards": 8
+   }
+  },
+  {
+   "scenario": "logistics_yards_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_haulers": 15,
+    "raw_moves": 280,
+    "raw_yards": 8
+   }
+  },
+  {
+   "scenario": "manufacturing_batch_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_batches": 39,
+    "raw_lines": 6,
+    "raw_measurements": 380
+   }
+  },
+  {
+   "scenario": "manufacturing_batch_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_batches": 51,
+    "raw_lines": 6,
+    "raw_measurements": 166
+   }
+  },
+  {
+   "scenario": "manufacturing_batch_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_batches": 25,
+    "raw_lines": 6,
+    "raw_measurements": 419
+   }
+  },
+  {
+   "scenario": "manufacturing_batches_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_batches": 20,
+    "raw_defects": 91,
+    "raw_qc": 45
+   }
+  },
+  {
+   "scenario": "manufacturing_batches_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_batches": 20,
+    "raw_defects": 64,
+    "raw_qc": 58
+   }
+  },
+  {
+   "scenario": "manufacturing_batches_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_batches": 20,
+    "raw_defects": 66,
+    "raw_qc": 37
+   }
+  },
+  {
+   "scenario": "manufacturing_cells_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_cells": 5,
+    "raw_machines": 8,
+    "raw_readings": 267
+   }
+  },
+  {
+   "scenario": "manufacturing_cells_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_cells": 5,
+    "raw_machines": 8,
+    "raw_readings": 235
+   }
+  },
+  {
+   "scenario": "manufacturing_cells_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_cells": 5,
+    "raw_machines": 8,
+    "raw_readings": 318
+   }
+  },
+  {
+   "scenario": "manufacturing_maintenance_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_events": 260,
+    "raw_machines": 12,
+    "raw_technicians": 12
+   }
+  },
+  {
+   "scenario": "manufacturing_maintenance_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_events": 260,
+    "raw_machines": 12,
+    "raw_technicians": 12
+   }
+  },
+  {
+   "scenario": "manufacturing_maintenance_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_events": 136,
+    "raw_machines": 12,
+    "raw_technicians": 12
+   }
+  },
+  {
+   "scenario": "manufacturing_orders_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_auftraege": 345,
+    "raw_maschinen": 10,
+    "raw_teile": 328
+   }
+  },
+  {
+   "scenario": "manufacturing_orders_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_auftraege": 311,
+    "raw_maschinen": 10,
+    "raw_teile": 323
+   }
+  },
+  {
+   "scenario": "manufacturing_orders_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_auftraege": 478,
+    "raw_maschinen": 10,
+    "raw_teile": 505
+   }
+  },
+  {
+   "scenario": "manufacturing_qc_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_defects": 196,
+    "raw_lines": 6,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "manufacturing_qc_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_defects": 296,
+    "raw_lines": 6,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "manufacturing_qc_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_defects": 284,
+    "raw_lines": 6,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "manufacturing_serials_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_lines": 29,
+    "raw_plants": 6,
+    "raw_units": 259
+   }
+  },
+  {
+   "scenario": "manufacturing_serials_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_lines": 31,
+    "raw_plants": 6,
+    "raw_units": 204
+   }
+  },
+  {
+   "scenario": "manufacturing_serials_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_lines": 27,
+    "raw_plants": 6,
+    "raw_units": 200
+   }
+  },
+  {
+   "scenario": "manufacturing_tools_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_cribs": 6,
+    "raw_tools": 42,
+    "raw_withdrawals": 383
+   }
+  },
+  {
+   "scenario": "manufacturing_tools_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_cribs": 6,
+    "raw_tools": 50,
+    "raw_withdrawals": 239
+   }
+  },
+  {
+   "scenario": "manufacturing_tools_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_cribs": 6,
+    "raw_tools": 36,
+    "raw_withdrawals": 156
+   }
+  },
+  {
+   "scenario": "manufacturing_yield_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_lines": 6,
+    "raw_runs": 204,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "manufacturing_yield_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_lines": 6,
+    "raw_runs": 151,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "manufacturing_yield_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_lines": 6,
+    "raw_runs": 239,
+    "raw_shifts": 2
+   }
+  },
+  {
+   "scenario": "media_advertising_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_airings": 409,
+    "raw_programs": 40,
+    "raw_stations": 8
+   }
+  },
+  {
+   "scenario": "media_advertising_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_airings": 411,
+    "raw_programs": 39,
+    "raw_stations": 8
+   }
+  },
+  {
+   "scenario": "media_advertising_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_airings": 154,
+    "raw_programs": 23,
+    "raw_stations": 8
+   }
+  },
+  {
+   "scenario": "media_airings_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_ausstrahlungen": 288,
+    "raw_episoden": 85,
+    "raw_programme": 10
+   }
+  },
+  {
+   "scenario": "media_airings_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_ausstrahlungen": 251,
+    "raw_episoden": 62,
+    "raw_programme": 10
+   }
+  },
+  {
+   "scenario": "media_airings_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_ausstrahlungen": 161,
+    "raw_episoden": 93,
+    "raw_programme": 10
+   }
+  },
+  {
+   "scenario": "media_archives_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_loans": 293,
+    "raw_reels": 29,
+    "raw_vaults": 6
+   }
+  },
+  {
+   "scenario": "media_archives_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_loans": 480,
+    "raw_reels": 46,
+    "raw_vaults": 6
+   }
+  },
+  {
+   "scenario": "media_archives_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_loans": 267,
+    "raw_reels": 33,
+    "raw_vaults": 6
+   }
+  },
+  {
+   "scenario": "media_highlights_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_airings": 248,
+    "raw_channels": 8,
+    "raw_programs": 33
+   }
+  },
+  {
+   "scenario": "media_highlights_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_airings": 460,
+    "raw_channels": 8,
+    "raw_programs": 24
+   }
+  },
+  {
+   "scenario": "media_highlights_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_airings": 361,
+    "raw_channels": 8,
+    "raw_programs": 42
+   }
+  },
+  {
+   "scenario": "media_logs_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_airings": 195,
+    "raw_channels": 8,
+    "raw_clips": 217,
+    "raw_programs": 39
+   }
+  },
+  {
+   "scenario": "media_logs_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_airings": 78,
+    "raw_channels": 8,
+    "raw_clips": 178,
+    "raw_programs": 45
+   }
+  },
+  {
+   "scenario": "media_logs_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_airings": 117,
+    "raw_channels": 8,
+    "raw_clips": 285,
+    "raw_programs": 25
+   }
+  },
+  {
+   "scenario": "media_podcasts_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_episodes": 462,
+    "raw_seasons": 35,
+    "raw_shows": 12
+   }
+  },
+  {
+   "scenario": "media_podcasts_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_episodes": 337,
+    "raw_seasons": 37,
+    "raw_shows": 12
+   }
+  },
+  {
+   "scenario": "media_podcasts_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_episodes": 449,
+    "raw_seasons": 39,
+    "raw_shows": 12
+   }
+  },
+  {
+   "scenario": "media_schedule_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_airings": 326,
+    "raw_channels": 8,
+    "raw_programs": 33
+   }
+  },
+  {
+   "scenario": "media_schedule_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_airings": 432,
+    "raw_channels": 8,
+    "raw_programs": 45
+   }
+  },
+  {
+   "scenario": "media_schedule_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_airings": 201,
+    "raw_channels": 8,
+    "raw_programs": 26
+   }
+  },
+  {
+   "scenario": "media_streams_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_channels": 15,
+    "raw_creators": 15,
+    "raw_videos": 127
+   }
+  },
+  {
+   "scenario": "media_streams_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_channels": 15,
+    "raw_creators": 15,
+    "raw_videos": 361
+   }
+  },
+  {
+   "scenario": "media_streams_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_channels": 15,
+    "raw_creators": 15,
+    "raw_videos": 151
+   }
+  },
+  {
+   "scenario": "media_subtitles_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_episodes": 236,
+    "raw_shows": 30,
+    "raw_studios": 6
+   }
+  },
+  {
+   "scenario": "media_subtitles_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_episodes": 411,
+    "raw_shows": 35,
+    "raw_studios": 6
+   }
+  },
+  {
+   "scenario": "media_subtitles_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_episodes": 246,
+    "raw_shows": 20,
+    "raw_studios": 6
+   }
+  },
+  {
+   "scenario": "realestate_agencies_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 10,
+    "raw_listings": 46,
+    "raw_viewings": 328
+   }
+  },
+  {
+   "scenario": "realestate_agencies_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 10,
+    "raw_listings": 47,
+    "raw_viewings": 375
+   }
+  },
+  {
+   "scenario": "realestate_agencies_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 10,
+    "raw_listings": 54,
+    "raw_viewings": 381
+   }
+  },
+  {
+   "scenario": "realestate_agents_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agents": 24,
+    "raw_listings": 272,
+    "raw_offices": 5
+   }
+  },
+  {
+   "scenario": "realestate_agents_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agents": 20,
+    "raw_listings": 177,
+    "raw_offices": 5
+   }
+  },
+  {
+   "scenario": "realestate_agents_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agents": 29,
+    "raw_listings": 244,
+    "raw_offices": 5
+   }
+  },
+  {
+   "scenario": "realestate_appraisals_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_appraisers": 8,
+    "raw_properties": 28,
+    "raw_valuations": 165
+   }
+  },
+  {
+   "scenario": "realestate_appraisals_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_appraisers": 8,
+    "raw_properties": 31,
+    "raw_valuations": 305
+   }
+  },
+  {
+   "scenario": "realestate_appraisals_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_appraisers": 8,
+    "raw_properties": 20,
+    "raw_valuations": 200
+   }
+  },
+  {
+   "scenario": "realestate_leases_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_leases": 317,
+    "raw_properties": 10,
+    "raw_units": 35
+   }
+  },
+  {
+   "scenario": "realestate_leases_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_leases": 370,
+    "raw_properties": 10,
+    "raw_units": 25
+   }
+  },
+  {
+   "scenario": "realestate_leases_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_leases": 154,
+    "raw_properties": 10,
+    "raw_units": 54
+   }
+  },
+  {
+   "scenario": "realestate_listings_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agents": 26,
+    "raw_listings": 352,
+    "raw_neighborhoods": 6
+   }
+  },
+  {
+   "scenario": "realestate_listings_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agents": 15,
+    "raw_listings": 308,
+    "raw_neighborhoods": 6
+   }
+  },
+  {
+   "scenario": "realestate_listings_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agents": 10,
+    "raw_listings": 325,
+    "raw_neighborhoods": 6
+   }
+  },
+  {
+   "scenario": "realestate_portfolio_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 8,
+    "raw_leases": 402,
+    "raw_properties": 43
+   }
+  },
+  {
+   "scenario": "realestate_portfolio_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 8,
+    "raw_leases": 311,
+    "raw_properties": 17
+   }
+  },
+  {
+   "scenario": "realestate_portfolio_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 8,
+    "raw_leases": 349,
+    "raw_properties": 30
+   }
+  },
+  {
+   "scenario": "realestate_rentals_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 8,
+    "raw_leases": 248,
+    "raw_properties": 16
+   }
+  },
+  {
+   "scenario": "realestate_rentals_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 8,
+    "raw_leases": 485,
+    "raw_properties": 32
+   }
+  },
+  {
+   "scenario": "realestate_rentals_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agencies": 8,
+    "raw_leases": 331,
+    "raw_properties": 32
+   }
+  },
+  {
+   "scenario": "realestate_valuations_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_districts": 6,
+    "raw_properties": 22,
+    "raw_valuations": 220
+   }
+  },
+  {
+   "scenario": "realestate_valuations_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_districts": 6,
+    "raw_properties": 46,
+    "raw_valuations": 421
+   }
+  },
+  {
+   "scenario": "realestate_valuations_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_districts": 6,
+    "raw_properties": 46,
+    "raw_valuations": 485
+   }
+  },
+  {
+   "scenario": "realestate_viewings_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_besichtigungen": 393,
+    "raw_makler": 10,
+    "raw_objekte": 12
+   }
+  },
+  {
+   "scenario": "realestate_viewings_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_besichtigungen": 151,
+    "raw_makler": 10,
+    "raw_objekte": 12
+   }
+  },
+  {
+   "scenario": "realestate_viewings_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_besichtigungen": 487,
+    "raw_makler": 10,
+    "raw_objekte": 12
+   }
+  },
+  {
+   "scenario": "retail_catalog_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_brands": 6,
+    "raw_products": 21,
+    "raw_stock": 148
+   }
+  },
+  {
+   "scenario": "retail_catalog_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_brands": 6,
+    "raw_products": 18,
+    "raw_stock": 88
+   }
+  },
+  {
+   "scenario": "retail_catalog_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_brands": 6,
+    "raw_products": 13,
+    "raw_stock": 206
+   }
+  },
+  {
+   "scenario": "retail_clearance_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_outlets": 8,
+    "raw_products": 31,
+    "raw_sales": 297
+   }
+  },
+  {
+   "scenario": "retail_clearance_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_outlets": 8,
+    "raw_products": 43,
+    "raw_sales": 308
+   }
+  },
+  {
+   "scenario": "retail_clearance_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_outlets": 8,
+    "raw_products": 16,
+    "raw_sales": 298
+   }
+  },
+  {
+   "scenario": "retail_gifting_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_customers": 30,
+    "raw_products": 20,
+    "raw_wishlists": 203
+   }
+  },
+  {
+   "scenario": "retail_gifting_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_customers": 30,
+    "raw_products": 20,
+    "raw_wishlists": 166
+   }
+  },
+  {
+   "scenario": "retail_gifting_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_customers": 30,
+    "raw_products": 20,
+    "raw_wishlists": 211
+   }
+  },
+  {
+   "scenario": "retail_inventory_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_stock": 375,
+    "raw_suppliers": 10,
+    "raw_warehouses": 6
+   }
+  },
+  {
+   "scenario": "retail_inventory_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_stock": 315,
+    "raw_suppliers": 10,
+    "raw_warehouses": 6
+   }
+  },
+  {
+   "scenario": "retail_inventory_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_stock": 289,
+    "raw_suppliers": 10,
+    "raw_warehouses": 6
+   }
+  },
+  {
+   "scenario": "retail_loyalty_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_members": 50,
+    "raw_purchases": 338,
+    "raw_stores": 8
+   }
+  },
+  {
+   "scenario": "retail_loyalty_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_members": 50,
+    "raw_purchases": 351,
+    "raw_stores": 8
+   }
+  },
+  {
+   "scenario": "retail_loyalty_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_members": 50,
+    "raw_purchases": 486,
+    "raw_stores": 8
+   }
+  },
+  {
+   "scenario": "retail_orders_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_customers": 50,
+    "raw_orders": 110,
+    "raw_products": 18
+   }
+  },
+  {
+   "scenario": "retail_orders_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_customers": 50,
+    "raw_orders": 246,
+    "raw_products": 12
+   }
+  },
+  {
+   "scenario": "retail_orders_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_customers": 50,
+    "raw_orders": 331,
+    "raw_products": 23
+   }
+  },
+  {
+   "scenario": "retail_pricing_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_products": 15,
+    "raw_sales": 498,
+    "raw_stores": 8
+   }
+  },
+  {
+   "scenario": "retail_pricing_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_products": 15,
+    "raw_sales": 600,
+    "raw_stores": 8
+   }
+  },
+  {
+   "scenario": "retail_pricing_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_products": 15,
+    "raw_sales": 215,
+    "raw_stores": 8
+   }
+  },
+  {
+   "scenario": "retail_returns_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_customers": 40,
+    "raw_orders": 50,
+    "raw_returns": 43
+   }
+  },
+  {
+   "scenario": "retail_returns_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_customers": 40,
+    "raw_orders": 50,
+    "raw_returns": 35
+   }
+  },
+  {
+   "scenario": "retail_returns_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_customers": 40,
+    "raw_orders": 50,
+    "raw_returns": 43
+   }
+  },
+  {
+   "scenario": "retail_reviews_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_brands": 8,
+    "raw_details": 30,
+    "raw_products": 30
+   }
+  },
+  {
+   "scenario": "retail_reviews_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_brands": 8,
+    "raw_details": 30,
+    "raw_products": 30
+   }
+  },
+  {
+   "scenario": "retail_reviews_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_brands": 8,
+    "raw_details": 30,
+    "raw_products": 30
+   }
+  },
+  {
+   "scenario": "sports_calendar_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_fixtures": 65,
+    "raw_tickets": 389,
+    "raw_venues": 8
+   }
+  },
+  {
+   "scenario": "sports_calendar_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_fixtures": 56,
+    "raw_tickets": 291,
+    "raw_venues": 8
+   }
+  },
+  {
+   "scenario": "sports_calendar_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_fixtures": 26,
+    "raw_tickets": 279,
+    "raw_venues": 8
+   }
+  },
+  {
+   "scenario": "sports_camps_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_athletes": 36,
+    "raw_camps": 6,
+    "raw_sessions": 379
+   }
+  },
+  {
+   "scenario": "sports_camps_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_athletes": 44,
+    "raw_camps": 6,
+    "raw_sessions": 255
+   }
+  },
+  {
+   "scenario": "sports_camps_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_athletes": 47,
+    "raw_camps": 6,
+    "raw_sessions": 488
+   }
+  },
+  {
+   "scenario": "sports_fixtures_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_fixtures": 392,
+    "raw_seasons": 4,
+    "raw_teams": 12
+   }
+  },
+  {
+   "scenario": "sports_fixtures_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_fixtures": 483,
+    "raw_seasons": 4,
+    "raw_teams": 12
+   }
+  },
+  {
+   "scenario": "sports_fixtures_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_fixtures": 248,
+    "raw_seasons": 4,
+    "raw_teams": 12
+   }
+  },
+  {
+   "scenario": "sports_league_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_games": 209,
+    "raw_teams": 10,
+    "raw_venues": 6
+   }
+  },
+  {
+   "scenario": "sports_league_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_games": 224,
+    "raw_teams": 10,
+    "raw_venues": 6
+   }
+  },
+  {
+   "scenario": "sports_league_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_games": 142,
+    "raw_teams": 10,
+    "raw_venues": 6
+   }
+  },
+  {
+   "scenario": "sports_matches_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_spiele": 203,
+    "raw_spieler": 36,
+    "raw_vereine": 10
+   }
+  },
+  {
+   "scenario": "sports_matches_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_spiele": 206,
+    "raw_spieler": 35,
+    "raw_vereine": 10
+   }
+  },
+  {
+   "scenario": "sports_matches_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_spiele": 480,
+    "raw_spieler": 35,
+    "raw_vereine": 10
+   }
+  },
+  {
+   "scenario": "sports_standings_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_matches": 249,
+    "raw_seasons": 4,
+    "raw_teams": 12
+   }
+  },
+  {
+   "scenario": "sports_standings_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_matches": 414,
+    "raw_seasons": 4,
+    "raw_teams": 12
+   }
+  },
+  {
+   "scenario": "sports_standings_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_matches": 236,
+    "raw_seasons": 4,
+    "raw_teams": 12
+   }
+  },
+  {
+   "scenario": "sports_training_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_athletes": 25,
+    "raw_drills": 8,
+    "raw_sessions": 171
+   }
+  },
+  {
+   "scenario": "sports_training_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_athletes": 25,
+    "raw_drills": 8,
+    "raw_sessions": 205
+   }
+  },
+  {
+   "scenario": "sports_training_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_athletes": 25,
+    "raw_drills": 8,
+    "raw_sessions": 471
+   }
+  },
+  {
+   "scenario": "sports_transfers_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_club_seasons": 12,
+    "raw_contracts": 168,
+    "raw_players": 40
+   }
+  },
+  {
+   "scenario": "sports_transfers_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_club_seasons": 12,
+    "raw_contracts": 118,
+    "raw_players": 40
+   }
+  },
+  {
+   "scenario": "sports_transfers_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_club_seasons": 12,
+    "raw_contracts": 123,
+    "raw_players": 40
+   }
+  },
+  {
+   "scenario": "sports_venues_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_matches": 379,
+    "raw_teams": 32,
+    "raw_venues": 8
+   }
+  },
+  {
+   "scenario": "sports_venues_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_matches": 325,
+    "raw_teams": 18,
+    "raw_venues": 8
+   }
+  },
+  {
+   "scenario": "sports_venues_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_matches": 306,
+    "raw_teams": 17,
+    "raw_venues": 8
+   }
+  },
+  {
+   "scenario": "telecom_billing_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_customers": 30,
+    "raw_invoices": 315,
+    "raw_plans": 8
+   }
+  },
+  {
+   "scenario": "telecom_billing_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_customers": 30,
+    "raw_invoices": 388,
+    "raw_plans": 8
+   }
+  },
+  {
+   "scenario": "telecom_billing_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_customers": 30,
+    "raw_invoices": 380,
+    "raw_plans": 8
+   }
+  },
+  {
+   "scenario": "telecom_calls_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_gespraeche": 233,
+    "raw_tarife": 8,
+    "raw_teilnehmer": 20
+   }
+  },
+  {
+   "scenario": "telecom_calls_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_gespraeche": 388,
+    "raw_tarife": 8,
+    "raw_teilnehmer": 44
+   }
+  },
+  {
+   "scenario": "telecom_calls_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_gespraeche": 447,
+    "raw_tarife": 8,
+    "raw_teilnehmer": 31
+   }
+  },
+  {
+   "scenario": "telecom_overage_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_plans": 8,
+    "raw_subscribers": 30,
+    "raw_usages": 379
+   }
+  },
+  {
+   "scenario": "telecom_overage_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_plans": 8,
+    "raw_subscribers": 30,
+    "raw_usages": 402
+   }
+  },
+  {
+   "scenario": "telecom_overage_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_plans": 8,
+    "raw_subscribers": 30,
+    "raw_usages": 265
+   }
+  },
+  {
+   "scenario": "telecom_quotas_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_plans": 8,
+    "raw_subscribers": 30,
+    "raw_usages": 157
+   }
+  },
+  {
+   "scenario": "telecom_quotas_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_plans": 8,
+    "raw_subscribers": 30,
+    "raw_usages": 223
+   }
+  },
+  {
+   "scenario": "telecom_quotas_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_plans": 8,
+    "raw_subscribers": 30,
+    "raw_usages": 211
+   }
+  },
+  {
+   "scenario": "telecom_roaming_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_plans": 6,
+    "raw_subscribers": 30,
+    "raw_usages": 183
+   }
+  },
+  {
+   "scenario": "telecom_roaming_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_plans": 6,
+    "raw_subscribers": 30,
+    "raw_usages": 251
+   }
+  },
+  {
+   "scenario": "telecom_roaming_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_plans": 6,
+    "raw_subscribers": 30,
+    "raw_usages": 159
+   }
+  },
+  {
+   "scenario": "telecom_sim_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_activations": 171,
+    "raw_regions": 6,
+    "raw_sims": 40
+   }
+  },
+  {
+   "scenario": "telecom_sim_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_activations": 269,
+    "raw_regions": 6,
+    "raw_sims": 50
+   }
+  },
+  {
+   "scenario": "telecom_sim_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_activations": 234,
+    "raw_regions": 6,
+    "raw_sims": 34
+   }
+  },
+  {
+   "scenario": "telecom_subscribers_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_billing": 60,
+    "raw_subscribers": 30,
+    "raw_subscriptions": 60
+   }
+  },
+  {
+   "scenario": "telecom_subscribers_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_billing": 60,
+    "raw_subscribers": 30,
+    "raw_subscriptions": 60
+   }
+  },
+  {
+   "scenario": "telecom_subscribers_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_billing": 60,
+    "raw_subscribers": 30,
+    "raw_subscriptions": 60
+   }
+  },
+  {
+   "scenario": "telecom_support_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_escalations": 174,
+    "raw_tickets": 37
+   }
+  },
+  {
+   "scenario": "telecom_support_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_escalations": 121,
+    "raw_tickets": 51
+   }
+  },
+  {
+   "scenario": "telecom_support_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_agents": 12,
+    "raw_escalations": 153,
+    "raw_tickets": 56
+   }
+  },
+  {
+   "scenario": "telecom_usage_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_sims": 60,
+    "raw_subscribers": 20,
+    "raw_usages": 174
+   }
+  },
+  {
+   "scenario": "telecom_usage_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_sims": 51,
+    "raw_subscribers": 20,
+    "raw_usages": 258
+   }
+  },
+  {
+   "scenario": "telecom_usage_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_sims": 55,
+    "raw_subscribers": 20,
+    "raw_usages": 395
+   }
+  },
+  {
+   "scenario": "transport_cargo_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_clients": 25,
+    "raw_shipments": 397,
+    "raw_vessels": 15
+   }
+  },
+  {
+   "scenario": "transport_cargo_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_clients": 25,
+    "raw_shipments": 440,
+    "raw_vessels": 15
+   }
+  },
+  {
+   "scenario": "transport_cargo_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_clients": 25,
+    "raw_shipments": 185,
+    "raw_vessels": 15
+   }
+  },
+  {
+   "scenario": "transport_customs_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_calls": 352,
+    "raw_ports": 8,
+    "raw_vessels": 20
+   }
+  },
+  {
+   "scenario": "transport_customs_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_calls": 407,
+    "raw_ports": 8,
+    "raw_vessels": 20
+   }
+  },
+  {
+   "scenario": "transport_customs_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_calls": 325,
+    "raw_ports": 8,
+    "raw_vessels": 20
+   }
+  },
+  {
+   "scenario": "transport_fleet_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_managers": 8,
+    "raw_routes": 23,
+    "raw_runs": 372
+   }
+  },
+  {
+   "scenario": "transport_fleet_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_managers": 8,
+    "raw_routes": 26,
+    "raw_runs": 328
+   }
+  },
+  {
+   "scenario": "transport_fleet_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_managers": 8,
+    "raw_routes": 38,
+    "raw_runs": 344
+   }
+  },
+  {
+   "scenario": "transport_fuel_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_depots": 8,
+    "raw_fuelings": 255,
+    "raw_vehicles": 23
+   }
+  },
+  {
+   "scenario": "transport_fuel_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_depots": 8,
+    "raw_fuelings": 219,
+    "raw_vehicles": 35
+   }
+  },
+  {
+   "scenario": "transport_fuel_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_depots": 8,
+    "raw_fuelings": 310,
+    "raw_vehicles": 38
+   }
+  },
+  {
+   "scenario": "transport_parcels_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_couriers": 15,
+    "raw_depots": 10,
+    "raw_parcels": 251
+   }
+  },
+  {
+   "scenario": "transport_parcels_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_couriers": 15,
+    "raw_depots": 10,
+    "raw_parcels": 273
+   }
+  },
+  {
+   "scenario": "transport_parcels_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_couriers": 15,
+    "raw_depots": 10,
+    "raw_parcels": 459
+   }
+  },
+  {
+   "scenario": "transport_schedules_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_lines": 8,
+    "raw_schedules": 480,
+    "raw_trips": 19
+   }
+  },
+  {
+   "scenario": "transport_schedules_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_lines": 8,
+    "raw_schedules": 285,
+    "raw_trips": 28
+   }
+  },
+  {
+   "scenario": "transport_schedules_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_lines": 8,
+    "raw_schedules": 415,
+    "raw_trips": 34
+   }
+  },
+  {
+   "scenario": "transport_tracking_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_carriers": 10,
+    "raw_pings": 483,
+    "raw_vehicles": 48
+   }
+  },
+  {
+   "scenario": "transport_tracking_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_carriers": 10,
+    "raw_pings": 382,
+    "raw_vehicles": 48
+   }
+  },
+  {
+   "scenario": "transport_tracking_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_carriers": 10,
+    "raw_pings": 495,
+    "raw_vehicles": 20
+   }
+  },
+  {
+   "scenario": "transport_trips_001.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_drivers": 20,
+    "raw_routes": 8,
+    "raw_trips": 258
+   }
+  },
+  {
+   "scenario": "transport_trips_001.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_drivers": 20,
+    "raw_routes": 8,
+    "raw_trips": 140
+   }
+  },
+  {
+   "scenario": "transport_trips_001.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_drivers": 20,
+    "raw_routes": 8,
+    "raw_trips": 220
+   }
+  },
+  {
+   "scenario": "transport_trips_002.json",
+   "seed": 0,
+   "ok": true,
+   "counts": {
+    "raw_depots": 8,
+    "raw_fahrten": 383,
+    "raw_fahrzeuge": 21
+   }
+  },
+  {
+   "scenario": "transport_trips_002.json",
+   "seed": 1,
+   "ok": true,
+   "counts": {
+    "raw_depots": 8,
+    "raw_fahrten": 311,
+    "raw_fahrzeuge": 21
+   }
+  },
+  {
+   "scenario": "transport_trips_002.json",
+   "seed": 7,
+   "ok": true,
+   "counts": {
+    "raw_depots": 8,
+    "raw_fahrten": 302,
+    "raw_fahrzeuge": 26
+   }
+  }
+ ]
+}

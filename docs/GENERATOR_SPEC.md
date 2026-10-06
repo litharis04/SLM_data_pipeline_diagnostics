@@ -412,6 +412,26 @@ are implementation-versioned and MUST NOT depend on wall-clock time.
 Failure to find a materializable combination is a clean-instance failure and exposes a contract,
 scenario, or generator defect. It is not permission to switch `data_seed`.
 
+Before drawing row-count proposals, the generator MUST compute reachable upper bounds for every
+constrained table (`_reachable_uppers`) from constant caps, link lower-bound inequalities, and
+dependent capacities (`bound = multiplier × Π counts[parent]`). If the declared ranges admit
+no combination satisfying those upper bounds, sampling MUST fail early before any RNG draw,
+identifying the table and the limiting constraint: `row-count-capacity-exceeded` when a
+table's `rows.min` exceeds its reachable PK capacity, `row-count-unresolvable` when
+`CountLink` ranges alone are incompatible. A sampled combination that violates a supported
+bound is resampled using only the involved row-count streams, preserving unrelated streams:
+the initial proposals are checked once, then at most `ROW_COUNT_RETRY_LIMIT` resampling
+rounds follow. If violations remain after the budget is exhausted while a satisfying
+combination exists, the deterministic fallback (`_apply_count_fallback`) MUST build the
+undirected dependency graph over ALL supported count constraints (tables bound only by
+constant caps form isolated vertices), take the union of the connected components containing
+the remaining violations, and set exactly those tables' counts to their previously computed
+reachable uppers — leaving every other count at its sampled proposal and consuming no
+additional RNG draws. The fallback MUST verify all count constraints before any value
+generation; only genuinely materializable combinations (e.g. exact child counts that force
+a parent to its maximum) use this path. It preserves exact counts and declared intervals,
+never switches seed, truncates data, or weakens keys/tests.
+
 ### 9.4. Row identity and ordering
 
 Each raw table has an internal zero-based row index used during generation. It MUST NOT be written
@@ -631,7 +651,10 @@ The generated project MUST:
   `clean`;
 - reference `../pipeline.duckdb` through a relative profile path;
 - use `dbt-duckdb` with one thread;
-- materialize every staging, intermediate, and output model as a table;
+- materialize every staging, intermediate, and output model as a table, using exactly
+  the dbt configuration key `materialized` (both the project-level `+materialized: table`
+  setting and the per-model `{{ config(materialized='table') }}` header); the key
+  `materialization` is not a valid dbt configuration key and MUST NOT appear;
 - place all generated model relations in schema `main` with exact model identifiers;
 - define raw tables under one source named `raw` and schema `raw`;
 - quote identifiers; and
@@ -928,6 +951,9 @@ A clean control succeeds only when:
 - every dbt model builds successfully;
 - every explicit and structural healthy test passes;
 - `manifest.json` and `run_results.json` are readable and correspond to this project; and
+- every generated model node in `manifest.json` carries
+  `config.materialized == "table"` (checked before publication; models only —
+  source/test/macro nodes are excluded); and
 - the generated artifacts pass the integrity checks required for publication.
 
 dbt invocation timestamps, durations, invocation IDs, and nondeterministic log formatting are

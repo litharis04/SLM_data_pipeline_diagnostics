@@ -185,7 +185,7 @@
         },
         {
           "generator": {
-            "digits": 1,
+            "digits": 2,
             "kind": "formatted_id",
             "prefix": "S-"
           },
