@@ -149,7 +149,10 @@ def test_first_try_success_publishes(tmp_path, monkeypatch, capsys):
     code = run(root, BASE_ARGV, tmp_path, sender=fake, prepare=builder, env={OR_ENV: OR_KEY})
     out, err = capsys.readouterr()
     assert code == 0
-    assert err == ""
+    assert "plgen create: attempt 1/5: requesting candidate" in err
+    assert "plgen create: attempt 1/5: validating candidate" in err
+    assert "plgen create: attempt 1/5: building clean instance" in err
+    assert "plgen create: attempt 1/5: checking realized size" in err
     assert f"created {COOP_ID} seed=0 size=small (500 rows)" in out
     scenario_file = root / "scenarios" / COOP_ID / "scenario.json"
     workdir = root / "scenarios" / COOP_ID / "work"

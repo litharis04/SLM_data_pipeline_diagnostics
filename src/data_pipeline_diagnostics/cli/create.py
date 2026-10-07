@@ -358,6 +358,11 @@ def run_create(
             if attempt == 1
             else f"{user_fixed}\n\n{_repair_block(last_text, last_issues)}"
         )
+        print(
+            f"plgen create: attempt {attempt}/{MAX_ATTEMPTS}: requesting candidate "
+            f"via {profile.provider} model {profile.model}",
+            file=sys.stderr,
+        )
         try:
             result = adapter.generate(
                 system=system, user=user, max_output_tokens=profile.max_output_tokens
@@ -365,6 +370,10 @@ def run_create(
         except ProviderError as exc:
             print(f"plgen create: provider failure: {sanitize_error(exc)}", file=sys.stderr)
             return 3
+        print(
+            f"plgen create: attempt {attempt}/{MAX_ATTEMPTS}: validating candidate",
+            file=sys.stderr,
+        )
         issues: list[RequirementIssue]
         validated: ValidatedScenario | None = None
         build_record: str | None = None
@@ -386,6 +395,10 @@ def run_create(
             validated, issues = _check_candidate(candidate, request)
         if not issues:
             assert validated is not None
+            print(
+                f"plgen create: attempt {attempt}/{MAX_ATTEMPTS}: building clean instance",
+                file=sys.stderr,
+            )
             try:
                 instance = scrubbed_build(build, validated, request.seed, cache_dir, config)
             except GenerationFailure as exc:
@@ -408,6 +421,10 @@ def run_create(
                     )
                     return 5
             else:
+                print(
+                    f"plgen create: attempt {attempt}/{MAX_ATTEMPTS}: checking realized size",
+                    file=sys.stderr,
+                )
                 try:
                     record = json.loads(
                         (instance.instance_dir / "instance_record.json").read_text(encoding="utf-8")
