@@ -6,13 +6,14 @@ from pathlib import Path
 
 import pytest
 
-from data_pipeline_diagnostics.cli import app, cmd_open
-from data_pipeline_diagnostics.cli.cmd_open import _cell, run_open
+from data_pipeline_diagnostics.cli import app, instances
+from data_pipeline_diagnostics.cli.cmd_open import run_open
 from data_pipeline_diagnostics.cli.features import (
     AuthoringRequest,
     extract_features,
     normalize_request,
 )
+from data_pipeline_diagnostics.cli.instances import _cell
 from data_pipeline_diagnostics.generator.cache import identity_digest
 from data_pipeline_diagnostics.scenario import (
     parse_scenario_json,
@@ -129,7 +130,7 @@ def test_output_previews_bounded_and_grain_ordered(ws_opened, shared_cache, caps
 
 def test_second_open_reuses_baseline_and_replaces_copy(ws_opened, shared_cache, capsys):
     seen = {}
-    real_prepare = cmd_open.prepare_clean_instance
+    real_prepare = instances.prepare_clean_instance
 
     def spy(validated, seed, cache_root):
         instance = real_prepare(validated, seed, cache_root)
@@ -242,7 +243,7 @@ def test_preview_failure_stays_visible(tmp_path, shared_cache, monkeypatch, caps
     def boom(db_path, model_name, grain):
         raise RuntimeError("db gone")
 
-    monkeypatch.setattr(cmd_open, "_preview_output", boom)
+    monkeypatch.setattr(instances, "_preview_output", boom)
     code = run(root, MINI_ID, shared_cache)
     out, err = capsys.readouterr()
     assert code == 0
@@ -270,7 +271,7 @@ def test_credential_env_excluded_during_build(tmp_path, shared_cache, monkeypatc
         ),
         encoding="utf-8",
     )
-    real_prepare = cmd_open.prepare_clean_instance
+    real_prepare = instances.prepare_clean_instance
 
     def spy(validated, seed, cache_root):
         assert "CRED_X" not in os.environ

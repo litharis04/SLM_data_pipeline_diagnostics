@@ -16,6 +16,7 @@ from pathlib import Path
 from data_pipeline_diagnostics.cli.cmd_connect import run_connect
 from data_pipeline_diagnostics.cli.cmd_list import run_list
 from data_pipeline_diagnostics.cli.cmd_open import run_open
+from data_pipeline_diagnostics.cli.cmd_seed import run_seed
 
 DEFAULT_WORKSPACE = "./pipeline_workspace"
 _MAX_DATA_SEED = 2**63 - 1
@@ -137,6 +138,8 @@ def dispatch(parsed: argparse.Namespace, workspace: Path) -> int:
         return run_connect(workspace, parsed)
     if parsed.command == "open":
         return run_open(workspace, parsed)
+    if parsed.command == "seed":
+        return run_seed(workspace, parsed)
     command = getattr(parsed, "command", None)
     print(f"plgen {command}: not yet implemented", file=sys.stderr)
     return 5
