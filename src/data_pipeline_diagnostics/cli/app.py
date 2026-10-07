@@ -133,6 +133,9 @@ def dispatch(parsed: argparse.Namespace, workspace: Path) -> int:
 def main(argv: list[str] | None = None) -> int:
     parser = build_parser()
     try:
+        # --help/--version exit inside parse_args, so the lines below only run
+        # for catalog commands. Workspace bootstrap stays library-only at this
+        # stage (see workspace.ensure_workspace); nothing here writes files.
         parsed = parser.parse_args(argv)
         workspace = resolve_workspace(parsed.workspace)
         return dispatch(parsed, workspace)
