@@ -108,6 +108,27 @@ def classify_raw_size(max_rows: int) -> str:
     return "outside-presets"
 
 
+def satisfies_join_mode(join_types: frozenset[str], mode: str) -> bool:
+    """Strict whole-example JOIN-mode predicate shared by checks and ranking."""
+    if mode == "auto":
+        return True
+    expected = {"inner"} if mode == "inner" else {"left"} if mode == "left" else {"inner", "left"}
+    if mode not in ("inner", "left", "mixed"):
+        return False
+    return set(join_types) == expected
+
+
+def satisfies_composite_key(has_composite_raw_pk: bool, mode: str) -> bool:
+    """Composite-key predicate shared by checks and ranking."""
+    if mode == "auto":
+        return True
+    if mode == "required":
+        return has_composite_raw_pk
+    if mode == "forbidden":
+        return not has_composite_raw_pk
+    return False
+
+
 def _contains_derivation(expression: object) -> bool:
     """True when the expression holds a ``binary``/``date_part`` node (nested)."""
     kind = getattr(expression, "kind", None)
@@ -202,7 +223,7 @@ def check_requirements(
                     message=f'required intermediate feature "{feature}" is absent',
                 )
             )
-    if request.joins != "auto":
+    if request.joins != "auto" and not satisfies_join_mode(features.join_types, request.joins):
         expected = (
             {"inner"}
             if request.joins == "inner"
@@ -210,17 +231,16 @@ def check_requirements(
             if request.joins == "left"
             else {"inner", "left"}
         )
-        if features.join_types != expected:
-            issues.append(
-                RequirementIssue(
-                    code="join-mode-mismatch",
-                    path="joins",
-                    message=(
-                        f'join mode "{request.joins}" requires exactly '
-                        f"{sorted(expected)}, found {sorted(features.join_types)}"
-                    ),
-                )
+        issues.append(
+            RequirementIssue(
+                code="join-mode-mismatch",
+                path="joins",
+                message=(
+                    f'join mode "{request.joins}" requires exactly '
+                    f"{sorted(expected)}, found {sorted(features.join_types)}"
+                ),
             )
+        )
     for function in sorted(request.metrics):
         if function not in features.metric_functions:
             issues.append(
@@ -230,7 +250,9 @@ def check_requirements(
                     message=f'required metric function "{function}" is absent from output models',
                 )
             )
-    if request.composite_keys == "required" and not features.has_composite_raw_pk:
+    if request.composite_keys == "required" and not satisfies_composite_key(
+        features.has_composite_raw_pk, "required"
+    ):
         issues.append(
             RequirementIssue(
                 code="composite-key-mismatch",
@@ -238,7 +260,9 @@ def check_requirements(
                 message="composite raw primary key is required but no raw table declares one",
             )
         )
-    if request.composite_keys == "forbidden" and features.has_composite_raw_pk:
+    if request.composite_keys == "forbidden" and not satisfies_composite_key(
+        features.has_composite_raw_pk, "forbidden"
+    ):
         issues.append(
             RequirementIssue(
                 code="composite-key-mismatch",
