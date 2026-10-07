@@ -100,6 +100,16 @@ def minimal_imported_entry(scenario_hash: str) -> dict[str, object]:
     }
 
 
+def instance_pointer(workdir: Path, digest: str) -> dict[str, str]:
+    """Current-instance pointer stored in ``entry.json`` (C08 writes, C03 reads)."""
+    path = Path(workdir)
+    if not path.is_absolute():
+        raise ValueError(f"instance path must be absolute, got {workdir!r}")
+    if not isinstance(digest, str) or not digest:
+        raise ValueError("instance digest must be a non-empty string")
+    return {"path": str(path), "digest": digest}
+
+
 def init_workspace(root: Path, bundle: Sequence[tuple[str, bytes]]) -> bool:
     """Bootstrap ``root`` from ``bundle``; ``True`` when bootstrapped now.
 
@@ -155,4 +165,6 @@ def ensure_workspace(root: Path) -> bool:
     """Bootstrap ``root`` from the bundled corpus when not yet initialized."""
     from data_pipeline_diagnostics.cli.bundle import iter_bundled_scenarios
 
+    if catalog_path(Path(root)).exists():
+        return False
     return init_workspace(root, iter_bundled_scenarios())

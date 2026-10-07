@@ -1,7 +1,8 @@
-"""Console scaffold for the ``plgen`` entry point (C01).
+"""Console scaffold for the ``plgen`` entry point (C01, extended in C03).
 
 Root dispatch, global flags, and the section 9 output/error skeleton.
-No command implements behavior yet; every valid command stubs to exit ``5``.
+``list`` is implemented (C03); every other valid command still stubs to
+exit ``5``.
 """
 
 from __future__ import annotations
@@ -11,6 +12,8 @@ import sys
 import traceback
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
+
+from data_pipeline_diagnostics.cli.cmd_list import run_list
 
 DEFAULT_WORKSPACE = "./pipeline_workspace"
 _MAX_DATA_SEED = 2**63 - 1
@@ -123,8 +126,9 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def dispatch(parsed: argparse.Namespace, workspace: Path) -> int:
-    """Stub handler: every valid command is not yet implemented (exit 5)."""
-    _ = workspace
+    """Route catalog commands; unimplemented ones stub to exit ``5``."""
+    if parsed.command == "list":
+        return run_list(workspace)
     command = getattr(parsed, "command", None)
     print(f"plgen {command}: not yet implemented", file=sys.stderr)
     return 5

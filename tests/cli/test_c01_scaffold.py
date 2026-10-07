@@ -7,7 +7,8 @@ from data_pipeline_diagnostics.cli import app
 COMMANDS = ["connect", "list", "open", "seed", "create", "delete"]
 
 VALID_STUBS: list[list[str]] = [
-    ["list"],
+    # NB: "list" was here in C01 but is implemented since C03
+    # (C01 anticipated this: stubs are "replaced by later tasks").
     ["connect", "--provider", "openrouter", "--model", "m"],
     ["open", "my_domain_001"],
     ["seed", "my_domain_001", "0"],
