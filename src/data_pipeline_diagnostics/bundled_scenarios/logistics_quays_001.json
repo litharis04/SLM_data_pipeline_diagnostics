@@ -1,0 +1,405 @@
+{
+  "description": "Logistics quays pipeline: berths mapped 1:1 to terminals, deduplicated terminal feed, boolean active flags cast to integer call status.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "right",
+          "source": "terminal_id",
+          "target": "terminal_id"
+        },
+        {
+          "side": "right",
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "terminal_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "terminal_id",
+            "right": "terminal_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_berths",
+      "name": "j_berth_terminal",
+      "operation": "join",
+      "right": "stg_terminals"
+    },
+    {
+      "grain": [
+        "terminal_id"
+      ],
+      "keys": [
+        "terminal_id"
+      ],
+      "name": "d_terminals",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "stadt",
+          "direction": "asc"
+        }
+      ],
+      "source": "j_berth_terminal"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "terminal_id",
+          "target": "terminal_id"
+        },
+        {
+          "side": "left",
+          "source": "stadt",
+          "target": "stadt"
+        },
+        {
+          "side": "right",
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "side": "right",
+          "source": "aktiv_code",
+          "target": "aktiv_code"
+        },
+        {
+          "side": "right",
+          "source": "gebuehr",
+          "target": "gebuehr"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "call_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "terminal_id",
+            "right": "terminal_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_terminals",
+      "name": "m_calls",
+      "operation": "join",
+      "right": "stg_calls"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "aktiv_code"
+      ],
+      "group_by": [
+        {
+          "source": "aktiv_code",
+          "target": "aktiv_code"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "gebuehr",
+          "function": "sum",
+          "name": "gesamt"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_gebuehr_by_status",
+      "source": "m_calls"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TE-"
+          },
+          "name": "terminal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "stadt",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_terminals",
+      "primary_key": [
+        "terminal_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "LP-"
+          },
+          "name": "berth_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_berth_terminal",
+            "target_side": "right"
+          },
+          "name": "terminal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "Kai",
+              "Pier",
+              "Dock"
+            ]
+          },
+          "name": "art",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_berths",
+      "primary_key": [
+        "berth_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "AN-"
+          },
+          "name": "call_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_call_terminal",
+            "target_side": "left"
+          },
+          "name": "terminal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean",
+            "true_probability": 0.6
+          },
+          "name": "aktiv",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 20.0
+          },
+          "name": "gebuehr",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_calls",
+      "primary_key": [
+        "call_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "terminal_id"
+        ],
+        "table": "raw_berths"
+      },
+      "name": "rel_berth_terminal",
+      "right": {
+        "columns": [
+          "terminal_id"
+        ],
+        "table": "raw_terminals"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "terminal_id"
+        ],
+        "table": "raw_terminals"
+      },
+      "name": "rel_call_terminal",
+      "right": {
+        "columns": [
+          "terminal_id"
+        ],
+        "table": "raw_calls"
+      }
+    }
+  ],
+  "scenario_id": "logistics_quays_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "terminal_id",
+          "target": "terminal_id"
+        },
+        {
+          "operations": [],
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "grain": [
+        "terminal_id"
+      ],
+      "name": "stg_terminals",
+      "row_operations": [],
+      "source": "raw_terminals"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "berth_id",
+          "target": "berth_id"
+        },
+        {
+          "operations": [],
+          "source": "terminal_id",
+          "target": "terminal_id"
+        },
+        {
+          "operations": [],
+          "source": "art",
+          "target": "art"
+        }
+      ],
+      "grain": [
+        "berth_id"
+      ],
+      "name": "stg_berths",
+      "row_operations": [],
+      "source": "raw_berths"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "operations": [],
+          "source": "terminal_id",
+          "target": "terminal_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "aktiv",
+          "target": "aktiv_code"
+        },
+        {
+          "operations": [],
+          "source": "gebuehr",
+          "target": "gebuehr"
+        }
+      ],
+      "grain": [
+        "call_id"
+      ],
+      "name": "stg_calls",
+      "row_operations": [],
+      "source": "raw_calls"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "terminal_id"
+      ],
+      "model": "m_calls",
+      "name": "call_terminal_present",
+      "type": "not_null"
+    }
+  ]
+}

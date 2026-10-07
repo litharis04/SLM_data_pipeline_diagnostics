@@ -1,0 +1,409 @@
+{
+  "description": "HR compensation pipeline: one-to-one contracts projected right-only with monthly derived pay.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "right",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "right",
+          "source": "salary",
+          "target": "salary"
+        },
+        {
+          "side": "right",
+          "source": "start_date",
+          "target": "start_date"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "salary",
+              "kind": "column"
+            },
+            "operator": "divide",
+            "right": {
+              "kind": "literal",
+              "value": 12
+            }
+          },
+          "name": "monthly",
+          "type": "float"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "year",
+            "value": {
+              "column": "start_date",
+              "kind": "column"
+            }
+          },
+          "name": "yr",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "contract_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "emp_id",
+            "right": "emp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_employees",
+      "name": "j_emp_contracts",
+      "operation": "join",
+      "right": "stg_contracts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "left",
+          "source": "monthly",
+          "target": "monthly"
+        },
+        {
+          "side": "right",
+          "source": "pay_id",
+          "target": "pay_id"
+        },
+        {
+          "side": "right",
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "pay_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "contract_id",
+            "right": "contract_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_emp_contracts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_payroll"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "contract_id"
+      ],
+      "group_by": [
+        {
+          "source": "contract_id",
+          "target": "contract_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "amount",
+          "function": "sum",
+          "name": "total_amount"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_payments"
+        }
+      ],
+      "name": "o_amount_by_contract",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EM-"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_employees",
+      "primary_key": [
+        "emp_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "CT-"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_emp_contracts",
+            "target_side": "left"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 200000,
+            "min": 20000
+          },
+          "name": "salary",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2020-01-01"
+          },
+          "name": "start_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_contracts",
+      "primary_key": [
+        "contract_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PY-"
+          },
+          "name": "pay_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_contract_payroll",
+            "target_side": "left"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20000.0,
+            "min": 1000.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_payroll",
+      "primary_key": [
+        "pay_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_employees"
+      },
+      "name": "rel_emp_contracts",
+      "right": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_contracts"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "contract_id"
+        ],
+        "table": "raw_contracts"
+      },
+      "name": "rel_contract_payroll",
+      "right": {
+        "columns": [
+          "contract_id"
+        ],
+        "table": "raw_payroll"
+      }
+    }
+  ],
+  "scenario_id": "hr_compensation_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "emp_id"
+      ],
+      "name": "stg_employees",
+      "row_operations": [],
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "salary",
+          "target": "salary"
+        },
+        {
+          "operations": [],
+          "source": "start_date",
+          "target": "start_date"
+        }
+      ],
+      "grain": [
+        "contract_id"
+      ],
+      "name": "stg_contracts",
+      "row_operations": [],
+      "source": "raw_contracts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "pay_id",
+          "target": "pay_id"
+        },
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "grain": [
+        "pay_id"
+      ],
+      "name": "stg_payroll",
+      "row_operations": [],
+      "source": "raw_payroll"
+    }
+  ],
+  "tests": [
+    {
+      "column": "salary",
+      "min": 0,
+      "model": "stg_contracts",
+      "name": "salary_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

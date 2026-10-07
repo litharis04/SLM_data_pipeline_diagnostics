@@ -1,0 +1,405 @@
+{
+  "description": "Hospitality spa pipeline: maximum-capacity booking keys, single-letter wings, bounded satisfaction ratings.",
+  "domain": "hospitality",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "booking_id",
+          "target": "booking_id"
+        },
+        {
+          "side": "left",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "left",
+          "source": "treatment",
+          "target": "treatment"
+        },
+        {
+          "side": "right",
+          "source": "center_id",
+          "target": "center_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "booking_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "therapist_id",
+            "right": "therapist_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_bookings",
+      "name": "j_book_therapists",
+      "operation": "join",
+      "right": "stg_therapists"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "booking_id",
+          "target": "booking_id"
+        },
+        {
+          "side": "left",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "left",
+          "source": "treatment",
+          "target": "treatment"
+        },
+        {
+          "side": "right",
+          "source": "center_name",
+          "target": "center_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "booking_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "center_id",
+            "right": "center_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_book_therapists",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_centers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "treatment"
+      ],
+      "group_by": [
+        {
+          "source": "treatment",
+          "target": "treatment"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "rating",
+          "function": "avg",
+          "name": "avg_rating"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_bookings"
+        }
+      ],
+      "name": "o_rating_by_treatment",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SP-"
+          },
+          "name": "center_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "center_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_centers",
+      "primary_key": [
+        "center_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "TH-"
+          },
+          "name": "therapist_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_center_therapists",
+            "target_side": "left"
+          },
+          "name": "center_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "therapist_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_therapists",
+      "primary_key": [
+        "therapist_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 18,
+            "kind": "formatted_id",
+            "prefix": "BK-"
+          },
+          "name": "booking_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_therapist_bookings",
+            "target_side": "left"
+          },
+          "name": "therapist_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "facial",
+              "massage"
+            ]
+          },
+          "name": "treatment",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "rating",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 2,
+            "min_length": 1
+          },
+          "name": "wing",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_bookings",
+      "primary_key": [
+        "booking_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "center_id"
+        ],
+        "table": "raw_centers"
+      },
+      "name": "rel_center_therapists",
+      "right": {
+        "columns": [
+          "center_id"
+        ],
+        "table": "raw_therapists"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "therapist_id"
+        ],
+        "table": "raw_therapists"
+      },
+      "name": "rel_therapist_bookings",
+      "right": {
+        "columns": [
+          "therapist_id"
+        ],
+        "table": "raw_bookings"
+      }
+    }
+  ],
+  "scenario_id": "hospitality_spa_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "center_id",
+          "target": "center_id"
+        },
+        {
+          "operations": [],
+          "source": "center_name",
+          "target": "center_name"
+        }
+      ],
+      "grain": [
+        "center_id"
+      ],
+      "name": "stg_centers",
+      "row_operations": [],
+      "source": "raw_centers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "therapist_id",
+          "target": "therapist_id"
+        },
+        {
+          "operations": [],
+          "source": "center_id",
+          "target": "center_id"
+        },
+        {
+          "operations": [],
+          "source": "therapist_name",
+          "target": "therapist_name"
+        }
+      ],
+      "grain": [
+        "therapist_id"
+      ],
+      "name": "stg_therapists",
+      "row_operations": [],
+      "source": "raw_therapists"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "booking_id",
+          "target": "booking_id"
+        },
+        {
+          "operations": [],
+          "source": "therapist_id",
+          "target": "therapist_id"
+        },
+        {
+          "operations": [],
+          "source": "treatment",
+          "target": "treatment"
+        },
+        {
+          "operations": [],
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "operations": [],
+          "source": "wing",
+          "target": "wing"
+        }
+      ],
+      "grain": [
+        "booking_id"
+      ],
+      "name": "stg_bookings",
+      "row_operations": [],
+      "source": "raw_bookings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "rating",
+      "max": 5,
+      "min": 1,
+      "model": "stg_bookings",
+      "name": "rating_bounds",
+      "type": "column_range"
+    }
+  ]
+}

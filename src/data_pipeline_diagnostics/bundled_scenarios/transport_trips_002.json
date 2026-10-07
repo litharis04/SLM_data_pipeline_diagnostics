@@ -1,0 +1,461 @@
+{
+  "description": "Transport trips pipeline: paid-trips rollup per vehicle, depots fed only by vehicles earning over a threshold.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fahrt_id",
+          "target": "fahrt_id"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "left",
+          "source": "betrag",
+          "target": "betrag"
+        },
+        {
+          "side": "right",
+          "source": "fahrzeug_id",
+          "target": "fahrzeug_id"
+        },
+        {
+          "side": "right",
+          "source": "depot_id",
+          "target": "depot_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "fahrt_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "fahrzeug_id",
+            "right": "fahrzeug_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_fahrten",
+      "name": "j_fahrt_fahrzeug",
+      "operation": "join",
+      "right": "stg_fahrzeuge"
+    },
+    {
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "betrag",
+            "kind": "column"
+          },
+          "operator": "gt",
+          "right": {
+            "kind": "literal",
+            "value": 0.0
+          }
+        }
+      ],
+      "grain": [
+        "depot_id",
+        "fahrzeug_id"
+      ],
+      "group_by": [
+        {
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "source": "fahrzeug_id",
+          "target": "fahrzeug_id"
+        }
+      ],
+      "metrics": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "status",
+              "kind": "column"
+            },
+            "operator": "eq",
+            "right": {
+              "kind": "literal",
+              "value": "bezahlt"
+            }
+          },
+          "function": "conditional_count",
+          "name": "n_bezahlt"
+        },
+        {
+          "column": "betrag",
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "status",
+              "kind": "column"
+            },
+            "operator": "eq",
+            "right": {
+              "kind": "literal",
+              "value": "bezahlt"
+            }
+          },
+          "function": "conditional_sum",
+          "name": "umsatz"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "a_fahrzeug_stats",
+      "operation": "aggregate",
+      "source": "j_fahrt_fahrzeug"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fahrzeug_id",
+          "target": "fahrzeug_id"
+        },
+        {
+          "side": "left",
+          "source": "n_bezahlt",
+          "target": "n_bezahlt"
+        },
+        {
+          "side": "left",
+          "source": "umsatz",
+          "target": "umsatz"
+        },
+        {
+          "side": "right",
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "side": "right",
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "fahrzeug_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "depot_id",
+            "right": "depot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_fahrzeug_stats",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_depots"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "umsatz",
+            "kind": "column"
+          },
+          "operator": "gt",
+          "right": {
+            "kind": "literal",
+            "value": 1000.0
+          }
+        }
+      ],
+      "grain": [
+        "stadt"
+      ],
+      "group_by": [
+        {
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_fahrzeuge"
+        }
+      ],
+      "name": "o_fahrzeuge_by_stadt",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DE-"
+          },
+          "name": "depot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "stadt",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_depots",
+      "primary_key": [
+        "depot_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FZ-"
+          },
+          "name": "fahrzeug_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_depot_fahrzeuge",
+            "target_side": "left"
+          },
+          "name": "depot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_fahrzeuge",
+      "primary_key": [
+        "fahrzeug_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "FA-"
+          },
+          "name": "fahrt_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_fahrzeug_fahrten",
+            "target_side": "left"
+          },
+          "name": "fahrzeug_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "bezahlt",
+              "offen",
+              "storniert"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000.0,
+            "min": 0.0
+          },
+          "name": "betrag",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_fahrten",
+      "primary_key": [
+        "fahrt_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "depot_id"
+        ],
+        "table": "raw_depots"
+      },
+      "name": "rel_depot_fahrzeuge",
+      "right": {
+        "columns": [
+          "depot_id"
+        ],
+        "table": "raw_fahrzeuge"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "fahrzeug_id"
+        ],
+        "table": "raw_fahrzeuge"
+      },
+      "name": "rel_fahrzeug_fahrten",
+      "right": {
+        "columns": [
+          "fahrzeug_id"
+        ],
+        "table": "raw_fahrten"
+      }
+    }
+  ],
+  "scenario_id": "transport_trips_002",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "depot_id",
+          "target": "depot_id"
+        },
+        {
+          "operations": [],
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "grain": [
+        "depot_id"
+      ],
+      "name": "stg_depots",
+      "row_operations": [],
+      "source": "raw_depots"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "fahrzeug_id",
+          "target": "fahrzeug_id"
+        },
+        {
+          "operations": [],
+          "source": "depot_id",
+          "target": "depot_id"
+        }
+      ],
+      "grain": [
+        "fahrzeug_id"
+      ],
+      "name": "stg_fahrzeuge",
+      "row_operations": [],
+      "source": "raw_fahrzeuge"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "fahrt_id",
+          "target": "fahrt_id"
+        },
+        {
+          "operations": [],
+          "source": "fahrzeug_id",
+          "target": "fahrzeug_id"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "betrag",
+          "target": "betrag"
+        }
+      ],
+      "grain": [
+        "fahrt_id"
+      ],
+      "name": "stg_fahrten",
+      "row_operations": [],
+      "source": "raw_fahrten"
+    }
+  ],
+  "tests": [
+    {
+      "column": "betrag",
+      "min": 0.0,
+      "model": "stg_fahrten",
+      "name": "betrag_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

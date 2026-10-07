@@ -1,0 +1,404 @@
+{
+  "description": "Energy retail pipeline: single national market, dashless zones and nulled placeholder notes.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "side": "right",
+          "source": "utility_id",
+          "target": "utility_id"
+        },
+        {
+          "side": "right",
+          "source": "zone",
+          "target": "zone"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "meter_id",
+            "right": "meter_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_readings",
+      "name": "j_read_meters",
+      "operation": "join",
+      "right": "stg_meters"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "side": "left",
+          "source": "zone",
+          "target": "zone"
+        },
+        {
+          "side": "right",
+          "source": "market",
+          "target": "market"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "utility_id",
+            "right": "utility_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_read_meters",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_utilities"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "zone"
+      ],
+      "group_by": [
+        {
+          "source": "zone",
+          "target": "zone"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "kwh",
+          "function": "sum",
+          "name": "total_kwh"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_readings"
+        }
+      ],
+      "name": "o_kwh_by_zone",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "UT-"
+          },
+          "name": "utility_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "national"
+            ]
+          },
+          "name": "market",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_utilities",
+      "primary_key": [
+        "utility_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "MT-"
+          },
+          "name": "meter_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_utility_meters",
+            "target_side": "left"
+          },
+          "name": "utility_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "A-1",
+              "B-2"
+            ]
+          },
+          "name": "zone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_meters",
+      "primary_key": [
+        "meter_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RD-"
+          },
+          "name": "reading_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_meter_readings",
+            "target_side": "left"
+          },
+          "name": "meter_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 0.0
+          },
+          "name": "kwh",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 5
+          },
+          "name": "note",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_readings",
+      "primary_key": [
+        "reading_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "utility_id"
+        ],
+        "table": "raw_utilities"
+      },
+      "name": "rel_utility_meters",
+      "right": {
+        "columns": [
+          "utility_id"
+        ],
+        "table": "raw_meters"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "meter_id"
+        ],
+        "table": "raw_meters"
+      },
+      "name": "rel_meter_readings",
+      "right": {
+        "columns": [
+          "meter_id"
+        ],
+        "table": "raw_readings"
+      }
+    }
+  ],
+  "scenario_id": "energy_retail_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "utility_id",
+          "target": "utility_id"
+        },
+        {
+          "operations": [],
+          "source": "market",
+          "target": "market"
+        }
+      ],
+      "grain": [
+        "utility_id"
+      ],
+      "name": "stg_utilities",
+      "row_operations": [],
+      "source": "raw_utilities"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "operations": [],
+          "source": "utility_id",
+          "target": "utility_id"
+        },
+        {
+          "operations": [
+            {
+              "new": "",
+              "old": "-",
+              "op": "replace"
+            }
+          ],
+          "source": "zone",
+          "target": "zone"
+        }
+      ],
+      "grain": [
+        "meter_id"
+      ],
+      "name": "stg_meters",
+      "row_operations": [],
+      "source": "raw_meters"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "operations": [],
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "operations": [],
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "operations": [
+            {
+              "op": "null_if",
+              "values": [
+                "n/a"
+              ]
+            }
+          ],
+          "source": "note",
+          "target": "note"
+        }
+      ],
+      "grain": [
+        "reading_id"
+      ],
+      "name": "stg_readings",
+      "row_operations": [],
+      "source": "raw_readings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "market",
+      "model": "stg_utilities",
+      "name": "market_values",
+      "type": "accepted_values",
+      "values": [
+        "national"
+      ]
+    }
+  ]
+}

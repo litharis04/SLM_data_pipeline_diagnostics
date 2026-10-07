@@ -1,0 +1,493 @@
+{
+  "description": "Manufacturing scrap pipeline: unknown defect codes nulled, earliest reports kept, per-line aggregates.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "filters": [],
+      "grain": [
+        "line_id",
+        "severity",
+        "shift_id"
+      ],
+      "group_by": [
+        {
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_defects"
+        },
+        {
+          "column": "scrap_kg",
+          "function": "sum",
+          "name": "scrap"
+        }
+      ],
+      "name": "a_line_stats",
+      "operation": "aggregate",
+      "source": "stg_defects"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "side": "left",
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "side": "left",
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "side": "left",
+          "source": "n_defects",
+          "target": "n_defects"
+        },
+        {
+          "side": "left",
+          "source": "scrap",
+          "target": "scrap"
+        },
+        {
+          "side": "right",
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "line_id",
+        "severity",
+        "shift_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "line_id",
+            "right": "line_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_line_stats",
+      "name": "j_stats_lines",
+      "operation": "join",
+      "right": "stg_lines"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "side": "left",
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "side": "left",
+          "source": "scrap",
+          "target": "scrap"
+        },
+        {
+          "side": "left",
+          "source": "n_defects",
+          "target": "n_defects"
+        },
+        {
+          "side": "right",
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "line_id",
+        "severity",
+        "shift_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "shift_id",
+            "right": "shift_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_stats_lines",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_shifts"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "severity",
+        "shift_id"
+      ],
+      "group_by": [
+        {
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "scrap",
+          "function": "sum",
+          "name": "total_scrap"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_groups"
+        }
+      ],
+      "name": "o_scrap_by_severity_shift",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "line_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_lines",
+      "primary_key": [
+        "line_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "day",
+              "night"
+            ]
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_shifts",
+      "primary_key": [
+        "shift_id"
+      ],
+      "rows": {
+        "max": 2,
+        "min": 2
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "DF-"
+          },
+          "name": "defect_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_line_defects",
+            "target_side": "left"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_shift_defects",
+            "target_side": "right"
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "dent",
+              "scratch",
+              "unknown"
+            ]
+          },
+          "name": "code",
+          "null_probability": 0.1,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "critical",
+              "minor"
+            ]
+          },
+          "name": "severity",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50.0,
+            "min": 0.1
+          },
+          "name": "scrap_kg",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "reported_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_defects",
+      "primary_key": [
+        "defect_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_lines"
+      },
+      "name": "rel_line_defects",
+      "right": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_defects"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_defects"
+      },
+      "name": "rel_shift_defects",
+      "right": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_shifts"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_qc_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "grain": [
+        "line_id"
+      ],
+      "name": "stg_lines",
+      "row_operations": [],
+      "source": "raw_lines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "grain": [
+        "shift_id"
+      ],
+      "name": "stg_shifts",
+      "row_operations": [],
+      "source": "raw_shifts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "defect_id",
+          "target": "defect_id"
+        },
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "null_if",
+              "values": [
+                "unknown"
+              ]
+            }
+          ],
+          "source": "code",
+          "target": "code"
+        },
+        {
+          "operations": [],
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "operations": [],
+          "source": "scrap_kg",
+          "target": "scrap_kg"
+        },
+        {
+          "operations": [],
+          "source": "reported_at",
+          "target": "reported_at"
+        }
+      ],
+      "grain": [
+        "defect_id"
+      ],
+      "name": "stg_defects",
+      "row_operations": [
+        {
+          "keys": [
+            "defect_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "reported_at",
+              "direction": "asc"
+            }
+          ]
+        }
+      ],
+      "source": "raw_defects"
+    }
+  ],
+  "tests": [
+    {
+      "column": "severity",
+      "model": "stg_defects",
+      "name": "severity_values",
+      "type": "accepted_values",
+      "values": [
+        "critical",
+        "minor"
+      ]
+    }
+  ]
+}

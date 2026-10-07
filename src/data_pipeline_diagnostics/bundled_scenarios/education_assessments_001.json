@@ -1,0 +1,463 @@
+{
+  "description": "Education assessments pipeline: conditional honors counting over a join-sourced output, legacy flag normalization.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "attempt_id",
+          "target": "attempt_id"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "left",
+          "source": "passed",
+          "target": "passed"
+        },
+        {
+          "side": "left",
+          "source": "is_makeup_label",
+          "target": "is_makeup_label"
+        },
+        {
+          "side": "right",
+          "source": "course_name",
+          "target": "course_name"
+        },
+        {
+          "side": "right",
+          "source": "credits",
+          "target": "credits"
+        },
+        {
+          "side": "right",
+          "source": "level_id",
+          "target": "level_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "attempt_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "course_id",
+            "right": "course_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_attempts",
+      "name": "j_att_courses",
+      "operation": "join",
+      "right": "stg_courses"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "attempt_id",
+          "target": "attempt_id"
+        },
+        {
+          "side": "left",
+          "source": "course_name",
+          "target": "course_name"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "left",
+          "source": "is_makeup_label",
+          "target": "is_makeup_label"
+        },
+        {
+          "side": "right",
+          "source": "level_name",
+          "target": "level_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "attempt_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "level_id",
+            "right": "level_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_att_courses",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_levels"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "course_name"
+      ],
+      "group_by": [
+        {
+          "source": "course_name",
+          "target": "course_name"
+        }
+      ],
+      "metrics": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "score",
+              "kind": "column"
+            },
+            "operator": "gte",
+            "right": {
+              "kind": "literal",
+              "value": 90.0
+            }
+          },
+          "function": "conditional_count",
+          "name": "n_honors"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_attempts"
+        }
+      ],
+      "name": "o_honors_by_course",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "LV-"
+          },
+          "name": "level_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "advanced",
+              "basic"
+            ]
+          },
+          "name": "level_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_levels",
+      "primary_key": [
+        "level_id"
+      ],
+      "rows": {
+        "max": 2,
+        "min": 2
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CS-"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 6
+          },
+          "name": "course_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "credits",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_level_courses",
+            "target_side": "right"
+          },
+          "name": "level_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_courses",
+      "primary_key": [
+        "course_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AT-"
+          },
+          "name": "attempt_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_course_attempts",
+            "target_side": "left"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1.0,
+            "min": 0.0
+          },
+          "name": "passed_flag",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean",
+            "true_probability": 0.2
+          },
+          "name": "is_makeup",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_attempts",
+      "primary_key": [
+        "attempt_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 80
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "level_id"
+        ],
+        "table": "raw_courses"
+      },
+      "name": "rel_level_courses",
+      "right": {
+        "columns": [
+          "level_id"
+        ],
+        "table": "raw_levels"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_courses"
+      },
+      "name": "rel_course_attempts",
+      "right": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_attempts"
+      }
+    }
+  ],
+  "scenario_id": "education_assessments_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "level_id",
+          "target": "level_id"
+        },
+        {
+          "operations": [],
+          "source": "level_name",
+          "target": "level_name"
+        }
+      ],
+      "grain": [
+        "level_id"
+      ],
+      "name": "stg_levels",
+      "row_operations": [],
+      "source": "raw_levels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "course_name",
+          "target": "course_name"
+        },
+        {
+          "operations": [],
+          "source": "credits",
+          "target": "credits"
+        },
+        {
+          "operations": [],
+          "source": "level_id",
+          "target": "level_id"
+        }
+      ],
+      "grain": [
+        "course_id"
+      ],
+      "name": "stg_courses",
+      "row_operations": [],
+      "source": "raw_courses"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "attempt_id",
+          "target": "attempt_id"
+        },
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "passed_flag",
+          "target": "passed"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "is_makeup",
+          "target": "is_makeup_label"
+        }
+      ],
+      "grain": [
+        "attempt_id"
+      ],
+      "name": "stg_attempts",
+      "row_operations": [],
+      "source": "raw_attempts"
+    }
+  ],
+  "tests": [
+    {
+      "column": "score",
+      "max": 100.0,
+      "min": 0.0,
+      "model": "stg_attempts",
+      "name": "score_bounds",
+      "type": "column_range"
+    }
+  ]
+}

@@ -1,0 +1,472 @@
+{
+  "description": "Insurance reports pipeline: weekday derivation over timestamps, first filings and large-claim conditionals.",
+  "domain": "insurance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "source": "filed_at",
+          "target": "filed_at"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day_of_week",
+            "value": {
+              "column": "filed_at",
+              "kind": "column"
+            }
+          },
+          "name": "dow",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "name": "t_claims",
+      "operation": "transform",
+      "source": "stg_claims"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "left",
+          "source": "filed_at",
+          "target": "filed_at"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "left",
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "side": "right",
+          "source": "product",
+          "target": "product"
+        },
+        {
+          "side": "right",
+          "source": "agent_id",
+          "target": "agent_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "policy_id",
+            "right": "policy_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_claims",
+      "name": "j_claims_policies",
+      "operation": "join",
+      "right": "stg_policies"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "left",
+          "source": "filed_at",
+          "target": "filed_at"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "left",
+          "source": "product",
+          "target": "product"
+        },
+        {
+          "side": "right",
+          "source": "agent_name",
+          "target": "agent_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "agent_id",
+            "right": "agent_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_claims_policies",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_agents"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "product"
+      ],
+      "group_by": [
+        {
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "filed_at",
+          "function": "min",
+          "name": "first_filed"
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "amount",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 10000.0
+            }
+          },
+          "function": "conditional_count",
+          "name": "big_claims"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_claims"
+        }
+      ],
+      "name": "o_filings_by_product",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AG-"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "agent_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_agents",
+      "primary_key": [
+        "agent_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_agent_policies",
+            "target_side": "left"
+          },
+          "name": "agent_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "auto",
+              "home"
+            ]
+          },
+          "name": "product",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_policies",
+      "primary_key": [
+        "policy_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CL-"
+          },
+          "name": "claim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_policy_claims",
+            "target_side": "left"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "filed_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 100.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_claims",
+      "primary_key": [
+        "claim_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_agents"
+      },
+      "name": "rel_agent_policies",
+      "right": {
+        "columns": [
+          "agent_id"
+        ],
+        "table": "raw_policies"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_policies"
+      },
+      "name": "rel_policy_claims",
+      "right": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_claims"
+      }
+    }
+  ],
+  "scenario_id": "insurance_reports_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_name",
+          "target": "agent_name"
+        }
+      ],
+      "grain": [
+        "agent_id"
+      ],
+      "name": "stg_agents",
+      "row_operations": [],
+      "source": "raw_agents"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "agent_id",
+          "target": "agent_id"
+        },
+        {
+          "operations": [],
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "grain": [
+        "policy_id"
+      ],
+      "name": "stg_policies",
+      "row_operations": [],
+      "source": "raw_policies"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "filed_at",
+          "target": "filed_at"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "grain": [
+        "claim_id"
+      ],
+      "name": "stg_claims",
+      "row_operations": [],
+      "source": "raw_claims"
+    }
+  ],
+  "tests": [
+    {
+      "column": "product",
+      "model": "stg_policies",
+      "name": "product_values",
+      "type": "accepted_values",
+      "values": [
+        "auto",
+        "home"
+      ]
+    }
+  ]
+}

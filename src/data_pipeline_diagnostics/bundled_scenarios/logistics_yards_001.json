@@ -1,0 +1,493 @@
+{
+  "description": "Logistics yards pipeline: integer export codes, weekday derivation and integer fee arithmetic in the transform.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "move_id",
+          "target": "move_id"
+        },
+        {
+          "source": "yard_id",
+          "target": "yard_id"
+        },
+        {
+          "source": "hauler_id",
+          "target": "hauler_id"
+        },
+        {
+          "source": "gate_date",
+          "target": "gate_date"
+        },
+        {
+          "source": "handling",
+          "target": "handling"
+        },
+        {
+          "source": "storage",
+          "target": "storage"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day_of_week",
+            "value": {
+              "column": "gate_date",
+              "kind": "column"
+            }
+          },
+          "name": "dow",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "handling",
+              "kind": "column"
+            },
+            "operator": "add",
+            "right": {
+              "column": "storage",
+              "kind": "column"
+            }
+          },
+          "name": "total",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "move_id"
+      ],
+      "name": "t_moves",
+      "operation": "transform",
+      "source": "stg_moves"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "move_id",
+          "target": "move_id"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "left",
+          "source": "hauler_id",
+          "target": "hauler_id"
+        },
+        {
+          "side": "right",
+          "source": "yard_name",
+          "target": "yard_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "move_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "yard_id",
+            "right": "yard_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_moves",
+      "name": "j_moves_yards",
+      "operation": "join",
+      "right": "stg_yards"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "move_id",
+          "target": "move_id"
+        },
+        {
+          "side": "left",
+          "source": "dow",
+          "target": "dow"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "right",
+          "source": "hauler_name",
+          "target": "hauler_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "move_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hauler_id",
+            "right": "hauler_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_moves_yards",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_haulers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "dow"
+      ],
+      "group_by": [
+        {
+          "source": "dow",
+          "target": "dow"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total",
+          "function": "sum",
+          "name": "revenue"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_moves"
+        }
+      ],
+      "name": "o_revenue_by_dow",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "YD-"
+          },
+          "name": "yard_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "yard_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_yards",
+      "primary_key": [
+        "yard_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HL-"
+          },
+          "name": "hauler_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "hauler_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_haulers",
+      "primary_key": [
+        "hauler_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "MV-"
+          },
+          "name": "move_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_yard_moves",
+            "target_side": "left"
+          },
+          "name": "yard_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hauler_moves",
+            "target_side": "right"
+          },
+          "name": "hauler_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "gate_date",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5000,
+            "min": 50
+          },
+          "name": "handling",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000,
+            "min": 0
+          },
+          "name": "storage",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "express",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_moves",
+      "primary_key": [
+        "move_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "yard_id"
+        ],
+        "table": "raw_yards"
+      },
+      "name": "rel_yard_moves",
+      "right": {
+        "columns": [
+          "yard_id"
+        ],
+        "table": "raw_moves"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "hauler_id"
+        ],
+        "table": "raw_moves"
+      },
+      "name": "rel_hauler_moves",
+      "right": {
+        "columns": [
+          "hauler_id"
+        ],
+        "table": "raw_haulers"
+      }
+    }
+  ],
+  "scenario_id": "logistics_yards_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "yard_id",
+          "target": "yard_id"
+        },
+        {
+          "operations": [],
+          "source": "yard_name",
+          "target": "yard_name"
+        }
+      ],
+      "grain": [
+        "yard_id"
+      ],
+      "name": "stg_yards",
+      "row_operations": [],
+      "source": "raw_yards"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hauler_id",
+          "target": "hauler_id"
+        },
+        {
+          "operations": [],
+          "source": "hauler_name",
+          "target": "hauler_name"
+        }
+      ],
+      "grain": [
+        "hauler_id"
+      ],
+      "name": "stg_haulers",
+      "row_operations": [],
+      "source": "raw_haulers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "move_id",
+          "target": "move_id"
+        },
+        {
+          "operations": [],
+          "source": "yard_id",
+          "target": "yard_id"
+        },
+        {
+          "operations": [],
+          "source": "hauler_id",
+          "target": "hauler_id"
+        },
+        {
+          "operations": [],
+          "source": "gate_date",
+          "target": "gate_date"
+        },
+        {
+          "operations": [],
+          "source": "handling",
+          "target": "handling"
+        },
+        {
+          "operations": [],
+          "source": "storage",
+          "target": "storage"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "express",
+          "target": "express_code"
+        }
+      ],
+      "grain": [
+        "move_id"
+      ],
+      "name": "stg_moves",
+      "row_operations": [],
+      "source": "raw_moves"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "gate_date"
+      ],
+      "model": "stg_moves",
+      "name": "gate_present",
+      "type": "not_null"
+    }
+  ]
+}

@@ -1,0 +1,403 @@
+{
+  "description": "Sports standings pipeline: legacy played flags and integer season labels normalized in staging, ranged goal totals.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "match_id",
+          "target": "match_id"
+        },
+        {
+          "side": "left",
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "side": "left",
+          "source": "home_score",
+          "target": "home_score"
+        },
+        {
+          "side": "left",
+          "source": "played",
+          "target": "played"
+        },
+        {
+          "side": "right",
+          "source": "team_name",
+          "target": "team_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "match_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "home_id",
+            "right": "team_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_matches",
+      "name": "j_match_teams",
+      "operation": "join",
+      "right": "stg_teams"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "match_id",
+          "target": "match_id"
+        },
+        {
+          "side": "left",
+          "source": "home_score",
+          "target": "home_score"
+        },
+        {
+          "side": "left",
+          "source": "team_name",
+          "target": "team_name"
+        },
+        {
+          "side": "right",
+          "source": "season_label",
+          "target": "season_label"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "match_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "season_id",
+            "right": "season_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_match_teams",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_seasons"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "season_label"
+      ],
+      "group_by": [
+        {
+          "source": "season_label",
+          "target": "season_label"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "home_score",
+          "function": "sum",
+          "name": "total_goals"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_matches"
+        }
+      ],
+      "name": "o_goals_by_season",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "TM-"
+          },
+          "name": "team_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "team_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_teams",
+      "primary_key": [
+        "team_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 26,
+            "min": 23
+          },
+          "name": "season_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 26,
+            "min": 23
+          },
+          "name": "year_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_seasons",
+      "primary_key": [
+        "season_id"
+      ],
+      "rows": {
+        "max": 4,
+        "min": 4
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "MT-"
+          },
+          "name": "match_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_team_matches",
+            "target_side": "left"
+          },
+          "name": "home_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_season_matches",
+            "target_side": "right"
+          },
+          "name": "season_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 8,
+            "min": 0
+          },
+          "name": "home_score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N",
+              "Y"
+            ]
+          },
+          "name": "played_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_matches",
+      "primary_key": [
+        "match_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "team_id"
+        ],
+        "table": "raw_teams"
+      },
+      "name": "rel_team_matches",
+      "right": {
+        "columns": [
+          "home_id"
+        ],
+        "table": "raw_matches"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "season_id"
+        ],
+        "table": "raw_matches"
+      },
+      "name": "rel_season_matches",
+      "right": {
+        "columns": [
+          "season_id"
+        ],
+        "table": "raw_seasons"
+      }
+    }
+  ],
+  "scenario_id": "sports_standings_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "team_id",
+          "target": "team_id"
+        },
+        {
+          "operations": [],
+          "source": "team_name",
+          "target": "team_name"
+        }
+      ],
+      "grain": [
+        "team_id"
+      ],
+      "name": "stg_teams",
+      "row_operations": [],
+      "source": "raw_teams"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "year_code",
+          "target": "season_label"
+        }
+      ],
+      "grain": [
+        "season_id"
+      ],
+      "name": "stg_seasons",
+      "row_operations": [],
+      "source": "raw_seasons"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "match_id",
+          "target": "match_id"
+        },
+        {
+          "operations": [],
+          "source": "home_id",
+          "target": "home_id"
+        },
+        {
+          "operations": [],
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "operations": [],
+          "source": "home_score",
+          "target": "home_score"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "played_str",
+          "target": "played"
+        }
+      ],
+      "grain": [
+        "match_id"
+      ],
+      "name": "stg_matches",
+      "row_operations": [],
+      "source": "raw_matches"
+    }
+  ],
+  "tests": [
+    {
+      "column": "total_goals",
+      "min": 0.0,
+      "model": "o_goals_by_season",
+      "name": "goals_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

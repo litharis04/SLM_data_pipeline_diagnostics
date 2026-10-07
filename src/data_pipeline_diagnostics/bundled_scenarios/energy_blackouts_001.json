@@ -1,0 +1,446 @@
+{
+  "description": "Energy blackout pipeline: unplanned events only, bounded customer counts and strict positive durations.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "side": "left",
+          "source": "customers",
+          "target": "customers"
+        },
+        {
+          "side": "left",
+          "source": "duration_h",
+          "target": "duration_h"
+        },
+        {
+          "side": "right",
+          "source": "region_id",
+          "target": "region_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "event_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "line_id",
+            "right": "line_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_events",
+      "name": "j_ev_lines",
+      "operation": "join",
+      "right": "stg_lines"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "side": "left",
+          "source": "customers",
+          "target": "customers"
+        },
+        {
+          "side": "left",
+          "source": "duration_h",
+          "target": "duration_h"
+        },
+        {
+          "side": "right",
+          "source": "region_name",
+          "target": "region_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "event_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "region_id",
+            "right": "region_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ev_lines",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_regions"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "region_name"
+      ],
+      "group_by": [
+        {
+          "source": "region_name",
+          "target": "region_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "customers",
+          "function": "sum",
+          "name": "total_customers"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_events"
+        }
+      ],
+      "name": "o_customers_by_region",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "RG-"
+          },
+          "name": "region_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "region_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "dispatcher",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_regions",
+      "primary_key": [
+        "region_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_region_lines",
+            "target_side": "left"
+          },
+          "name": "region_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 400,
+            "min": 110
+          },
+          "name": "voltage_kv",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_lines",
+      "primary_key": [
+        "line_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "BL-"
+          },
+          "name": "event_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_line_events",
+            "target_side": "left"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "fault",
+              "planned",
+              "storm"
+            ]
+          },
+          "name": "cause",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5000,
+            "min": 1
+          },
+          "name": "customers",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 72.0,
+            "min": 0.1
+          },
+          "name": "duration_h",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_events",
+      "primary_key": [
+        "event_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "region_id"
+        ],
+        "table": "raw_regions"
+      },
+      "name": "rel_region_lines",
+      "right": {
+        "columns": [
+          "region_id"
+        ],
+        "table": "raw_lines"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_lines"
+      },
+      "name": "rel_line_events",
+      "right": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_events"
+      }
+    }
+  ],
+  "scenario_id": "energy_blackouts_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "region_id",
+          "target": "region_id"
+        },
+        {
+          "operations": [],
+          "source": "region_name",
+          "target": "region_name"
+        },
+        {
+          "operations": [],
+          "source": "dispatcher",
+          "target": "dispatcher"
+        }
+      ],
+      "grain": [
+        "region_id"
+      ],
+      "name": "stg_regions",
+      "row_operations": [],
+      "source": "raw_regions"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "region_id",
+          "target": "region_id"
+        },
+        {
+          "operations": [],
+          "source": "voltage_kv",
+          "target": "voltage_kv"
+        }
+      ],
+      "grain": [
+        "line_id"
+      ],
+      "name": "stg_lines",
+      "row_operations": [],
+      "source": "raw_lines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "event_id",
+          "target": "event_id"
+        },
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "cause",
+          "target": "cause"
+        },
+        {
+          "operations": [],
+          "source": "customers",
+          "target": "customers"
+        },
+        {
+          "operations": [],
+          "source": "duration_h",
+          "target": "duration_h"
+        }
+      ],
+      "grain": [
+        "event_id"
+      ],
+      "name": "stg_events",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "in",
+            "negated": true,
+            "options": [
+              "planned"
+            ],
+            "value": {
+              "column": "cause",
+              "kind": "column"
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_events"
+    }
+  ],
+  "tests": [
+    {
+      "column": "customers",
+      "max": 100000,
+      "min": 1,
+      "model": "stg_events",
+      "name": "customers_bounds",
+      "type": "column_range"
+    },
+    {
+      "column": "duration_h",
+      "inclusive": false,
+      "min": 0.0,
+      "model": "stg_events",
+      "name": "duration_positive",
+      "type": "column_range"
+    }
+  ]
+}

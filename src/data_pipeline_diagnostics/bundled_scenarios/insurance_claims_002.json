@@ -1,0 +1,430 @@
+{
+  "description": "Insurance claims pipeline: strictly positive payouts with non-negative reserve guard per adjuster city.",
+  "domain": "insurance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "schaden_id",
+          "target": "schaden_id"
+        },
+        {
+          "side": "left",
+          "source": "betrag",
+          "target": "betrag"
+        },
+        {
+          "side": "left",
+          "source": "reserve",
+          "target": "reserve"
+        },
+        {
+          "side": "right",
+          "source": "kunde_id",
+          "target": "kunde_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "schaden_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "police_id",
+            "right": "police_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_schaeden",
+      "name": "j_schaden_policen",
+      "operation": "join",
+      "right": "stg_policen"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "schaden_id",
+          "target": "schaden_id"
+        },
+        {
+          "side": "left",
+          "source": "betrag",
+          "target": "betrag"
+        },
+        {
+          "side": "left",
+          "source": "reserve",
+          "target": "reserve"
+        },
+        {
+          "side": "right",
+          "source": "vollname",
+          "target": "vollname"
+        },
+        {
+          "side": "right",
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "schaden_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "kunde_id",
+            "right": "kunde_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_schaden_policen",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_kunden"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "stadt"
+      ],
+      "group_by": [
+        {
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "betrag",
+          "function": "sum",
+          "name": "betrag_gesamt"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_betrag_by_stadt",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "KU-"
+          },
+          "name": "kunde_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "vollname",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "stadt",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_kunden",
+      "primary_key": [
+        "kunde_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PO-"
+          },
+          "name": "police_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_kunde_policen",
+            "target_side": "left"
+          },
+          "name": "kunde_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_policen",
+      "primary_key": [
+        "police_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SC-"
+          },
+          "name": "schaden_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_police_schaeden",
+            "target_side": "left"
+          },
+          "name": "police_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_kunde_schaeden",
+            "target_side": "left"
+          },
+          "name": "kunde_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50000.0,
+            "min": 100.0
+          },
+          "name": "betrag",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20000.0,
+            "min": 0.0
+          },
+          "name": "reserve",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_schaeden",
+      "primary_key": [
+        "schaden_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "kunde_id"
+        ],
+        "table": "raw_kunden"
+      },
+      "name": "rel_kunde_policen",
+      "right": {
+        "columns": [
+          "kunde_id"
+        ],
+        "table": "raw_policen"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "police_id"
+        ],
+        "table": "raw_policen"
+      },
+      "name": "rel_police_schaeden",
+      "right": {
+        "columns": [
+          "police_id"
+        ],
+        "table": "raw_schaeden"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "kunde_id"
+        ],
+        "table": "raw_kunden"
+      },
+      "name": "rel_kunde_schaeden",
+      "right": {
+        "columns": [
+          "kunde_id"
+        ],
+        "table": "raw_schaeden"
+      }
+    }
+  ],
+  "scenario_id": "insurance_claims_002",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "kunde_id",
+          "target": "kunde_id"
+        },
+        {
+          "operations": [],
+          "source": "vollname",
+          "target": "vollname"
+        },
+        {
+          "operations": [],
+          "source": "stadt",
+          "target": "stadt"
+        }
+      ],
+      "grain": [
+        "kunde_id"
+      ],
+      "name": "stg_kunden",
+      "row_operations": [],
+      "source": "raw_kunden"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "police_id",
+          "target": "police_id"
+        },
+        {
+          "operations": [],
+          "source": "kunde_id",
+          "target": "kunde_id"
+        }
+      ],
+      "grain": [
+        "police_id"
+      ],
+      "name": "stg_policen",
+      "row_operations": [],
+      "source": "raw_policen"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "schaden_id",
+          "target": "schaden_id"
+        },
+        {
+          "operations": [],
+          "source": "police_id",
+          "target": "police_id"
+        },
+        {
+          "operations": [],
+          "source": "kunde_id",
+          "target": "kunde_id"
+        },
+        {
+          "operations": [],
+          "source": "betrag",
+          "target": "betrag"
+        },
+        {
+          "operations": [],
+          "source": "reserve",
+          "target": "reserve"
+        }
+      ],
+      "grain": [
+        "schaden_id"
+      ],
+      "name": "stg_schaeden",
+      "row_operations": [],
+      "source": "raw_schaeden"
+    }
+  ],
+  "tests": [
+    {
+      "column": "betrag",
+      "inclusive": false,
+      "min": 0.0,
+      "model": "stg_schaeden",
+      "name": "betrag_positiv",
+      "type": "column_range"
+    },
+    {
+      "column": "reserve",
+      "min": 0.0,
+      "model": "m_full",
+      "name": "reserve_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

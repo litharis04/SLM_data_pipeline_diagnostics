@@ -1,0 +1,420 @@
+{
+  "description": "Manufacturing serials pipeline: kept origin codes, print-ready manufacture and calibration labels.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "side": "left",
+          "source": "mfg_label",
+          "target": "mfg_label"
+        },
+        {
+          "side": "left",
+          "source": "cal_label",
+          "target": "cal_label"
+        },
+        {
+          "side": "right",
+          "source": "plant_id",
+          "target": "plant_id"
+        },
+        {
+          "side": "left",
+          "source": "origin",
+          "target": "origin"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "unit_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "line_id",
+            "right": "line_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_units",
+      "name": "j_units_lines",
+      "operation": "join",
+      "right": "stg_lines"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "side": "left",
+          "source": "origin",
+          "target": "origin"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "unit_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plant_id",
+            "right": "plant_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_units_lines",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_plants"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "origin"
+      ],
+      "group_by": [
+        {
+          "source": "origin",
+          "target": "origin"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_units"
+        }
+      ],
+      "name": "o_units_by_origin",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "plant_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_plants",
+      "primary_key": [
+        "plant_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_plant_lines",
+            "target_side": "left"
+          },
+          "name": "plant_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "line_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_lines",
+      "primary_key": [
+        "line_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SN-"
+          },
+          "name": "unit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_line_units",
+            "target_side": "left"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "mfg_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "calibrated_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "domestic",
+              "imported"
+            ]
+          },
+          "name": "origin",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_units",
+      "primary_key": [
+        "unit_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "plant_id"
+        ],
+        "table": "raw_plants"
+      },
+      "name": "rel_plant_lines",
+      "right": {
+        "columns": [
+          "plant_id"
+        ],
+        "table": "raw_lines"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_lines"
+      },
+      "name": "rel_line_units",
+      "right": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_units"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_serials_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "plant_id",
+          "target": "plant_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "plant_id"
+      ],
+      "name": "stg_plants",
+      "row_operations": [],
+      "source": "raw_plants"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "plant_id",
+          "target": "plant_id"
+        },
+        {
+          "operations": [],
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "grain": [
+        "line_id"
+      ],
+      "name": "stg_lines",
+      "row_operations": [],
+      "source": "raw_lines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "unit_id",
+          "target": "unit_id"
+        },
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "mfg_date",
+          "target": "mfg_label"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "calibrated_at",
+          "target": "cal_label"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "domestic": "DOM"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "origin",
+          "target": "origin"
+        }
+      ],
+      "grain": [
+        "unit_id"
+      ],
+      "name": "stg_units",
+      "row_operations": [],
+      "source": "raw_units"
+    }
+  ],
+  "tests": [
+    {
+      "column": "origin",
+      "model": "stg_units",
+      "name": "origin_values",
+      "type": "accepted_values",
+      "values": [
+        "DOM",
+        "imported"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,550 @@
+{
+  "description": "Agriculture irrigation pipeline: watered-on-time plantings, keyless crop master, one-to-one soil tests.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "planting_id",
+          "target": "planting_id"
+        },
+        {
+          "side": "left",
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "side": "left",
+          "source": "planted",
+          "target": "planted"
+        },
+        {
+          "side": "left",
+          "source": "watered",
+          "target": "watered"
+        },
+        {
+          "side": "right",
+          "source": "crop_name",
+          "target": "crop_name"
+        },
+        {
+          "side": "left",
+          "source": "crop",
+          "target": "crop"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "planting_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "crop",
+            "right": "crop_code"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_plantings",
+      "name": "j_plant_crops",
+      "operation": "join",
+      "right": "stg_crops"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "side": "left",
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "side": "right",
+          "source": "ph",
+          "target": "ph"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "plot_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plot_id",
+            "right": "plot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_plots",
+      "name": "j_plot_soil",
+      "operation": "join",
+      "right": "stg_soil"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "planting_id",
+          "target": "planting_id"
+        },
+        {
+          "side": "left",
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "side": "left",
+          "source": "watered",
+          "target": "watered"
+        },
+        {
+          "side": "right",
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "side": "right",
+          "source": "ph",
+          "target": "ph"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "planting_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plot_id",
+            "right": "plot_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_plant_crops",
+      "name": "j_full",
+      "operation": "join",
+      "right": "j_plot_soil"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "crop"
+      ],
+      "group_by": [
+        {
+          "source": "crop",
+          "target": "crop"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "ph",
+          "function": "avg",
+          "name": "avg_ph"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_plantings"
+        }
+      ],
+      "name": "o_ph_by_crop",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "BR",
+              "CN",
+              "SO",
+              "WH"
+            ]
+          },
+          "name": "crop_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "crop_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_crops",
+      "primary_key": [],
+      "rows": {
+        "max": 4,
+        "min": 4
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "plot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 1.0
+          },
+          "name": "area_ha",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_plots",
+      "primary_key": [
+        "plot_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SL-"
+          },
+          "name": "soil_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_plot_soil",
+            "target_side": "left"
+          },
+          "name": "plot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 8.5,
+            "min": 5.5
+          },
+          "name": "ph",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_soil",
+      "primary_key": [
+        "soil_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PT-"
+          },
+          "name": "planting_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_plot_plantings",
+            "target_side": "left"
+          },
+          "name": "plot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_crop_plantings",
+            "target_side": "right"
+          },
+          "name": "crop",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-06-30",
+            "min": "2024-03-01"
+          },
+          "name": "planted",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-07-31",
+            "min": "2024-03-05"
+          },
+          "name": "watered",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_plantings",
+      "primary_key": [
+        "planting_id"
+      ],
+      "rows": {
+        "max": 200,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "crop"
+        ],
+        "table": "raw_plantings"
+      },
+      "name": "rel_crop_plantings",
+      "right": {
+        "columns": [
+          "crop_code"
+        ],
+        "table": "raw_crops"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "plot_id"
+        ],
+        "table": "raw_plots"
+      },
+      "name": "rel_plot_plantings",
+      "right": {
+        "columns": [
+          "plot_id"
+        ],
+        "table": "raw_plantings"
+      }
+    },
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "plot_id"
+        ],
+        "table": "raw_plots"
+      },
+      "name": "rel_plot_soil",
+      "right": {
+        "columns": [
+          "plot_id"
+        ],
+        "table": "raw_soil"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_irrigation_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "crop_code",
+          "target": "crop_code"
+        },
+        {
+          "operations": [],
+          "source": "crop_name",
+          "target": "crop_name"
+        }
+      ],
+      "grain": [
+        "crop_code"
+      ],
+      "name": "stg_crops",
+      "row_operations": [],
+      "source": "raw_crops"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "operations": [],
+          "source": "area_ha",
+          "target": "area_ha"
+        }
+      ],
+      "grain": [
+        "plot_id"
+      ],
+      "name": "stg_plots",
+      "row_operations": [],
+      "source": "raw_plots"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "soil_id",
+          "target": "soil_id"
+        },
+        {
+          "operations": [],
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "operations": [],
+          "source": "ph",
+          "target": "ph"
+        }
+      ],
+      "grain": [
+        "soil_id"
+      ],
+      "name": "stg_soil",
+      "row_operations": [],
+      "source": "raw_soil"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "planting_id",
+          "target": "planting_id"
+        },
+        {
+          "operations": [],
+          "source": "plot_id",
+          "target": "plot_id"
+        },
+        {
+          "operations": [],
+          "source": "crop",
+          "target": "crop"
+        },
+        {
+          "operations": [],
+          "source": "planted",
+          "target": "planted"
+        },
+        {
+          "operations": [],
+          "source": "watered",
+          "target": "watered"
+        }
+      ],
+      "grain": [
+        "planting_id"
+      ],
+      "name": "stg_plantings",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "watered",
+              "kind": "column"
+            },
+            "operator": "gte",
+            "right": {
+              "column": "planted",
+              "kind": "column"
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_plantings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "crop_code",
+      "model": "raw_crops",
+      "name": "crop_codes",
+      "type": "accepted_values",
+      "values": [
+        "BR",
+        "CN",
+        "SO",
+        "WH"
+      ]
+    }
+  ]
+}

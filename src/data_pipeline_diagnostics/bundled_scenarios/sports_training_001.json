@@ -1,0 +1,437 @@
+{
+  "description": "Sports training pipeline: per-athlete aggregates over staging, earliest session records, print-ready session dates.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "filters": [],
+      "grain": [
+        "athlete_id",
+        "drill_id"
+      ],
+      "group_by": [
+        {
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "source": "drill_id",
+          "target": "drill_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "score",
+          "function": "sum",
+          "name": "total_score"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_sessions"
+        }
+      ],
+      "name": "a_athlete_stats",
+      "operation": "aggregate",
+      "source": "stg_sessions"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "side": "left",
+          "source": "drill_id",
+          "target": "drill_id"
+        },
+        {
+          "side": "left",
+          "source": "total_score",
+          "target": "total_score"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "athlete_id",
+        "drill_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "athlete_id",
+            "right": "athlete_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_athlete_stats",
+      "name": "j_stats_athletes",
+      "operation": "join",
+      "right": "stg_athletes"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "side": "left",
+          "source": "total_score",
+          "target": "total_score"
+        },
+        {
+          "side": "right",
+          "source": "drill_name",
+          "target": "drill_name"
+        },
+        {
+          "side": "left",
+          "source": "drill_id",
+          "target": "drill_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "athlete_id",
+        "drill_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "drill_id",
+            "right": "drill_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_stats_athletes",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_drills"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "drill_name"
+      ],
+      "group_by": [
+        {
+          "source": "drill_name",
+          "target": "drill_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total_score",
+          "function": "sum",
+          "name": "drill_score"
+        },
+        {
+          "column": "athlete_id",
+          "function": "count_distinct",
+          "name": "n_athletes"
+        }
+      ],
+      "name": "o_score_by_drill",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AT-"
+          },
+          "name": "athlete_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_athletes",
+      "primary_key": [
+        "athlete_id"
+      ],
+      "rows": {
+        "max": 25,
+        "min": 25
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "DR-"
+          },
+          "name": "drill_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "drill_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_drills",
+      "primary_key": [
+        "drill_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SN-"
+          },
+          "name": "session_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_athlete_sessions",
+            "target_side": "left"
+          },
+          "name": "athlete_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_drill_sessions",
+            "target_side": "right"
+          },
+          "name": "drill_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "session_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_sessions",
+      "primary_key": [
+        "session_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "athlete_id"
+        ],
+        "table": "raw_athletes"
+      },
+      "name": "rel_athlete_sessions",
+      "right": {
+        "columns": [
+          "athlete_id"
+        ],
+        "table": "raw_sessions"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "drill_id"
+        ],
+        "table": "raw_sessions"
+      },
+      "name": "rel_drill_sessions",
+      "right": {
+        "columns": [
+          "drill_id"
+        ],
+        "table": "raw_drills"
+      }
+    }
+  ],
+  "scenario_id": "sports_training_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "athlete_id"
+      ],
+      "name": "stg_athletes",
+      "row_operations": [],
+      "source": "raw_athletes"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "drill_id",
+          "target": "drill_id"
+        },
+        {
+          "operations": [],
+          "source": "drill_name",
+          "target": "drill_name"
+        }
+      ],
+      "grain": [
+        "drill_id"
+      ],
+      "name": "stg_drills",
+      "row_operations": [],
+      "source": "raw_drills"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "session_id",
+          "target": "session_id"
+        },
+        {
+          "operations": [],
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "operations": [],
+          "source": "drill_id",
+          "target": "drill_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "session_date",
+          "target": "date_label"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        }
+      ],
+      "grain": [
+        "session_id"
+      ],
+      "name": "stg_sessions",
+      "row_operations": [
+        {
+          "keys": [
+            "session_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "date_label",
+              "direction": "asc"
+            }
+          ]
+        }
+      ],
+      "source": "raw_sessions"
+    }
+  ],
+  "tests": [
+    {
+      "column": "score",
+      "min": 0.0,
+      "model": "stg_sessions",
+      "name": "score_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

@@ -1,0 +1,473 @@
+{
+  "description": "Finance limits pipeline: deduplicated limit feed, integer active flags and derived available credit.",
+  "domain": "finance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "limit_id",
+          "target": "limit_id"
+        },
+        {
+          "side": "left",
+          "source": "max_amount",
+          "target": "max_amount"
+        },
+        {
+          "side": "left",
+          "source": "used",
+          "target": "used"
+        },
+        {
+          "side": "left",
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "limit_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "customer_id",
+            "right": "customer_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_limits",
+      "name": "j_limits_customers",
+      "operation": "join",
+      "right": "stg_customers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "limit_id",
+          "target": "limit_id"
+        },
+        {
+          "side": "left",
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "side": "left",
+          "source": "max_amount",
+          "target": "max_amount"
+        },
+        {
+          "side": "left",
+          "source": "used",
+          "target": "used"
+        },
+        {
+          "side": "right",
+          "source": "txn_id",
+          "target": "txn_id"
+        },
+        {
+          "side": "right",
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "max_amount",
+              "kind": "column"
+            },
+            "operator": "subtract",
+            "right": {
+              "column": "used",
+              "kind": "column"
+            }
+          },
+          "name": "available",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "txn_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "limit_id",
+            "right": "limit_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_limits_customers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_transactions"
+    },
+    {
+      "keys": [
+        "limit_id"
+      ],
+      "name": "d_limits",
+      "grain": [
+        "limit_id"
+      ],
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "reviewed",
+          "direction": "desc"
+        }
+      ],
+      "source": "stg_limits"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "customer_id"
+      ],
+      "group_by": [
+        {
+          "source": "customer_id",
+          "target": "customer_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "amount",
+          "function": "sum",
+          "name": "volume"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_txns"
+        }
+      ],
+      "name": "o_volume_by_customer",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CU-"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_customers",
+      "primary_key": [
+        "customer_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "LM-"
+          },
+          "name": "limit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_customer_limits",
+            "target_side": "left"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1,
+            "min": 0
+          },
+          "name": "active",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 1000.0
+          },
+          "name": "max_amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50000.0,
+            "min": 0.0
+          },
+          "name": "used",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "reviewed",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_limits",
+      "primary_key": [
+        "limit_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TX-"
+          },
+          "name": "txn_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_limit_txns",
+            "target_side": "left"
+          },
+          "name": "limit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 10000.0,
+            "min": 10.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_transactions",
+      "primary_key": [
+        "txn_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_customers"
+      },
+      "name": "rel_customer_limits",
+      "right": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_limits"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "limit_id"
+        ],
+        "table": "raw_limits"
+      },
+      "name": "rel_limit_txns",
+      "right": {
+        "columns": [
+          "limit_id"
+        ],
+        "table": "raw_transactions"
+      }
+    }
+  ],
+  "scenario_id": "finance_limits_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "customer_id"
+      ],
+      "name": "stg_customers",
+      "row_operations": [],
+      "source": "raw_customers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "limit_id",
+          "target": "limit_id"
+        },
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "active",
+          "target": "active_flag"
+        },
+        {
+          "operations": [],
+          "source": "max_amount",
+          "target": "max_amount"
+        },
+        {
+          "operations": [],
+          "source": "used",
+          "target": "used"
+        },
+        {
+          "operations": [],
+          "source": "reviewed",
+          "target": "reviewed"
+        }
+      ],
+      "grain": [
+        "limit_id"
+      ],
+      "name": "stg_limits",
+      "row_operations": [],
+      "source": "raw_limits"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "txn_id",
+          "target": "txn_id"
+        },
+        {
+          "operations": [],
+          "source": "limit_id",
+          "target": "limit_id"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "grain": [
+        "txn_id"
+      ],
+      "name": "stg_transactions",
+      "row_operations": [],
+      "source": "raw_transactions"
+    }
+  ],
+  "tests": [
+    {
+      "column": "amount",
+      "min": 0.0,
+      "model": "stg_transactions",
+      "name": "amount_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

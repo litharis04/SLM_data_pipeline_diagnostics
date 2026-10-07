@@ -1,0 +1,406 @@
+{
+  "description": "Retail reviews pipeline: one-to-one product details with right-side keys, trimmed reviews and lowered brand names.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "detail_id",
+          "target": "detail_id"
+        },
+        {
+          "side": "left",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "right",
+          "source": "brand_id",
+          "target": "brand_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "detail_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "product_id",
+            "right": "product_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_details",
+      "name": "j_det_products",
+      "operation": "join",
+      "right": "stg_products"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "detail_id",
+          "target": "detail_id"
+        },
+        {
+          "side": "left",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "right",
+          "source": "brand_name",
+          "target": "brand_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "detail_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "brand_id",
+            "right": "brand_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_det_products",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_brands"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "brand_name"
+      ],
+      "group_by": [
+        {
+          "source": "brand_name",
+          "target": "brand_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "rating",
+          "function": "avg",
+          "name": "avg_rating"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_reviews"
+        }
+      ],
+      "name": "o_rating_by_brand",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "BR-"
+          },
+          "name": "brand_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "brand_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_brands",
+      "primary_key": [
+        "brand_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PD-"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_brand_products",
+            "target_side": "left"
+          },
+          "name": "brand_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "product_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "DT-"
+          },
+          "name": "detail_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_product_details",
+            "target_side": "left"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "rating",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 40,
+            "min_length": 5
+          },
+          "name": "review",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "reviewer",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_details",
+      "primary_key": [
+        "detail_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "brand_id"
+        ],
+        "table": "raw_brands"
+      },
+      "name": "rel_brand_products",
+      "right": {
+        "columns": [
+          "brand_id"
+        ],
+        "table": "raw_products"
+      }
+    },
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_products"
+      },
+      "name": "rel_product_details",
+      "right": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_details"
+      }
+    }
+  ],
+  "scenario_id": "retail_reviews_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "brand_id",
+          "target": "brand_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "lower"
+            }
+          ],
+          "source": "brand_name",
+          "target": "brand_name"
+        }
+      ],
+      "grain": [
+        "brand_id"
+      ],
+      "name": "stg_brands",
+      "row_operations": [],
+      "source": "raw_brands"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "brand_id",
+          "target": "brand_id"
+        },
+        {
+          "operations": [],
+          "source": "product_name",
+          "target": "product_name"
+        }
+      ],
+      "grain": [
+        "product_id"
+      ],
+      "name": "stg_products",
+      "row_operations": [],
+      "source": "raw_products"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "detail_id",
+          "target": "detail_id"
+        },
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "operations": [
+            {
+              "op": "trim"
+            }
+          ],
+          "source": "review",
+          "target": "review"
+        },
+        {
+          "operations": [],
+          "source": "reviewer",
+          "target": "reviewer"
+        }
+      ],
+      "grain": [
+        "detail_id"
+      ],
+      "name": "stg_details",
+      "row_operations": [],
+      "source": "raw_details"
+    }
+  ],
+  "tests": [
+    {
+      "column": "rating",
+      "model": "stg_details",
+      "name": "rating_values",
+      "type": "accepted_values",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ]
+}

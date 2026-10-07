@@ -1,0 +1,411 @@
+{
+  "description": "Education courses pipeline: weighted difficulties, biased online flags and constrained access codes.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "right",
+          "source": "school_id",
+          "target": "school_id"
+        },
+        {
+          "side": "right",
+          "source": "difficulty",
+          "target": "difficulty"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "course_id",
+            "right": "course_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_enrollments",
+      "name": "j_enr_courses",
+      "operation": "join",
+      "right": "stg_courses"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "left",
+          "source": "difficulty",
+          "target": "difficulty"
+        },
+        {
+          "side": "right",
+          "source": "school_name",
+          "target": "school_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "school_id",
+            "right": "school_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_enr_courses",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_schools"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "difficulty"
+      ],
+      "group_by": [
+        {
+          "source": "difficulty",
+          "target": "difficulty"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "score",
+          "function": "avg",
+          "name": "avg_score"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_enrollments"
+        }
+      ],
+      "name": "o_score_by_difficulty",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SC-"
+          },
+          "name": "school_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "school_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_schools",
+      "primary_key": [
+        "school_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CS-"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_school_courses",
+            "target_side": "left"
+          },
+          "name": "school_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "easy",
+              "hard"
+            ],
+            "weights": [
+              3.0,
+              1.0
+            ]
+          },
+          "name": "difficulty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "alphabet": "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+            "kind": "random_string",
+            "max_length": 6,
+            "min_length": 6
+          },
+          "name": "access_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean",
+            "true_probability": 0.3
+          },
+          "name": "online",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_courses",
+      "primary_key": [
+        "course_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EN-"
+          },
+          "name": "enroll_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_course_enrollments",
+            "target_side": "left"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_enrollments",
+      "primary_key": [
+        "enroll_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "school_id"
+        ],
+        "table": "raw_schools"
+      },
+      "name": "rel_school_courses",
+      "right": {
+        "columns": [
+          "school_id"
+        ],
+        "table": "raw_courses"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_courses"
+      },
+      "name": "rel_course_enrollments",
+      "right": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_enrollments"
+      }
+    }
+  ],
+  "scenario_id": "education_courses_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "school_id",
+          "target": "school_id"
+        },
+        {
+          "operations": [],
+          "source": "school_name",
+          "target": "school_name"
+        }
+      ],
+      "grain": [
+        "school_id"
+      ],
+      "name": "stg_schools",
+      "row_operations": [],
+      "source": "raw_schools"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "school_id",
+          "target": "school_id"
+        },
+        {
+          "operations": [],
+          "source": "difficulty",
+          "target": "difficulty"
+        },
+        {
+          "operations": [],
+          "source": "access_code",
+          "target": "access_code"
+        },
+        {
+          "operations": [],
+          "source": "online",
+          "target": "online"
+        }
+      ],
+      "grain": [
+        "course_id"
+      ],
+      "name": "stg_courses",
+      "row_operations": [],
+      "source": "raw_courses"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        }
+      ],
+      "grain": [
+        "enroll_id"
+      ],
+      "name": "stg_enrollments",
+      "row_operations": [],
+      "source": "raw_enrollments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "difficulty",
+      "model": "stg_courses",
+      "name": "difficulty_values",
+      "type": "accepted_values",
+      "values": [
+        "easy",
+        "hard"
+      ]
+    }
+  ]
+}

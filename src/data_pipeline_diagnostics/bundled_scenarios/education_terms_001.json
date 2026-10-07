@@ -1,0 +1,467 @@
+{
+  "description": "Education enrollments pipeline: quarterly enrollment analysis, negated status filter, non-negative fee guard.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "side": "left",
+          "source": "enrolled",
+          "target": "enrolled"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "left",
+          "source": "fee",
+          "target": "fee"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "quarter",
+            "value": {
+              "column": "enrolled",
+              "kind": "column"
+            }
+          },
+          "name": "quartal",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "student_id",
+            "right": "student_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_enrollments",
+      "name": "j_enroll_students",
+      "operation": "join",
+      "right": "stg_students"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "quartal",
+          "target": "quartal"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "left",
+          "source": "fee",
+          "target": "fee"
+        },
+        {
+          "side": "right",
+          "source": "titel",
+          "target": "titel"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "course_id",
+            "right": "course_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_enroll_students",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_courses"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "quartal"
+      ],
+      "group_by": [
+        {
+          "source": "quartal",
+          "target": "quartal"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "fee",
+          "function": "sum",
+          "name": "gesamt"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_fee_by_quarter",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "student_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_students",
+      "primary_key": [
+        "student_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "KU-"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 16,
+            "min_length": 6
+          },
+          "name": "titel",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_courses",
+      "primary_key": [
+        "course_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EI-"
+          },
+          "name": "enroll_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_student_enrollments",
+            "target_side": "left"
+          },
+          "name": "student_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_course_enrollments",
+            "target_side": "left"
+          },
+          "name": "course_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "enrolled",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "aktiv",
+              "pausiert",
+              "abgebrochen"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 900.0,
+            "min": 50.0
+          },
+          "name": "fee",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_enrollments",
+      "primary_key": [
+        "enroll_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "student_id"
+        ],
+        "table": "raw_students"
+      },
+      "name": "rel_student_enrollments",
+      "right": {
+        "columns": [
+          "student_id"
+        ],
+        "table": "raw_enrollments"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_courses"
+      },
+      "name": "rel_course_enrollments",
+      "right": {
+        "columns": [
+          "course_id"
+        ],
+        "table": "raw_enrollments"
+      }
+    }
+  ],
+  "scenario_id": "education_terms_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "student_id"
+      ],
+      "name": "stg_students",
+      "row_operations": [],
+      "source": "raw_students"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "titel",
+          "target": "titel"
+        }
+      ],
+      "grain": [
+        "course_id"
+      ],
+      "name": "stg_courses",
+      "row_operations": [],
+      "source": "raw_courses"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "operations": [],
+          "source": "student_id",
+          "target": "student_id"
+        },
+        {
+          "operations": [],
+          "source": "course_id",
+          "target": "course_id"
+        },
+        {
+          "operations": [],
+          "source": "enrolled",
+          "target": "enrolled"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "fee",
+          "target": "fee"
+        }
+      ],
+      "grain": [
+        "enroll_id"
+      ],
+      "name": "stg_enrollments",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "status",
+              "kind": "column"
+            },
+            "operator": "ne",
+            "right": {
+              "kind": "literal",
+              "value": "abgebrochen"
+            }
+          },
+          "op": "filter"
+        },
+        {
+          "condition": {
+            "condition": {
+              "kind": "comparison",
+              "left": {
+                "column": "fee",
+                "kind": "column"
+              },
+              "operator": "lt",
+              "right": {
+                "kind": "literal",
+                "value": 0.0
+              }
+            },
+            "kind": "not"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_enrollments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "fee",
+      "min": 0.0,
+      "model": "m_full",
+      "name": "fee_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

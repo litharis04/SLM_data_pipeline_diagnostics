@@ -1,0 +1,504 @@
+{
+  "description": "Energy trading pipeline: one-to-one contract schedules, retired note feed, trimmed desk names.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "schedule_id",
+          "target": "schedule_id"
+        },
+        {
+          "side": "left",
+          "source": "note",
+          "target": "note"
+        },
+        {
+          "side": "right",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "right",
+          "source": "desk_id",
+          "target": "desk_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "schedule_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "contract_id",
+            "right": "contract_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_schedules",
+      "name": "j_sched_contracts",
+      "operation": "join",
+      "right": "stg_contracts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "schedule_id",
+          "target": "schedule_id"
+        },
+        {
+          "side": "left",
+          "source": "note",
+          "target": "note"
+        },
+        {
+          "side": "right",
+          "source": "desk_name",
+          "target": "desk_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "schedule_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "desk_id",
+            "right": "desk_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_sched_contracts",
+      "name": "j_full_desks",
+      "operation": "join",
+      "right": "stg_desks"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "schedule_id",
+          "target": "schedule_id"
+        },
+        {
+          "side": "left",
+          "source": "desk_name",
+          "target": "desk_name"
+        },
+        {
+          "side": "right",
+          "source": "delivery_id",
+          "target": "delivery_id"
+        },
+        {
+          "side": "right",
+          "source": "volume",
+          "target": "volume"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "delivery_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "schedule_id",
+            "right": "schedule_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_full_desks",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_deliveries"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "desk_name"
+      ],
+      "group_by": [
+        {
+          "source": "desk_name",
+          "target": "desk_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "volume",
+          "function": "sum",
+          "name": "total_volume"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_deliveries"
+        }
+      ],
+      "name": "o_volume_by_desk",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DK-"
+          },
+          "name": "desk_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "desk_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_desks",
+      "primary_key": [
+        "desk_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "CT-"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_desk_contracts",
+            "target_side": "left"
+          },
+          "name": "desk_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "gas",
+              "power"
+            ]
+          },
+          "name": "product",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_contracts",
+      "primary_key": [
+        "contract_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "SC-"
+          },
+          "name": "schedule_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_contract_schedules",
+            "target_side": "left"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 5
+          },
+          "name": "note",
+          "null_probability": 1.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_schedules",
+      "primary_key": [
+        "schedule_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "DV-"
+          },
+          "name": "delivery_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_schedule_deliveries",
+            "target_side": "left"
+          },
+          "name": "schedule_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 10000.0,
+            "min": 10.0
+          },
+          "name": "volume",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_deliveries",
+      "primary_key": [
+        "delivery_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "desk_id"
+        ],
+        "table": "raw_desks"
+      },
+      "name": "rel_desk_contracts",
+      "right": {
+        "columns": [
+          "desk_id"
+        ],
+        "table": "raw_contracts"
+      }
+    },
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "contract_id"
+        ],
+        "table": "raw_contracts"
+      },
+      "name": "rel_contract_schedules",
+      "right": {
+        "columns": [
+          "contract_id"
+        ],
+        "table": "raw_schedules"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "schedule_id"
+        ],
+        "table": "raw_schedules"
+      },
+      "name": "rel_schedule_deliveries",
+      "right": {
+        "columns": [
+          "schedule_id"
+        ],
+        "table": "raw_deliveries"
+      }
+    }
+  ],
+  "scenario_id": "energy_trading_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [
+            {
+              "op": "trim"
+            }
+          ],
+          "source": "desk_name",
+          "target": "desk_name"
+        },
+        {
+          "operations": [],
+          "source": "desk_id",
+          "target": "desk_id"
+        }
+      ],
+      "grain": [
+        "desk_id"
+      ],
+      "name": "stg_desks",
+      "row_operations": [],
+      "source": "raw_desks"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "desk_id",
+          "target": "desk_id"
+        },
+        {
+          "operations": [],
+          "source": "product",
+          "target": "product"
+        }
+      ],
+      "grain": [
+        "contract_id"
+      ],
+      "name": "stg_contracts",
+      "row_operations": [],
+      "source": "raw_contracts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "schedule_id",
+          "target": "schedule_id"
+        },
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "note",
+          "target": "note"
+        }
+      ],
+      "grain": [
+        "schedule_id"
+      ],
+      "name": "stg_schedules",
+      "row_operations": [],
+      "source": "raw_schedules"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "delivery_id",
+          "target": "delivery_id"
+        },
+        {
+          "operations": [],
+          "source": "schedule_id",
+          "target": "schedule_id"
+        },
+        {
+          "operations": [],
+          "source": "volume",
+          "target": "volume"
+        }
+      ],
+      "grain": [
+        "delivery_id"
+      ],
+      "name": "stg_deliveries",
+      "row_operations": [],
+      "source": "raw_deliveries"
+    }
+  ],
+  "tests": [
+    {
+      "column": "product",
+      "model": "stg_contracts",
+      "name": "product_values",
+      "type": "accepted_values",
+      "values": [
+        "gas",
+        "power"
+      ]
+    }
+  ]
+}

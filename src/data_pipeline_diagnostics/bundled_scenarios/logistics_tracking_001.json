@@ -1,0 +1,413 @@
+{
+  "description": "Logistics tracking pipeline: fallback contacts, delivered flags and zone labels parsed in staging.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "side": "left",
+          "source": "zone_label",
+          "target": "zone_label"
+        },
+        {
+          "side": "left",
+          "source": "delivered",
+          "target": "delivered"
+        },
+        {
+          "side": "left",
+          "source": "hub_id",
+          "target": "hub_id"
+        },
+        {
+          "side": "right",
+          "source": "contact",
+          "target": "contact"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ship_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "carrier_id",
+            "right": "carrier_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_shipments",
+      "name": "j_ship_carriers",
+      "operation": "join",
+      "right": "stg_carriers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "side": "left",
+          "source": "zone_label",
+          "target": "zone_label"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ship_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hub_id",
+            "right": "hub_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ship_carriers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_hubs"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "zone_label"
+      ],
+      "group_by": [
+        {
+          "source": "zone_label",
+          "target": "zone_label"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_shipments"
+        }
+      ],
+      "name": "o_shipments_by_zone",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CR-"
+          },
+          "name": "carrier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "company",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email",
+            "locale": "de_DE"
+          },
+          "name": "contact",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_carriers",
+      "primary_key": [
+        "carrier_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HB-"
+          },
+          "name": "hub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hubs",
+      "primary_key": [
+        "hub_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TR-"
+          },
+          "name": "ship_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_carrier_shipments",
+            "target_side": "left"
+          },
+          "name": "carrier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hub_shipments",
+            "target_side": "right"
+          },
+          "name": "hub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 9,
+            "min": 1
+          },
+          "name": "zone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N",
+              "Y"
+            ]
+          },
+          "name": "delivered_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_shipments",
+      "primary_key": [
+        "ship_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "carrier_id"
+        ],
+        "table": "raw_carriers"
+      },
+      "name": "rel_carrier_shipments",
+      "right": {
+        "columns": [
+          "carrier_id"
+        ],
+        "table": "raw_shipments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "hub_id"
+        ],
+        "table": "raw_shipments"
+      },
+      "name": "rel_hub_shipments",
+      "right": {
+        "columns": [
+          "hub_id"
+        ],
+        "table": "raw_hubs"
+      }
+    }
+  ],
+  "scenario_id": "logistics_tracking_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "carrier_id",
+          "target": "carrier_id"
+        },
+        {
+          "operations": [],
+          "source": "company",
+          "target": "company"
+        },
+        {
+          "operations": [
+            {
+              "op": "coalesce",
+              "value": "unknown"
+            }
+          ],
+          "source": "contact",
+          "target": "contact"
+        }
+      ],
+      "grain": [
+        "carrier_id"
+      ],
+      "name": "stg_carriers",
+      "row_operations": [],
+      "source": "raw_carriers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hub_id",
+          "target": "hub_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "hub_id"
+      ],
+      "name": "stg_hubs",
+      "row_operations": [],
+      "source": "raw_hubs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ship_id",
+          "target": "ship_id"
+        },
+        {
+          "operations": [],
+          "source": "carrier_id",
+          "target": "carrier_id"
+        },
+        {
+          "operations": [],
+          "source": "hub_id",
+          "target": "hub_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "zone",
+          "target": "zone_label"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "delivered_str",
+          "target": "delivered"
+        }
+      ],
+      "grain": [
+        "ship_id"
+      ],
+      "name": "stg_shipments",
+      "row_operations": [],
+      "source": "raw_shipments"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "contact"
+      ],
+      "model": "stg_carriers",
+      "name": "contact_filled",
+      "type": "not_null"
+    }
+  ]
+}

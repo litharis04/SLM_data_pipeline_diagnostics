@@ -1,0 +1,446 @@
+{
+  "description": "Real-estate valuations pipeline: strict condition codebook, print-ready year and tax labels.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "valuation_id",
+          "target": "valuation_id"
+        },
+        {
+          "side": "left",
+          "source": "fee",
+          "target": "fee"
+        },
+        {
+          "side": "right",
+          "source": "district_id",
+          "target": "district_id"
+        },
+        {
+          "side": "right",
+          "source": "condition",
+          "target": "condition"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "valuation_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "prop_id",
+            "right": "prop_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_valuations",
+      "name": "j_val_properties",
+      "operation": "join",
+      "right": "stg_properties"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "valuation_id",
+          "target": "valuation_id"
+        },
+        {
+          "side": "left",
+          "source": "fee",
+          "target": "fee"
+        },
+        {
+          "side": "left",
+          "source": "condition",
+          "target": "condition"
+        },
+        {
+          "side": "right",
+          "source": "district_name",
+          "target": "district_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "valuation_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "district_id",
+            "right": "district_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_val_properties",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_districts"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "condition"
+      ],
+      "group_by": [
+        {
+          "source": "condition",
+          "target": "condition"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "fee",
+          "function": "avg",
+          "name": "avg_fee"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_valuations"
+        }
+      ],
+      "name": "o_tax_by_condition",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "DT-"
+          },
+          "name": "district_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "district_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_districts",
+      "primary_key": [
+        "district_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_district_properties",
+            "target_side": "left"
+          },
+          "name": "district_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "fair",
+              "good",
+              "poor"
+            ]
+          },
+          "name": "condition",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 2024,
+            "min": 1900
+          },
+          "name": "year_built",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_properties",
+      "primary_key": [
+        "prop_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "VL-"
+          },
+          "name": "valuation_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_property_valuations",
+            "target_side": "left"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50000.0,
+            "min": 500.0
+          },
+          "name": "tax",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "appraiser",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000.0,
+            "min": 50.0
+          },
+          "name": "fee",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_valuations",
+      "primary_key": [
+        "valuation_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "district_id"
+        ],
+        "table": "raw_districts"
+      },
+      "name": "rel_district_properties",
+      "right": {
+        "columns": [
+          "district_id"
+        ],
+        "table": "raw_properties"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_properties"
+      },
+      "name": "rel_property_valuations",
+      "right": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_valuations"
+      }
+    }
+  ],
+  "scenario_id": "realestate_valuations_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "district_id",
+          "target": "district_id"
+        },
+        {
+          "operations": [],
+          "source": "district_name",
+          "target": "district_name"
+        }
+      ],
+      "grain": [
+        "district_id"
+      ],
+      "name": "stg_districts",
+      "row_operations": [],
+      "source": "raw_districts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [],
+          "source": "district_id",
+          "target": "district_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "fair": "F",
+                "good": "G",
+                "poor": "P"
+              },
+              "on_unmapped": "error",
+              "op": "map_values"
+            }
+          ],
+          "source": "condition",
+          "target": "condition"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "year_built",
+          "target": "year_label"
+        }
+      ],
+      "grain": [
+        "prop_id"
+      ],
+      "name": "stg_properties",
+      "row_operations": [],
+      "source": "raw_properties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "valuation_id",
+          "target": "valuation_id"
+        },
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "tax",
+          "target": "tax_label"
+        },
+        {
+          "operations": [],
+          "source": "appraiser",
+          "target": "appraiser"
+        },
+        {
+          "operations": [],
+          "source": "fee",
+          "target": "fee"
+        }
+      ],
+      "grain": [
+        "valuation_id"
+      ],
+      "name": "stg_valuations",
+      "row_operations": [],
+      "source": "raw_valuations"
+    }
+  ],
+  "tests": [
+    {
+      "column": "condition",
+      "model": "stg_properties",
+      "name": "condition_values",
+      "type": "accepted_values",
+      "values": [
+        "F",
+        "G",
+        "P"
+      ]
+    }
+  ]
+}

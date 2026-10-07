@@ -1,0 +1,428 @@
+{
+  "description": "Transport schedules pipeline: deduplicated trip feed, quarter and month derivation in the join.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sched_id",
+          "target": "sched_id"
+        },
+        {
+          "side": "left",
+          "source": "depart",
+          "target": "depart"
+        },
+        {
+          "side": "right",
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "side": "right",
+          "source": "trip_name",
+          "target": "trip_name"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "quarter",
+            "value": {
+              "column": "depart",
+              "kind": "column"
+            }
+          },
+          "name": "qtr",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "month",
+            "value": {
+              "column": "depart",
+              "kind": "column"
+            }
+          },
+          "name": "mon",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "sched_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "trip_id",
+            "right": "trip_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_schedules",
+      "name": "j_sched_trips",
+      "operation": "join",
+      "right": "stg_trips"
+    },
+    {
+      "grain": [
+        "sched_id"
+      ],
+      "keys": [
+        "sched_id"
+      ],
+      "name": "d_sched_dedup",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "depart",
+          "direction": "desc"
+        }
+      ],
+      "source": "j_sched_trips"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sched_id",
+          "target": "sched_id"
+        },
+        {
+          "side": "left",
+          "source": "qtr",
+          "target": "qtr"
+        },
+        {
+          "side": "left",
+          "source": "depart",
+          "target": "depart"
+        },
+        {
+          "side": "right",
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sched_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "line_id",
+            "right": "line_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_sched_dedup",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_lines"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "qtr"
+      ],
+      "group_by": [
+        {
+          "source": "qtr",
+          "target": "qtr"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "depart",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_schedules"
+        }
+      ],
+      "name": "o_latest_by_quarter",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "line_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "dispatcher",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_lines",
+      "primary_key": [
+        "line_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TR-"
+          },
+          "name": "trip_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_line_trips",
+            "target_side": "left"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "trip_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_trips",
+      "primary_key": [
+        "trip_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SC-"
+          },
+          "name": "sched_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_trip_schedules",
+            "target_side": "left"
+          },
+          "name": "trip_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "depart",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_schedules",
+      "primary_key": [
+        "sched_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_lines"
+      },
+      "name": "rel_line_trips",
+      "right": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_trips"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "trip_id"
+        ],
+        "table": "raw_trips"
+      },
+      "name": "rel_trip_schedules",
+      "right": {
+        "columns": [
+          "trip_id"
+        ],
+        "table": "raw_schedules"
+      }
+    }
+  ],
+  "scenario_id": "transport_schedules_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "line_name",
+          "target": "line_name"
+        },
+        {
+          "operations": [],
+          "source": "dispatcher",
+          "target": "dispatcher"
+        }
+      ],
+      "grain": [
+        "line_id"
+      ],
+      "name": "stg_lines",
+      "row_operations": [],
+      "source": "raw_lines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "trip_id",
+          "target": "trip_id"
+        },
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "trip_name",
+          "target": "trip_name"
+        }
+      ],
+      "grain": [
+        "trip_id"
+      ],
+      "name": "stg_trips",
+      "row_operations": [],
+      "source": "raw_trips"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sched_id",
+          "target": "sched_id"
+        },
+        {
+          "operations": [],
+          "source": "trip_id",
+          "target": "trip_id"
+        },
+        {
+          "operations": [],
+          "source": "depart",
+          "target": "depart"
+        }
+      ],
+      "grain": [
+        "sched_id"
+      ],
+      "name": "stg_schedules",
+      "row_operations": [],
+      "source": "raw_schedules"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "depart"
+      ],
+      "model": "stg_schedules",
+      "name": "depart_present",
+      "type": "not_null"
+    }
+  ]
+}

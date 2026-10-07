@@ -1,0 +1,619 @@
+{
+  "description": "Media logs pipeline: boolean live flags as labels, opposed staging row-operation orders.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "side": "left",
+          "source": "viewers",
+          "target": "viewers"
+        },
+        {
+          "side": "left",
+          "source": "live_label",
+          "target": "live_label"
+        },
+        {
+          "side": "right",
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "side": "right",
+          "source": "genre",
+          "target": "genre"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "airing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "program_id",
+            "right": "program_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_airings",
+      "name": "j_air_programs",
+      "operation": "join",
+      "right": "stg_programs"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "side": "left",
+          "source": "viewers",
+          "target": "viewers"
+        },
+        {
+          "side": "left",
+          "source": "genre",
+          "target": "genre"
+        },
+        {
+          "side": "right",
+          "source": "channel_name",
+          "target": "channel_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "airing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "channel_id",
+            "right": "channel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_air_programs",
+      "name": "j_full_channels",
+      "operation": "join",
+      "right": "stg_channels"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "side": "left",
+          "source": "viewers",
+          "target": "viewers"
+        },
+        {
+          "side": "left",
+          "source": "genre",
+          "target": "genre"
+        },
+        {
+          "side": "right",
+          "source": "clip_id",
+          "target": "clip_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "clip_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "airing_id",
+            "right": "airing_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_full_channels",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_clips"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "genre"
+      ],
+      "group_by": [
+        {
+          "source": "genre",
+          "target": "genre"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "viewers",
+          "function": "sum",
+          "name": "total_viewers"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_airings"
+        }
+      ],
+      "name": "o_viewers_by_genre",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "CH-"
+          },
+          "name": "channel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "channel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_channels",
+      "primary_key": [
+        "channel_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PG-"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_channel_programs",
+            "target_side": "left"
+          },
+          "name": "channel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "host",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "drama",
+              "sports"
+            ]
+          },
+          "name": "genre",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_programs",
+      "primary_key": [
+        "program_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "AR-"
+          },
+          "name": "airing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_program_airings",
+            "target_side": "left"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000000,
+            "min": 0
+          },
+          "name": "viewers",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "live",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "aired",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_airings",
+      "primary_key": [
+        "airing_id"
+      ],
+      "rows": {
+        "max": 200,
+        "min": 60
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CL-"
+          },
+          "name": "clip_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_airing_clips",
+            "target_side": "left"
+          },
+          "name": "airing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 600,
+            "min": 5
+          },
+          "name": "duration_sec",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_clips",
+      "primary_key": [
+        "clip_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "channel_id"
+        ],
+        "table": "raw_channels"
+      },
+      "name": "rel_channel_programs",
+      "right": {
+        "columns": [
+          "channel_id"
+        ],
+        "table": "raw_programs"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_programs"
+      },
+      "name": "rel_program_airings",
+      "right": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_airings"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "airing_id"
+        ],
+        "table": "raw_airings"
+      },
+      "name": "rel_airing_clips",
+      "right": {
+        "columns": [
+          "airing_id"
+        ],
+        "table": "raw_clips"
+      }
+    }
+  ],
+  "scenario_id": "media_logs_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "operations": [],
+          "source": "channel_name",
+          "target": "channel_name"
+        }
+      ],
+      "grain": [
+        "channel_id"
+      ],
+      "name": "stg_channels",
+      "row_operations": [],
+      "source": "raw_channels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "channel_id",
+          "target": "channel_id"
+        },
+        {
+          "operations": [],
+          "source": "host",
+          "target": "host"
+        },
+        {
+          "operations": [],
+          "source": "genre",
+          "target": "genre"
+        }
+      ],
+      "grain": [
+        "program_id"
+      ],
+      "name": "stg_programs",
+      "row_operations": [],
+      "source": "raw_programs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "viewers",
+          "target": "viewers"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "live",
+          "target": "live_label"
+        },
+        {
+          "operations": [],
+          "source": "aired",
+          "target": "aired"
+        }
+      ],
+      "grain": [
+        "airing_id"
+      ],
+      "name": "stg_airings",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "viewers",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "op": "filter"
+        },
+        {
+          "keys": [
+            "airing_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "aired",
+              "direction": "desc"
+            }
+          ]
+        }
+      ],
+      "source": "raw_airings"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "clip_id",
+          "target": "clip_id"
+        },
+        {
+          "operations": [],
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "operations": [],
+          "source": "duration_sec",
+          "target": "duration_sec"
+        }
+      ],
+      "grain": [
+        "clip_id"
+      ],
+      "name": "stg_clips",
+      "row_operations": [
+        {
+          "keys": [
+            "clip_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "duration_sec",
+              "direction": "desc"
+            }
+          ]
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "duration_sec",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_clips"
+    }
+  ],
+  "tests": [
+    {
+      "column": "genre",
+      "model": "stg_programs",
+      "name": "genre_values",
+      "type": "accepted_values",
+      "values": [
+        "drama",
+        "sports"
+      ]
+    }
+  ]
+}

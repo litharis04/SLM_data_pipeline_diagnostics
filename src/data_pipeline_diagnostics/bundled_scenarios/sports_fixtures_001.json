@@ -1,0 +1,520 @@
+{
+  "description": "Sports fixtures pipeline: completed-fixture aggregates, major-season output gate, unique broadcast audit codes.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "side": "left",
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "side": "left",
+          "source": "attendance",
+          "target": "attendance"
+        },
+        {
+          "side": "left",
+          "source": "broadcast_id",
+          "target": "broadcast_id"
+        },
+        {
+          "side": "left",
+          "source": "stream_key",
+          "target": "stream_key"
+        },
+        {
+          "side": "right",
+          "source": "team_name",
+          "target": "team_name"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "fixture_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "home_id",
+            "right": "team_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_fixtures",
+      "name": "j_fix_teams",
+      "operation": "join",
+      "right": "stg_teams"
+    },
+    {
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "status",
+            "kind": "column"
+          },
+          "operator": "eq",
+          "right": {
+            "kind": "literal",
+            "value": "played"
+          }
+        }
+      ],
+      "grain": [
+        "season_id"
+      ],
+      "group_by": [
+        {
+          "source": "season_id",
+          "target": "season_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "attendance",
+          "function": "sum",
+          "name": "total_att"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_fixtures"
+        }
+      ],
+      "name": "a_season_stats",
+      "operation": "aggregate",
+      "source": "j_fix_teams"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "side": "left",
+          "source": "total_att",
+          "target": "total_att"
+        },
+        {
+          "side": "right",
+          "source": "label",
+          "target": "label"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "season_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "season_id",
+            "right": "season_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_season_stats",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_seasons"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "total_att",
+            "kind": "column"
+          },
+          "operator": "gte",
+          "right": {
+            "kind": "literal",
+            "value": 100000
+          }
+        }
+      ],
+      "grain": [
+        "label"
+      ],
+      "group_by": [
+        {
+          "source": "label",
+          "target": "label"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total_att",
+          "function": "sum",
+          "name": "season_att"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_seasons"
+        }
+      ],
+      "name": "o_att_by_label",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "TM-"
+          },
+          "name": "team_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "team_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_teams",
+      "primary_key": [
+        "team_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 26,
+            "min": 23
+          },
+          "name": "season_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "regular",
+              "split"
+            ]
+          },
+          "name": "label",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_seasons",
+      "primary_key": [
+        "season_id"
+      ],
+      "rows": {
+        "max": 4,
+        "min": 4
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "FX-"
+          },
+          "name": "fixture_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_team_home",
+            "target_side": "left"
+          },
+          "name": "home_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_team_away",
+            "target_side": "left"
+          },
+          "name": "away_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_season_fixtures",
+            "target_side": "right"
+          },
+          "name": "season_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 80000,
+            "min": 0
+          },
+          "name": "attendance",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "played",
+              "scheduled"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "broadcast_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "stream_key",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_fixtures",
+      "primary_key": [
+        "fixture_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "team_id"
+        ],
+        "table": "raw_teams"
+      },
+      "name": "rel_team_home",
+      "right": {
+        "columns": [
+          "home_id"
+        ],
+        "table": "raw_fixtures"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "team_id"
+        ],
+        "table": "raw_teams"
+      },
+      "name": "rel_team_away",
+      "right": {
+        "columns": [
+          "away_id"
+        ],
+        "table": "raw_fixtures"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "season_id"
+        ],
+        "table": "raw_fixtures"
+      },
+      "name": "rel_season_fixtures",
+      "right": {
+        "columns": [
+          "season_id"
+        ],
+        "table": "raw_seasons"
+      }
+    }
+  ],
+  "scenario_id": "sports_fixtures_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "team_id",
+          "target": "team_id"
+        },
+        {
+          "operations": [],
+          "source": "team_name",
+          "target": "team_name"
+        }
+      ],
+      "grain": [
+        "team_id"
+      ],
+      "name": "stg_teams",
+      "row_operations": [],
+      "source": "raw_teams"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "operations": [],
+          "source": "label",
+          "target": "label"
+        }
+      ],
+      "grain": [
+        "season_id"
+      ],
+      "name": "stg_seasons",
+      "row_operations": [],
+      "source": "raw_seasons"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "fixture_id",
+          "target": "fixture_id"
+        },
+        {
+          "operations": [],
+          "source": "home_id",
+          "target": "home_id"
+        },
+        {
+          "operations": [],
+          "source": "away_id",
+          "target": "away_id"
+        },
+        {
+          "operations": [],
+          "source": "season_id",
+          "target": "season_id"
+        },
+        {
+          "operations": [],
+          "source": "attendance",
+          "target": "attendance"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "broadcast_id",
+          "target": "broadcast_id"
+        },
+        {
+          "operations": [],
+          "source": "stream_key",
+          "target": "stream_key"
+        }
+      ],
+      "grain": [
+        "fixture_id"
+      ],
+      "name": "stg_fixtures",
+      "row_operations": [],
+      "source": "raw_fixtures"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "broadcast_id",
+        "stream_key"
+      ],
+      "model": "j_fix_teams",
+      "name": "broadcast_unique",
+      "type": "unique"
+    }
+  ]
+}

@@ -1,0 +1,431 @@
+{
+  "description": "Finance audits pipeline: deduplicated finding feed, null-skipping reviewer counts, integer score contract.",
+  "domain": "finance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "finding_id",
+          "target": "finding_id"
+        },
+        {
+          "side": "left",
+          "source": "reviewer",
+          "target": "reviewer"
+        },
+        {
+          "side": "left",
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "side": "right",
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "side": "left",
+          "source": "found_date",
+          "target": "found_date"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "finding_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "audit_id",
+            "right": "audit_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_findings",
+      "name": "j_find_audits",
+      "operation": "join",
+      "right": "stg_audits"
+    },
+    {
+      "grain": [
+        "finding_id"
+      ],
+      "keys": [
+        "finding_id"
+      ],
+      "name": "d_find_dedup",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "found_date",
+          "direction": "desc"
+        }
+      ],
+      "source": "j_find_audits"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "finding_id",
+          "target": "finding_id"
+        },
+        {
+          "side": "left",
+          "source": "reviewer",
+          "target": "reviewer"
+        },
+        {
+          "side": "left",
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "finding_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "branch_id",
+            "right": "branch_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_find_dedup",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_branches"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "city"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "reviewer",
+          "function": "count",
+          "name": "reviewed"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_findings"
+        }
+      ],
+      "name": "o_reviewed_by_city",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "BR-"
+          },
+          "name": "branch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_branches",
+      "primary_key": [
+        "branch_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "AD-"
+          },
+          "name": "audit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_branch_audits",
+            "target_side": "left"
+          },
+          "name": "branch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_audits",
+      "primary_key": [
+        "audit_id"
+      ],
+      "rows": {
+        "max": 72,
+        "min": 24
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "FD-"
+          },
+          "name": "finding_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_audit_findings",
+            "target_side": "left"
+          },
+          "name": "audit_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "reviewer",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "high",
+              "low"
+            ]
+          },
+          "name": "severity",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "found_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_findings",
+      "primary_key": [
+        "finding_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "branch_id"
+        ],
+        "table": "raw_branches"
+      },
+      "name": "rel_branch_audits",
+      "right": {
+        "columns": [
+          "branch_id"
+        ],
+        "table": "raw_audits"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "audit_id"
+        ],
+        "table": "raw_audits"
+      },
+      "name": "rel_audit_findings",
+      "right": {
+        "columns": [
+          "audit_id"
+        ],
+        "table": "raw_findings"
+      }
+    }
+  ],
+  "scenario_id": "finance_audits_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "branch_id"
+      ],
+      "name": "stg_branches",
+      "row_operations": [],
+      "source": "raw_branches"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "audit_id",
+          "target": "audit_id"
+        },
+        {
+          "operations": [],
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        }
+      ],
+      "grain": [
+        "audit_id"
+      ],
+      "name": "stg_audits",
+      "row_operations": [],
+      "source": "raw_audits"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "finding_id",
+          "target": "finding_id"
+        },
+        {
+          "operations": [],
+          "source": "audit_id",
+          "target": "audit_id"
+        },
+        {
+          "operations": [],
+          "source": "reviewer",
+          "target": "reviewer"
+        },
+        {
+          "operations": [],
+          "source": "severity",
+          "target": "severity"
+        },
+        {
+          "operations": [],
+          "source": "found_date",
+          "target": "found_date"
+        }
+      ],
+      "grain": [
+        "finding_id"
+      ],
+      "name": "stg_findings",
+      "row_operations": [],
+      "source": "raw_findings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "score",
+      "model": "stg_audits",
+      "name": "score_values",
+      "type": "accepted_values",
+      "values": [
+        1,
+        2,
+        3,
+        4,
+        5
+      ]
+    }
+  ]
+}

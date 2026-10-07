@@ -1,0 +1,500 @@
+{
+  "description": "Retail pricing pipeline: unified float costs, whole-percent taxes, derived unit prices.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "source": "qty",
+          "target": "qty"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "total",
+              "kind": "column"
+            },
+            "operator": "divide",
+            "right": {
+              "column": "qty",
+              "kind": "column"
+            }
+          },
+          "name": "unit",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "name": "t_sales",
+      "operation": "transform",
+      "source": "stg_sales"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "side": "left",
+          "source": "unit",
+          "target": "unit"
+        },
+        {
+          "side": "left",
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "side": "right",
+          "source": "category",
+          "target": "category"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "product_id",
+            "right": "product_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_sales",
+      "name": "j_sales_products",
+      "operation": "join",
+      "right": "stg_products"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "side": "left",
+          "source": "unit",
+          "target": "unit"
+        },
+        {
+          "side": "left",
+          "source": "category",
+          "target": "category"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "store_id",
+            "right": "store_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_sales_products",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_stores"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "category"
+      ],
+      "group_by": [
+        {
+          "source": "category",
+          "target": "category"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "unit",
+          "function": "avg",
+          "name": "avg_unit"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_sales"
+        }
+      ],
+      "name": "o_unit_by_category",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PD-"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "product_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "garden",
+              "kitchen"
+            ]
+          },
+          "name": "category",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 20000,
+            "min": 100
+          },
+          "name": "cost_cents",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "store_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_stores",
+      "primary_key": [
+        "store_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SL-"
+          },
+          "name": "sale_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_product_sales",
+            "target_side": "left"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_store_sales",
+            "target_side": "right"
+          },
+          "name": "store_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 20,
+            "min": 1
+          },
+          "name": "qty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2000.0,
+            "min": 5.0
+          },
+          "name": "total",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 19.0,
+            "min": 5.0
+          },
+          "name": "tax",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_sales",
+      "primary_key": [
+        "sale_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_products"
+      },
+      "name": "rel_product_sales",
+      "right": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_sales"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "store_id"
+        ],
+        "table": "raw_sales"
+      },
+      "name": "rel_store_sales",
+      "right": {
+        "columns": [
+          "store_id"
+        ],
+        "table": "raw_stores"
+      }
+    }
+  ],
+  "scenario_id": "retail_pricing_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "product_name",
+          "target": "product_name"
+        },
+        {
+          "operations": [],
+          "source": "category",
+          "target": "category"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "cost_cents",
+          "target": "cost"
+        }
+      ],
+      "grain": [
+        "product_id"
+      ],
+      "name": "stg_products",
+      "row_operations": [],
+      "source": "raw_products"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "store_id"
+      ],
+      "name": "stg_stores",
+      "row_operations": [],
+      "source": "raw_stores"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "store_id",
+          "target": "store_id"
+        },
+        {
+          "operations": [],
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "operations": [],
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "tax",
+          "target": "tax_int"
+        }
+      ],
+      "grain": [
+        "sale_id"
+      ],
+      "name": "stg_sales",
+      "row_operations": [],
+      "source": "raw_sales"
+    }
+  ],
+  "tests": [
+    {
+      "column": "category",
+      "model": "stg_products",
+      "name": "category_values",
+      "type": "accepted_values",
+      "values": [
+        "garden",
+        "kitchen"
+      ]
+    }
+  ]
+}

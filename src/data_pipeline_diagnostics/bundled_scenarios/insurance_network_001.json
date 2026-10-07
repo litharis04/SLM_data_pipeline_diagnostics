@@ -1,0 +1,416 @@
+{
+  "description": "Insurance network pipeline: bridge-level aggregates joined to both endpoints, whole-unit deductibles.",
+  "domain": "insurance",
+  "intermediate_models": [
+    {
+      "filters": [],
+      "grain": [
+        "plan_id",
+        "provider_id"
+      ],
+      "group_by": [
+        {
+          "source": "provider_id",
+          "target": "provider_id"
+        },
+        {
+          "source": "plan_id",
+          "target": "plan_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "premium",
+          "function": "sum",
+          "name": "total_premium"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_contracts"
+        }
+      ],
+      "name": "a_provider_plans",
+      "operation": "aggregate",
+      "source": "stg_contracts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "provider_id",
+          "target": "provider_id"
+        },
+        {
+          "side": "left",
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "side": "left",
+          "source": "total_premium",
+          "target": "total_premium"
+        },
+        {
+          "side": "right",
+          "source": "provider_name",
+          "target": "provider_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "plan_id",
+        "provider_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "provider_id",
+            "right": "provider_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_provider_plans",
+      "name": "j_agg_providers",
+      "operation": "join",
+      "right": "stg_providers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "provider_id",
+          "target": "provider_id"
+        },
+        {
+          "side": "left",
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "side": "left",
+          "source": "total_premium",
+          "target": "total_premium"
+        },
+        {
+          "side": "right",
+          "source": "plan_name",
+          "target": "plan_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "plan_id",
+        "provider_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plan_id",
+            "right": "plan_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_agg_providers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_plans"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "plan_name"
+      ],
+      "group_by": [
+        {
+          "source": "plan_name",
+          "target": "plan_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total_premium",
+          "function": "sum",
+          "name": "plan_premium"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_pairs"
+        }
+      ],
+      "name": "o_premium_by_plan",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PV-"
+          },
+          "name": "provider_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "provider_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_providers",
+      "primary_key": [
+        "provider_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "plan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "plan_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_plans",
+      "primary_key": [
+        "plan_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CT-"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_network",
+            "target_side": "left"
+          },
+          "name": "provider_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_network",
+            "target_side": "right"
+          },
+          "name": "plan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 10000.0,
+            "min": 100.0
+          },
+          "name": "premium",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 0.0
+          },
+          "name": "deductible",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_contracts",
+      "primary_key": [
+        "contract_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "bridge": {
+        "left_columns": [
+          "provider_id"
+        ],
+        "right_columns": [
+          "plan_id"
+        ],
+        "table": "raw_contracts"
+      },
+      "cardinality": "many_to_many",
+      "left": {
+        "columns": [
+          "provider_id"
+        ],
+        "table": "raw_providers"
+      },
+      "name": "rel_network",
+      "right": {
+        "columns": [
+          "plan_id"
+        ],
+        "table": "raw_plans"
+      }
+    }
+  ],
+  "scenario_id": "insurance_network_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "provider_id",
+          "target": "provider_id"
+        },
+        {
+          "operations": [],
+          "source": "provider_name",
+          "target": "provider_name"
+        }
+      ],
+      "grain": [
+        "provider_id"
+      ],
+      "name": "stg_providers",
+      "row_operations": [],
+      "source": "raw_providers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "operations": [],
+          "source": "plan_name",
+          "target": "plan_name"
+        }
+      ],
+      "grain": [
+        "plan_id"
+      ],
+      "name": "stg_plans",
+      "row_operations": [],
+      "source": "raw_plans"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "provider_id",
+          "target": "provider_id"
+        },
+        {
+          "operations": [],
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "operations": [],
+          "source": "premium",
+          "target": "premium"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "deductible",
+          "target": "deductible_int"
+        }
+      ],
+      "grain": [
+        "contract_id"
+      ],
+      "name": "stg_contracts",
+      "row_operations": [],
+      "source": "raw_contracts"
+    }
+  ],
+  "tests": [
+    {
+      "column": "premium",
+      "min": 0.0,
+      "model": "stg_contracts",
+      "name": "premium_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

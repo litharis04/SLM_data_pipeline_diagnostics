@@ -1,0 +1,463 @@
+{
+  "description": "HR onboarding pipeline: kept source codes, parsed grade levels and remote flags.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "task_id",
+          "target": "task_id"
+        },
+        {
+          "side": "left",
+          "source": "priority",
+          "target": "priority"
+        },
+        {
+          "side": "left",
+          "source": "hire_id",
+          "target": "hire_id"
+        },
+        {
+          "side": "right",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "side": "right",
+          "source": "office_id",
+          "target": "office_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "task_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hire_id",
+            "right": "hire_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_tasks",
+      "name": "j_tasks_hires",
+      "operation": "join",
+      "right": "stg_hires"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "task_id",
+          "target": "task_id"
+        },
+        {
+          "side": "left",
+          "source": "priority",
+          "target": "priority"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "task_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "office_id",
+            "right": "office_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_tasks_hires",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_offices"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "city"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "priority",
+          "function": "avg",
+          "name": "avg_priority"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_tasks"
+        }
+      ],
+      "name": "o_priority_by_city",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "OF-"
+          },
+          "name": "office_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_offices",
+      "primary_key": [
+        "office_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "HR-"
+          },
+          "name": "hire_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_office_hires",
+            "target_side": "left"
+          },
+          "name": "office_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "1",
+              "2",
+              "3"
+            ]
+          },
+          "name": "grade_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N",
+              "Y"
+            ]
+          },
+          "name": "remote_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "ads",
+              "referral"
+            ]
+          },
+          "name": "source",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hires",
+      "primary_key": [
+        "hire_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TS-"
+          },
+          "name": "task_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hire_tasks",
+            "target_side": "left"
+          },
+          "name": "hire_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 5
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 3,
+            "min": 1
+          },
+          "name": "priority",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_tasks",
+      "primary_key": [
+        "task_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "office_id"
+        ],
+        "table": "raw_offices"
+      },
+      "name": "rel_office_hires",
+      "right": {
+        "columns": [
+          "office_id"
+        ],
+        "table": "raw_hires"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "hire_id"
+        ],
+        "table": "raw_hires"
+      },
+      "name": "rel_hire_tasks",
+      "right": {
+        "columns": [
+          "hire_id"
+        ],
+        "table": "raw_tasks"
+      }
+    }
+  ],
+  "scenario_id": "hr_onboarding_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "office_id",
+          "target": "office_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "office_id"
+      ],
+      "name": "stg_offices",
+      "row_operations": [],
+      "source": "raw_offices"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hire_id",
+          "target": "hire_id"
+        },
+        {
+          "operations": [],
+          "source": "office_id",
+          "target": "office_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "grade_str",
+          "target": "level"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "remote_str",
+          "target": "remote"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "referral": "REF"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "source",
+          "target": "source"
+        }
+      ],
+      "grain": [
+        "hire_id"
+      ],
+      "name": "stg_hires",
+      "row_operations": [],
+      "source": "raw_hires"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "task_id",
+          "target": "task_id"
+        },
+        {
+          "operations": [],
+          "source": "hire_id",
+          "target": "hire_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "operations": [],
+          "source": "priority",
+          "target": "priority"
+        }
+      ],
+      "grain": [
+        "task_id"
+      ],
+      "name": "stg_tasks",
+      "row_operations": [],
+      "source": "raw_tasks"
+    }
+  ],
+  "tests": [
+    {
+      "column": "source",
+      "model": "stg_hires",
+      "name": "source_values",
+      "type": "accepted_values",
+      "values": [
+        "REF",
+        "ads"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,390 @@
+{
+  "description": "Real-estate appraisals pipeline: null-mapped ungraded conditions with print-ready value labels.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "valuation_id",
+          "target": "valuation_id"
+        },
+        {
+          "side": "right",
+          "source": "appraiser_id",
+          "target": "appraiser_id"
+        },
+        {
+          "side": "right",
+          "source": "condition",
+          "target": "condition"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "valuation_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "prop_id",
+            "right": "prop_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_valuations",
+      "name": "j_val_properties",
+      "operation": "join",
+      "right": "stg_properties"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "valuation_id",
+          "target": "valuation_id"
+        },
+        {
+          "side": "left",
+          "source": "condition",
+          "target": "condition"
+        },
+        {
+          "side": "right",
+          "source": "appraiser_name",
+          "target": "appraiser_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "valuation_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "appraiser_id",
+            "right": "appraiser_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_val_properties",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_appraisers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "condition"
+      ],
+      "group_by": [
+        {
+          "source": "condition",
+          "target": "condition"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_valuations"
+        }
+      ],
+      "name": "o_valuations_by_condition",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AP-"
+          },
+          "name": "appraiser_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "appraiser_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_appraisers",
+      "primary_key": [
+        "appraiser_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_appraiser_properties",
+            "target_side": "left"
+          },
+          "name": "appraiser_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "fair",
+              "good"
+            ]
+          },
+          "name": "condition",
+          "null_probability": 0.1,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_properties",
+      "primary_key": [
+        "prop_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "VL-"
+          },
+          "name": "valuation_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_property_valuations",
+            "target_side": "left"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 50000.0,
+            "min": 500.0
+          },
+          "name": "value",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "flag",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_valuations",
+      "primary_key": [
+        "valuation_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "appraiser_id"
+        ],
+        "table": "raw_appraisers"
+      },
+      "name": "rel_appraiser_properties",
+      "right": {
+        "columns": [
+          "appraiser_id"
+        ],
+        "table": "raw_properties"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_properties"
+      },
+      "name": "rel_property_valuations",
+      "right": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_valuations"
+      }
+    }
+  ],
+  "scenario_id": "realestate_appraisals_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "appraiser_id",
+          "target": "appraiser_id"
+        },
+        {
+          "operations": [],
+          "source": "appraiser_name",
+          "target": "appraiser_name"
+        }
+      ],
+      "grain": [
+        "appraiser_id"
+      ],
+      "name": "stg_appraisers",
+      "row_operations": [],
+      "source": "raw_appraisers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [],
+          "source": "appraiser_id",
+          "target": "appraiser_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "good": "G"
+              },
+              "on_unmapped": "null",
+              "op": "map_values"
+            }
+          ],
+          "source": "condition",
+          "target": "condition"
+        }
+      ],
+      "grain": [
+        "prop_id"
+      ],
+      "name": "stg_properties",
+      "row_operations": [],
+      "source": "raw_properties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "valuation_id",
+          "target": "valuation_id"
+        },
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "value",
+          "target": "value_label"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "flag",
+          "target": "flag_label"
+        }
+      ],
+      "grain": [
+        "valuation_id"
+      ],
+      "name": "stg_valuations",
+      "row_operations": [],
+      "source": "raw_valuations"
+    }
+  ],
+  "tests": [
+    {
+      "column": "condition",
+      "model": "stg_properties",
+      "name": "condition_values",
+      "type": "accepted_values",
+      "values": [
+        "G"
+      ]
+    }
+  ]
+}

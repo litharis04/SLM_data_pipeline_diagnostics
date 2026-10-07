@@ -1,0 +1,468 @@
+{
+  "description": "Finance settlements pipeline: binary confidence flags, month and day derivation in the transform.",
+  "domain": "finance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "source": "acct_id",
+          "target": "acct_id"
+        },
+        {
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "source": "settled",
+          "target": "settled"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "month",
+            "value": {
+              "column": "settled",
+              "kind": "column"
+            }
+          },
+          "name": "month",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day",
+            "value": {
+              "column": "settled",
+              "kind": "column"
+            }
+          },
+          "name": "settle_day",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "batch_id"
+      ],
+      "name": "t_batches",
+      "operation": "transform",
+      "source": "stg_batches"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "side": "left",
+          "source": "month",
+          "target": "month"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "left",
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "side": "right",
+          "source": "owner",
+          "target": "owner"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "batch_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "acct_id",
+            "right": "acct_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_batches",
+      "name": "j_batches_accounts",
+      "operation": "join",
+      "right": "stg_accounts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "side": "left",
+          "source": "month",
+          "target": "month"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "right",
+          "source": "cp_name",
+          "target": "cp_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "batch_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "cp_id",
+            "right": "cp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_batches_accounts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_counterparties"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "month"
+      ],
+      "group_by": [
+        {
+          "source": "month",
+          "target": "month"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "amount",
+          "function": "sum",
+          "name": "volume"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_batches"
+        }
+      ],
+      "name": "o_volume_by_month",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AC-"
+          },
+          "name": "acct_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "owner",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_accounts",
+      "primary_key": [
+        "acct_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CP-"
+          },
+          "name": "cp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "cp_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_counterparties",
+      "primary_key": [
+        "cp_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "batch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_acct_batches",
+            "target_side": "left"
+          },
+          "name": "acct_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_cp_batches",
+            "target_side": "right"
+          },
+          "name": "cp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "settled",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 100.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1.0,
+            "min": 0.0
+          },
+          "name": "confidence",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_batches",
+      "primary_key": [
+        "batch_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "acct_id"
+        ],
+        "table": "raw_accounts"
+      },
+      "name": "rel_acct_batches",
+      "right": {
+        "columns": [
+          "acct_id"
+        ],
+        "table": "raw_batches"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "cp_id"
+        ],
+        "table": "raw_batches"
+      },
+      "name": "rel_cp_batches",
+      "right": {
+        "columns": [
+          "cp_id"
+        ],
+        "table": "raw_counterparties"
+      }
+    }
+  ],
+  "scenario_id": "finance_settlements_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "acct_id",
+          "target": "acct_id"
+        },
+        {
+          "operations": [],
+          "source": "owner",
+          "target": "owner"
+        }
+      ],
+      "grain": [
+        "acct_id"
+      ],
+      "name": "stg_accounts",
+      "row_operations": [],
+      "source": "raw_accounts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "operations": [],
+          "source": "cp_name",
+          "target": "cp_name"
+        }
+      ],
+      "grain": [
+        "cp_id"
+      ],
+      "name": "stg_counterparties",
+      "row_operations": [],
+      "source": "raw_counterparties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "batch_id",
+          "target": "batch_id"
+        },
+        {
+          "operations": [],
+          "source": "acct_id",
+          "target": "acct_id"
+        },
+        {
+          "operations": [],
+          "source": "cp_id",
+          "target": "cp_id"
+        },
+        {
+          "operations": [],
+          "source": "settled",
+          "target": "settled"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "confidence",
+          "target": "flag"
+        }
+      ],
+      "grain": [
+        "batch_id"
+      ],
+      "name": "stg_batches",
+      "row_operations": [],
+      "source": "raw_batches"
+    }
+  ],
+  "tests": [
+    {
+      "column": "amount",
+      "min": 0.0,
+      "model": "stg_batches",
+      "name": "amount_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

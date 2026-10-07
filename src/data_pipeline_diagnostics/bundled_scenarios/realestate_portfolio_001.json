@@ -1,0 +1,472 @@
+{
+  "description": "Managed real-estate portfolio pipeline: negated membership and presence guards, dimensional city-segment output.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lease_id",
+          "target": "lease_id"
+        },
+        {
+          "side": "left",
+          "source": "rent",
+          "target": "rent"
+        },
+        {
+          "side": "right",
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        },
+        {
+          "side": "right",
+          "source": "segment",
+          "target": "segment"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lease_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "prop_id",
+            "right": "prop_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_leases",
+      "name": "j_leases_properties",
+      "operation": "join",
+      "right": "stg_properties"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lease_id",
+          "target": "lease_id"
+        },
+        {
+          "side": "left",
+          "source": "rent",
+          "target": "rent"
+        },
+        {
+          "side": "left",
+          "source": "city",
+          "target": "city"
+        },
+        {
+          "side": "left",
+          "source": "segment",
+          "target": "segment"
+        },
+        {
+          "side": "right",
+          "source": "contact",
+          "target": "contact"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lease_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "agency_id",
+            "right": "agency_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_leases_properties",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_agencies"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [
+        "city",
+        "segment"
+      ],
+      "filters": [],
+      "grain": [
+        "city",
+        "segment"
+      ],
+      "group_by": [
+        {
+          "source": "city",
+          "target": "city"
+        },
+        {
+          "source": "segment",
+          "target": "segment"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "rent",
+          "function": "sum",
+          "name": "total_rent"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_leases"
+        }
+      ],
+      "name": "o_rent_by_city_segment",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AG-"
+          },
+          "name": "agency_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "contact",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_agencies",
+      "primary_key": [
+        "agency_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_agency_properties",
+            "target_side": "left"
+          },
+          "name": "agency_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "commercial",
+              "residential"
+            ]
+          },
+          "name": "segment",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_properties",
+      "primary_key": [
+        "prop_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LS-"
+          },
+          "name": "lease_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_property_leases",
+            "target_side": "left"
+          },
+          "name": "prop_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20000.0,
+            "min": 300.0
+          },
+          "name": "rent",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "active",
+              "ended",
+              "foreclosure"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "manager",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_leases",
+      "primary_key": [
+        "lease_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "agency_id"
+        ],
+        "table": "raw_agencies"
+      },
+      "name": "rel_agency_properties",
+      "right": {
+        "columns": [
+          "agency_id"
+        ],
+        "table": "raw_properties"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_properties"
+      },
+      "name": "rel_property_leases",
+      "right": {
+        "columns": [
+          "prop_id"
+        ],
+        "table": "raw_leases"
+      }
+    }
+  ],
+  "scenario_id": "realestate_portfolio_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "operations": [],
+          "source": "contact",
+          "target": "contact"
+        }
+      ],
+      "grain": [
+        "agency_id"
+      ],
+      "name": "stg_agencies",
+      "row_operations": [],
+      "source": "raw_agencies"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [],
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        },
+        {
+          "operations": [],
+          "source": "segment",
+          "target": "segment"
+        }
+      ],
+      "grain": [
+        "prop_id"
+      ],
+      "name": "stg_properties",
+      "row_operations": [],
+      "source": "raw_properties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "lease_id",
+          "target": "lease_id"
+        },
+        {
+          "operations": [],
+          "source": "prop_id",
+          "target": "prop_id"
+        },
+        {
+          "operations": [],
+          "source": "rent",
+          "target": "rent"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "manager",
+          "target": "manager"
+        }
+      ],
+      "grain": [
+        "lease_id"
+      ],
+      "name": "stg_leases",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "in",
+                "negated": true,
+                "options": [
+                  "foreclosure"
+                ],
+                "value": {
+                  "column": "status",
+                  "kind": "column"
+                }
+              },
+              {
+                "kind": "is_null",
+                "negated": true,
+                "value": {
+                  "column": "manager",
+                  "kind": "column"
+                }
+              }
+            ],
+            "kind": "all"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_leases"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "stg_leases",
+      "name": "status_values",
+      "type": "accepted_values",
+      "values": [
+        "active",
+        "ended",
+        "foreclosure"
+      ]
+    }
+  ]
+}

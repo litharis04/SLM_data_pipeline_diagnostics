@@ -1,0 +1,495 @@
+{
+  "description": "Agriculture livestock pipeline: shared animal feed branching into breed and pen summaries, birth weekday derivation.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "animal_id",
+          "target": "animal_id"
+        },
+        {
+          "side": "left",
+          "source": "species",
+          "target": "species"
+        },
+        {
+          "side": "left",
+          "source": "birth_weight",
+          "target": "birth_weight"
+        },
+        {
+          "side": "left",
+          "source": "born",
+          "target": "born"
+        },
+        {
+          "side": "left",
+          "source": "vet_visit",
+          "target": "vet_visit"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day",
+            "value": {
+              "column": "born",
+              "kind": "column"
+            }
+          },
+          "name": "birth_day",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "day_of_week",
+            "value": {
+              "column": "vet_visit",
+              "kind": "column"
+            }
+          },
+          "name": "vet_dow",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "animal_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "pen_id",
+            "right": "pen_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_animals",
+      "name": "j_anim_pens",
+      "operation": "join",
+      "right": "stg_pens"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "animal_id",
+          "target": "animal_id"
+        },
+        {
+          "side": "left",
+          "source": "pen_id",
+          "target": "pen_id"
+        },
+        {
+          "side": "right",
+          "source": "weigh_id",
+          "target": "weigh_id"
+        },
+        {
+          "side": "right",
+          "source": "kg",
+          "target": "kg"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "animal_id",
+        "weigh_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "animal_id",
+            "right": "animal_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_animals",
+      "name": "j_anim_weights",
+      "operation": "join",
+      "right": "stg_weights"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "species"
+      ],
+      "group_by": [
+        {
+          "source": "species",
+          "target": "species"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "birth_weight",
+          "function": "avg",
+          "name": "avg_birth_weight"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_animals"
+        }
+      ],
+      "name": "o_weight_by_species",
+      "source": "j_anim_pens"
+    },
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "pen_id"
+      ],
+      "group_by": [
+        {
+          "source": "pen_id",
+          "target": "pen_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "kg",
+          "function": "sum",
+          "name": "total_kg"
+        }
+      ],
+      "name": "o_kg_by_pen",
+      "source": "j_anim_weights"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "PN-"
+          },
+          "name": "pen_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 10,
+            "min_length": 4
+          },
+          "name": "barn",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_pens",
+      "primary_key": [
+        "pen_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "AN-"
+          },
+          "name": "animal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_pen_animals",
+            "target_side": "left"
+          },
+          "name": "pen_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "cattle",
+              "sheep"
+            ]
+          },
+          "name": "species",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-06-30",
+            "min": "2022-01-01"
+          },
+          "name": "born",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "vet_visit",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 60.0,
+            "min": 2.0
+          },
+          "name": "birth_weight",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_animals",
+      "primary_key": [
+        "animal_id"
+      ],
+      "rows": {
+        "max": 120,
+        "min": 40
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "WH-"
+          },
+          "name": "weigh_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_animal_weights",
+            "target_side": "left"
+          },
+          "name": "animal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "weighed",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 900.0,
+            "min": 10.0
+          },
+          "name": "kg",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_weights",
+      "primary_key": [
+        "weigh_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "pen_id"
+        ],
+        "table": "raw_pens"
+      },
+      "name": "rel_pen_animals",
+      "right": {
+        "columns": [
+          "pen_id"
+        ],
+        "table": "raw_animals"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "animal_id"
+        ],
+        "table": "raw_animals"
+      },
+      "name": "rel_animal_weights",
+      "right": {
+        "columns": [
+          "animal_id"
+        ],
+        "table": "raw_weights"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_livestock_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "pen_id",
+          "target": "pen_id"
+        },
+        {
+          "operations": [],
+          "source": "barn",
+          "target": "barn"
+        }
+      ],
+      "grain": [
+        "pen_id"
+      ],
+      "name": "stg_pens",
+      "row_operations": [],
+      "source": "raw_pens"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "animal_id",
+          "target": "animal_id"
+        },
+        {
+          "operations": [],
+          "source": "pen_id",
+          "target": "pen_id"
+        },
+        {
+          "operations": [],
+          "source": "species",
+          "target": "species"
+        },
+        {
+          "operations": [],
+          "source": "born",
+          "target": "born"
+        },
+        {
+          "operations": [],
+          "source": "vet_visit",
+          "target": "vet_visit"
+        },
+        {
+          "operations": [],
+          "source": "birth_weight",
+          "target": "birth_weight"
+        }
+      ],
+      "grain": [
+        "animal_id"
+      ],
+      "name": "stg_animals",
+      "row_operations": [],
+      "source": "raw_animals"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "weigh_id",
+          "target": "weigh_id"
+        },
+        {
+          "operations": [],
+          "source": "animal_id",
+          "target": "animal_id"
+        },
+        {
+          "operations": [],
+          "source": "weighed",
+          "target": "weighed"
+        },
+        {
+          "operations": [],
+          "source": "kg",
+          "target": "kg"
+        }
+      ],
+      "grain": [
+        "weigh_id"
+      ],
+      "name": "stg_weights",
+      "row_operations": [],
+      "source": "raw_weights"
+    }
+  ],
+  "tests": [
+    {
+      "column": "species",
+      "model": "stg_animals",
+      "name": "species_values",
+      "type": "accepted_values",
+      "values": [
+        "cattle",
+        "sheep"
+      ]
+    }
+  ]
+}

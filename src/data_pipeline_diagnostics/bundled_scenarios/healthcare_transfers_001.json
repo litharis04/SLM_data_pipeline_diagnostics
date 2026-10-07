@@ -1,0 +1,430 @@
+{
+  "description": "Healthcare transfers pipeline: dashless ward codes, compact transfer dates and ISO handoff parsing.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "transfer_id",
+          "target": "transfer_id"
+        },
+        {
+          "side": "left",
+          "source": "transfer_date",
+          "target": "transfer_date"
+        },
+        {
+          "side": "left",
+          "source": "reason",
+          "target": "reason"
+        },
+        {
+          "side": "right",
+          "source": "hospital_id",
+          "target": "hospital_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "transfer_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "ward_id",
+            "right": "ward_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_transfers",
+      "name": "j_trans_wards",
+      "operation": "join",
+      "right": "stg_wards"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "transfer_id",
+          "target": "transfer_id"
+        },
+        {
+          "side": "left",
+          "source": "transfer_date",
+          "target": "transfer_date"
+        },
+        {
+          "side": "left",
+          "source": "reason",
+          "target": "reason"
+        },
+        {
+          "side": "right",
+          "source": "hospital_name",
+          "target": "hospital_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "transfer_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hospital_id",
+            "right": "hospital_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_trans_wards",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_hospitals"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "reason"
+      ],
+      "group_by": [
+        {
+          "source": "reason",
+          "target": "reason"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "transfer_date",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_transfers"
+        }
+      ],
+      "name": "o_latest_by_reason",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HP-"
+          },
+          "name": "hospital_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "hospital_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hospitals",
+      "primary_key": [
+        "hospital_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "WD-"
+          },
+          "name": "ward_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hospital_wards",
+            "target_side": "left"
+          },
+          "name": "hospital_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N-1",
+              "S-2"
+            ]
+          },
+          "name": "code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_wards",
+      "primary_key": [
+        "ward_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TF-"
+          },
+          "name": "transfer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_ward_transfers",
+            "target_side": "left"
+          },
+          "name": "ward_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "20240301",
+              "20240302"
+            ]
+          },
+          "name": "transfer_date_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "2024-03-01T08:00:00",
+              "2024-03-02T08:00:00"
+            ]
+          },
+          "name": "handoff_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "escalation",
+              "routine"
+            ]
+          },
+          "name": "reason",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_transfers",
+      "primary_key": [
+        "transfer_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "hospital_id"
+        ],
+        "table": "raw_hospitals"
+      },
+      "name": "rel_hospital_wards",
+      "right": {
+        "columns": [
+          "hospital_id"
+        ],
+        "table": "raw_wards"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "ward_id"
+        ],
+        "table": "raw_wards"
+      },
+      "name": "rel_ward_transfers",
+      "right": {
+        "columns": [
+          "ward_id"
+        ],
+        "table": "raw_transfers"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_transfers_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hospital_id",
+          "target": "hospital_id"
+        },
+        {
+          "operations": [],
+          "source": "hospital_name",
+          "target": "hospital_name"
+        }
+      ],
+      "grain": [
+        "hospital_id"
+      ],
+      "name": "stg_hospitals",
+      "row_operations": [],
+      "source": "raw_hospitals"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ward_id",
+          "target": "ward_id"
+        },
+        {
+          "operations": [],
+          "source": "hospital_id",
+          "target": "hospital_id"
+        },
+        {
+          "operations": [
+            {
+              "new": "",
+              "old": "-",
+              "op": "replace"
+            }
+          ],
+          "source": "code",
+          "target": "code"
+        }
+      ],
+      "grain": [
+        "ward_id"
+      ],
+      "name": "stg_wards",
+      "row_operations": [],
+      "source": "raw_wards"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "transfer_id",
+          "target": "transfer_id"
+        },
+        {
+          "operations": [],
+          "source": "ward_id",
+          "target": "ward_id"
+        },
+        {
+          "operations": [
+            {
+              "format": "%Y%m%d",
+              "op": "cast",
+              "type": "date"
+            }
+          ],
+          "source": "transfer_date_str",
+          "target": "transfer_date"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "timestamp"
+            }
+          ],
+          "source": "handoff_str",
+          "target": "handoff_at"
+        },
+        {
+          "operations": [],
+          "source": "reason",
+          "target": "reason"
+        }
+      ],
+      "grain": [
+        "transfer_id"
+      ],
+      "name": "stg_transfers",
+      "row_operations": [],
+      "source": "raw_transfers"
+    }
+  ],
+  "tests": [
+    {
+      "column": "reason",
+      "model": "stg_transfers",
+      "name": "reason_values",
+      "type": "accepted_values",
+      "values": [
+        "escalation",
+        "routine"
+      ]
+    }
+  ]
+}

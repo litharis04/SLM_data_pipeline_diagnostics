@@ -1,0 +1,400 @@
+{
+  "description": "Manufacturing cells pipeline: minimum-capacity machine keys, keyless cell master, retired manual feed.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "side": "right",
+          "source": "cell_code",
+          "target": "cell_code"
+        },
+        {
+          "side": "right",
+          "source": "model",
+          "target": "model"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "machine_id",
+            "right": "machine_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_readings",
+      "name": "j_read_machines",
+      "operation": "join",
+      "right": "stg_machines"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "side": "right",
+          "source": "cell_name",
+          "target": "cell_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "cell_code",
+            "right": "cell_code"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_read_machines",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_cells"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "cell_name"
+      ],
+      "group_by": [
+        {
+          "source": "cell_name",
+          "target": "cell_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "value",
+          "function": "sum",
+          "name": "total_value"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_readings"
+        }
+      ],
+      "name": "o_value_by_cell",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "C1",
+              "C2",
+              "C3",
+              "C4",
+              "C5"
+            ]
+          },
+          "name": "cell_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "cell_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "supervisor",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_cells",
+      "primary_key": [],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 1,
+            "kind": "formatted_id",
+            "prefix": "M-"
+          },
+          "name": "machine_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_cell_machines",
+            "target_side": "right"
+          },
+          "name": "cell_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "model",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_machines",
+      "primary_key": [
+        "machine_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RD-"
+          },
+          "name": "reading_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_machine_readings",
+            "target_side": "left"
+          },
+          "name": "machine_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 0.0
+          },
+          "name": "value",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 5
+          },
+          "name": "manual",
+          "null_probability": 1.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_readings",
+      "primary_key": [
+        "reading_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "cell_code"
+        ],
+        "table": "raw_machines"
+      },
+      "name": "rel_cell_machines",
+      "right": {
+        "columns": [
+          "cell_code"
+        ],
+        "table": "raw_cells"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "machine_id"
+        ],
+        "table": "raw_machines"
+      },
+      "name": "rel_machine_readings",
+      "right": {
+        "columns": [
+          "machine_id"
+        ],
+        "table": "raw_readings"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_cells_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "cell_code",
+          "target": "cell_code"
+        },
+        {
+          "operations": [],
+          "source": "cell_name",
+          "target": "cell_name"
+        },
+        {
+          "operations": [],
+          "source": "supervisor",
+          "target": "supervisor"
+        }
+      ],
+      "grain": [
+        "cell_code"
+      ],
+      "name": "stg_cells",
+      "row_operations": [],
+      "source": "raw_cells"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "machine_id",
+          "target": "machine_id"
+        },
+        {
+          "operations": [],
+          "source": "cell_code",
+          "target": "cell_code"
+        },
+        {
+          "operations": [],
+          "source": "model",
+          "target": "model"
+        }
+      ],
+      "grain": [
+        "machine_id"
+      ],
+      "name": "stg_machines",
+      "row_operations": [],
+      "source": "raw_machines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "operations": [],
+          "source": "machine_id",
+          "target": "machine_id"
+        },
+        {
+          "operations": [],
+          "source": "value",
+          "target": "value"
+        },
+        {
+          "operations": [],
+          "source": "manual",
+          "target": "manual"
+        }
+      ],
+      "grain": [
+        "reading_id"
+      ],
+      "name": "stg_readings",
+      "row_operations": [],
+      "source": "raw_readings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "value",
+      "min": 0.0,
+      "model": "stg_readings",
+      "name": "value_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

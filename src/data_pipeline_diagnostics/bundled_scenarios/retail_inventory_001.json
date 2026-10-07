@@ -1,0 +1,399 @@
+{
+  "description": "Retail inventory pipeline: distinct-SKU counting with temporal minima and ranged SKU metric.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "stock_id",
+          "target": "stock_id"
+        },
+        {
+          "side": "left",
+          "source": "sku",
+          "target": "sku"
+        },
+        {
+          "side": "left",
+          "source": "received",
+          "target": "received"
+        },
+        {
+          "side": "left",
+          "source": "warehouse_id",
+          "target": "warehouse_id"
+        },
+        {
+          "side": "right",
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "stock_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "supplier_id",
+            "right": "supplier_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_stock",
+      "name": "j_stock_suppliers",
+      "operation": "join",
+      "right": "stg_suppliers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "stock_id",
+          "target": "stock_id"
+        },
+        {
+          "side": "left",
+          "source": "sku",
+          "target": "sku"
+        },
+        {
+          "side": "left",
+          "source": "received",
+          "target": "received"
+        },
+        {
+          "side": "left",
+          "source": "company",
+          "target": "company"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "stock_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "warehouse_id",
+            "right": "warehouse_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_stock_suppliers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_warehouses"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "company"
+      ],
+      "group_by": [
+        {
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "sku",
+          "function": "count_distinct",
+          "name": "n_skus"
+        },
+        {
+          "column": "received",
+          "function": "min",
+          "name": "first_seen"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_items"
+        }
+      ],
+      "name": "o_skus_by_supplier",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "SP-"
+          },
+          "name": "supplier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "company",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_suppliers",
+      "primary_key": [
+        "supplier_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "WH-"
+          },
+          "name": "warehouse_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_warehouses",
+      "primary_key": [
+        "warehouse_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "stock_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_supplier_stock",
+            "target_side": "left"
+          },
+          "name": "supplier_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_warehouse_stock",
+            "target_side": "right"
+          },
+          "name": "warehouse_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 10,
+            "min_length": 8
+          },
+          "name": "sku",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "received",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_stock",
+      "primary_key": [
+        "stock_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "supplier_id"
+        ],
+        "table": "raw_suppliers"
+      },
+      "name": "rel_supplier_stock",
+      "right": {
+        "columns": [
+          "supplier_id"
+        ],
+        "table": "raw_stock"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "warehouse_id"
+        ],
+        "table": "raw_stock"
+      },
+      "name": "rel_warehouse_stock",
+      "right": {
+        "columns": [
+          "warehouse_id"
+        ],
+        "table": "raw_warehouses"
+      }
+    }
+  ],
+  "scenario_id": "retail_inventory_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "supplier_id",
+          "target": "supplier_id"
+        },
+        {
+          "operations": [],
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "grain": [
+        "supplier_id"
+      ],
+      "name": "stg_suppliers",
+      "row_operations": [],
+      "source": "raw_suppliers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "warehouse_id",
+          "target": "warehouse_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "warehouse_id"
+      ],
+      "name": "stg_warehouses",
+      "row_operations": [],
+      "source": "raw_warehouses"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "stock_id",
+          "target": "stock_id"
+        },
+        {
+          "operations": [],
+          "source": "supplier_id",
+          "target": "supplier_id"
+        },
+        {
+          "operations": [],
+          "source": "warehouse_id",
+          "target": "warehouse_id"
+        },
+        {
+          "operations": [],
+          "source": "sku",
+          "target": "sku"
+        },
+        {
+          "operations": [],
+          "source": "received",
+          "target": "received"
+        }
+      ],
+      "grain": [
+        "stock_id"
+      ],
+      "name": "stg_stock",
+      "row_operations": [],
+      "source": "raw_stock"
+    }
+  ],
+  "tests": [
+    {
+      "column": "n_skus",
+      "min": 0,
+      "model": "o_skus_by_supplier",
+      "name": "skus_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

@@ -1,0 +1,384 @@
+{
+  "description": "Insurance premiums pipeline: claim-level payout ledger with public category label and bounded row contract.",
+  "domain": "insurance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "kind",
+          "target": "kind"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "right",
+          "source": "holder_id",
+          "target": "holder_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "policy_id",
+            "right": "policy_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_claims",
+      "name": "j_claims_policies",
+      "operation": "join",
+      "right": "stg_policies"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "side": "left",
+          "source": "kind",
+          "target": "kind"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "right",
+          "source": "holder_name",
+          "target": "holder_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "holder_id",
+            "right": "holder_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_claims_policies",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_holders"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "claim_id"
+      ],
+      "group_by": [
+        {
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "source": "kind",
+          "target": "category"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "amount",
+          "function": "sum",
+          "name": "payout"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_lines"
+        }
+      ],
+      "name": "o_payout_by_claim",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HH-"
+          },
+          "name": "holder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "holder_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_holders",
+      "primary_key": [
+        "holder_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_holder_policies",
+            "target_side": "left"
+          },
+          "name": "holder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_policies",
+      "primary_key": [
+        "policy_id"
+      ],
+      "rows": {
+        "max": 72,
+        "min": 24
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CL-"
+          },
+          "name": "claim_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_policy_claims",
+            "target_side": "left"
+          },
+          "name": "policy_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "fire",
+              "flood"
+            ]
+          },
+          "name": "kind",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 100.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_claims",
+      "primary_key": [
+        "claim_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "holder_id"
+        ],
+        "table": "raw_holders"
+      },
+      "name": "rel_holder_policies",
+      "right": {
+        "columns": [
+          "holder_id"
+        ],
+        "table": "raw_policies"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_policies"
+      },
+      "name": "rel_policy_claims",
+      "right": {
+        "columns": [
+          "policy_id"
+        ],
+        "table": "raw_claims"
+      }
+    }
+  ],
+  "scenario_id": "insurance_premiums_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "holder_id",
+          "target": "holder_id"
+        },
+        {
+          "operations": [],
+          "source": "holder_name",
+          "target": "holder_name"
+        }
+      ],
+      "grain": [
+        "holder_id"
+      ],
+      "name": "stg_holders",
+      "row_operations": [],
+      "source": "raw_holders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "holder_id",
+          "target": "holder_id"
+        }
+      ],
+      "grain": [
+        "policy_id"
+      ],
+      "name": "stg_policies",
+      "row_operations": [],
+      "source": "raw_policies"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "claim_id",
+          "target": "claim_id"
+        },
+        {
+          "operations": [],
+          "source": "policy_id",
+          "target": "policy_id"
+        },
+        {
+          "operations": [],
+          "source": "kind",
+          "target": "kind"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "grain": [
+        "claim_id"
+      ],
+      "name": "stg_claims",
+      "row_operations": [],
+      "source": "raw_claims"
+    }
+  ],
+  "tests": [
+    {
+      "column": "kind",
+      "model": "stg_claims",
+      "name": "kind_values",
+      "type": "accepted_values",
+      "values": [
+        "fire",
+        "flood"
+      ]
+    },
+    {
+      "max": 100000,
+      "min": 1,
+      "model": "o_payout_by_claim",
+      "name": "ledger_bounded",
+      "type": "row_count"
+    }
+  ]
+}

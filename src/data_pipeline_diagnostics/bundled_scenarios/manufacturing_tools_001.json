@@ -1,0 +1,382 @@
+{
+  "description": "Manufacturing tools pipeline: custom-start tool IDs, constrained bin codes, capped withdrawal quantities.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "withdrawal_id",
+          "target": "withdrawal_id"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "right",
+          "source": "crib_id",
+          "target": "crib_id"
+        },
+        {
+          "side": "right",
+          "source": "bin_code",
+          "target": "bin_code"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "withdrawal_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "tool_id",
+            "right": "tool_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_withdrawals",
+      "name": "j_wd_tools",
+      "operation": "join",
+      "right": "stg_tools"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "withdrawal_id",
+          "target": "withdrawal_id"
+        },
+        {
+          "side": "left",
+          "source": "qty",
+          "target": "qty"
+        },
+        {
+          "side": "right",
+          "source": "crib_name",
+          "target": "crib_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "withdrawal_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "crib_id",
+            "right": "crib_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_wd_tools",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_cribs"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "crib_name"
+      ],
+      "group_by": [
+        {
+          "source": "crib_name",
+          "target": "crib_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "qty",
+          "function": "sum",
+          "name": "total_qty"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_withdrawals"
+        }
+      ],
+      "name": "o_qty_by_crib",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "CB-"
+          },
+          "name": "crib_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "crib_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_cribs",
+      "primary_key": [
+        "crib_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "TL-",
+            "start": 500
+          },
+          "name": "tool_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_crib_tools",
+            "target_side": "left"
+          },
+          "name": "crib_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "alphabet": "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+            "kind": "random_string",
+            "max_length": 6,
+            "min_length": 6
+          },
+          "name": "bin_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "custodian",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_tools",
+      "primary_key": [
+        "tool_id"
+      ],
+      "rows": {
+        "max": 54,
+        "min": 18
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "WD-"
+          },
+          "name": "withdrawal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_tool_withdrawals",
+            "target_side": "left"
+          },
+          "name": "tool_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 100,
+            "min": 1
+          },
+          "name": "qty",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_withdrawals",
+      "primary_key": [
+        "withdrawal_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "crib_id"
+        ],
+        "table": "raw_cribs"
+      },
+      "name": "rel_crib_tools",
+      "right": {
+        "columns": [
+          "crib_id"
+        ],
+        "table": "raw_tools"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "tool_id"
+        ],
+        "table": "raw_tools"
+      },
+      "name": "rel_tool_withdrawals",
+      "right": {
+        "columns": [
+          "tool_id"
+        ],
+        "table": "raw_withdrawals"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_tools_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "crib_id",
+          "target": "crib_id"
+        },
+        {
+          "operations": [],
+          "source": "crib_name",
+          "target": "crib_name"
+        }
+      ],
+      "grain": [
+        "crib_id"
+      ],
+      "name": "stg_cribs",
+      "row_operations": [],
+      "source": "raw_cribs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "tool_id",
+          "target": "tool_id"
+        },
+        {
+          "operations": [],
+          "source": "crib_id",
+          "target": "crib_id"
+        },
+        {
+          "operations": [],
+          "source": "bin_code",
+          "target": "bin_code"
+        },
+        {
+          "operations": [],
+          "source": "custodian",
+          "target": "custodian"
+        }
+      ],
+      "grain": [
+        "tool_id"
+      ],
+      "name": "stg_tools",
+      "row_operations": [],
+      "source": "raw_tools"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "withdrawal_id",
+          "target": "withdrawal_id"
+        },
+        {
+          "operations": [],
+          "source": "tool_id",
+          "target": "tool_id"
+        },
+        {
+          "operations": [],
+          "source": "qty",
+          "target": "qty"
+        }
+      ],
+      "grain": [
+        "withdrawal_id"
+      ],
+      "name": "stg_withdrawals",
+      "row_operations": [],
+      "source": "raw_withdrawals"
+    }
+  ],
+  "tests": [
+    {
+      "column": "qty",
+      "max": 100000,
+      "model": "stg_withdrawals",
+      "name": "qty_capped",
+      "type": "column_range"
+    }
+  ]
+}
