@@ -87,6 +87,40 @@ class AuthoringRequest:
     metrics: frozenset[str]
     seed: int
 
+    def to_dict(self) -> dict[str, object]:
+        """Deterministic plain-data form for authored ``entry.json`` blocks."""
+        return {
+            "scenario_id": self.scenario_id,
+            "domain": self.domain,
+            "size": self.size,
+            "composite_keys": self.composite_keys,
+            "staging": sorted(self.staging),
+            "intermediate": sorted(self.intermediate),
+            "joins": self.joins,
+            "metrics": sorted(self.metrics),
+            "seed": self.seed,
+        }
+
+    @classmethod
+    def from_dict(cls, data: object) -> AuthoringRequest:
+        """Rebuild from :meth:`to_dict` output; ``ValueError`` when corrupt."""
+        if not isinstance(data, dict):
+            raise ValueError("requirements must be a JSON object")
+        try:
+            return normalize_request(
+                scenario_id=data["scenario_id"],
+                domain=data["domain"],
+                size=data.get("size", "small"),
+                composite_keys=data.get("composite_keys", "auto"),
+                staging=data.get("staging"),
+                intermediate=data.get("intermediate"),
+                joins=data.get("joins", "auto"),
+                metrics=data.get("metrics"),
+                seed=data.get("seed", 0),
+            )
+        except (KeyError, TypeError, ValueError) as exc:
+            raise ValueError(f"invalid requirements: {exc}") from exc
+
 
 @dataclass(frozen=True)
 class RequirementIssue:
