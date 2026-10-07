@@ -14,6 +14,7 @@ from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
 from data_pipeline_diagnostics.cli.cmd_connect import run_connect
+from data_pipeline_diagnostics.cli.cmd_delete import run_delete
 from data_pipeline_diagnostics.cli.cmd_list import run_list
 from data_pipeline_diagnostics.cli.cmd_open import run_open
 from data_pipeline_diagnostics.cli.cmd_seed import run_seed
@@ -140,6 +141,8 @@ def dispatch(parsed: argparse.Namespace, workspace: Path) -> int:
         return run_open(workspace, parsed)
     if parsed.command == "seed":
         return run_seed(workspace, parsed)
+    if parsed.command == "delete":
+        return run_delete(workspace, parsed)
     command = getattr(parsed, "command", None)
     print(f"plgen {command}: not yet implemented", file=sys.stderr)
     return 5

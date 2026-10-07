@@ -6,12 +6,10 @@ from data_pipeline_diagnostics.cli import app
 
 COMMANDS = ["connect", "list", "open", "seed", "create", "delete"]
 
+# NB: every C01 stub is implemented now ("list" C03, "connect" C07, "open" C08,
+# "seed" C09, "delete" C10); only "create" still stubs to exit 5 (see below).
 VALID_STUBS: list[list[str]] = [
-    # NB: "list" (C03), "connect" (C07), "open" (C08), and "seed" (C09) were
-    # here in C01 but are implemented since (C01 anticipated this: stubs are
-    # "replaced by later tasks").
     ["create", "--domain", "mydomain"],
-    ["delete", "my_domain_001"],
 ]
 
 
