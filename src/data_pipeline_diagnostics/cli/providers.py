@@ -26,7 +26,7 @@ GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
 DEFAULT_OUTPUT_TOKENS = 32_768
 REQUEST_TIMEOUT = 180
 
-Sender = Callable[[str, str, dict[str, str], bytes, int], tuple[int, dict[str, str], bytes]]
+Sender = Callable[[str, str, dict[str, str], bytes | None, int], tuple[int, dict[str, str], bytes]]
 
 
 @dataclass(frozen=True)
@@ -120,12 +120,15 @@ def sanitize_error(exc: BaseException) -> str:
 
 
 def _send_urllib(
-    provider: str, url: str, headers: dict[str, str], body: bytes, timeout: int
+    provider: str, url: str, headers: dict[str, str], body: bytes | None, timeout: int
 ) -> tuple[int, dict[str, str], bytes]:
-    """One POST; HTTP errors surface as data, never as retries."""
+    """One request (POST with a body, GET without); errors surface as data, never retries."""
     del provider
     request = Request(
-        url, data=body, headers={"Content-Type": "application/json", **headers}, method="POST"
+        url,
+        data=body,
+        headers={"Content-Type": "application/json", **headers},
+        method="POST" if body is not None else "GET",
     )
     try:
         with urlopen(request, timeout=timeout) as response:
@@ -178,7 +181,37 @@ def post_json(
     sender: Sender | None = None,
 ) -> dict[str, object]:
     """POST a JSON payload once; transport failures become ``ProviderError``."""
-    body = json.dumps(payload).encode("utf-8")
+    return _request_json(
+        provider,
+        url,
+        headers=headers,
+        body=json.dumps(payload).encode("utf-8"),
+        timeout=timeout,
+        sender=sender,
+    )
+
+
+def get_json(
+    provider: str,
+    url: str,
+    *,
+    headers: dict[str, str],
+    timeout: int = REQUEST_TIMEOUT,
+    sender: Sender | None = None,
+) -> dict[str, object]:
+    """GET a JSON document once (non-generation verification); same error mapping."""
+    return _request_json(provider, url, headers=headers, body=None, timeout=timeout, sender=sender)
+
+
+def _request_json(
+    provider: str,
+    url: str,
+    *,
+    headers: dict[str, str],
+    body: bytes | None,
+    timeout: int,
+    sender: Sender | None,
+) -> dict[str, object]:
     send = sender or _send_urllib
     try:
         status, response_headers, response_body = send(provider, url, headers, body, timeout)
@@ -443,7 +476,7 @@ class FakeTransport:
         self.calls: list[dict[str, object]] = []
 
     def __call__(
-        self, provider: str, url: str, headers: dict[str, str], body: bytes, timeout: int
+        self, provider: str, url: str, headers: dict[str, str], body: bytes | None, timeout: int
     ) -> tuple[int, dict[str, str], bytes]:
         self.calls.append(
             {

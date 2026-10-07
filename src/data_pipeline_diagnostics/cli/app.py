@@ -13,6 +13,7 @@ import traceback
 from importlib.metadata import PackageNotFoundError, version
 from pathlib import Path
 
+from data_pipeline_diagnostics.cli.cmd_connect import run_connect
 from data_pipeline_diagnostics.cli.cmd_list import run_list
 
 DEFAULT_WORKSPACE = "./pipeline_workspace"
@@ -69,7 +70,9 @@ def build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", metavar="<command>", required=True)
 
     connect = sub.add_parser("connect", help="Configure a provider profile.")
-    connect.add_argument("--provider", required=True, help="Provider identifier.")
+    connect.add_argument(
+        "--provider", required=True, choices=("openrouter", "gemini"), help="Provider identifier."
+    )
     connect.add_argument("--model", required=True, help="Model identifier.")
     connect.add_argument("--key-env", default=None, help="Credential env var name.")
     connect.add_argument(
@@ -129,6 +132,8 @@ def dispatch(parsed: argparse.Namespace, workspace: Path) -> int:
     """Route catalog commands; unimplemented ones stub to exit ``5``."""
     if parsed.command == "list":
         return run_list(workspace)
+    if parsed.command == "connect":
+        return run_connect(workspace, parsed)
     command = getattr(parsed, "command", None)
     print(f"plgen {command}: not yet implemented", file=sys.stderr)
     return 5
