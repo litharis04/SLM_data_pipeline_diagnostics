@@ -224,7 +224,8 @@ def _print_summary(
     print("\n".join(lines))
 
 
-def _scrubbed_build(build: Prepare, validated, seed: int, cache_dir: Path, config) -> CleanInstance:
+def scrubbed_build(build: Prepare, validated, seed: int, cache_dir: Path, config) -> CleanInstance:
+    """Run ``build`` with configured credential env vars removed (restored after)."""
     removed: dict[str, str] = {}
     for name in configured_credential_envs(config):
         if name in os.environ:
@@ -233,6 +234,24 @@ def _scrubbed_build(build: Prepare, validated, seed: int, cache_dir: Path, confi
         return build(validated, seed, cache_dir)
     finally:
         os.environ.update(removed)
+
+
+def publish_working_copy(scenario_dir_path: Path, instance: CleanInstance) -> tuple[Path, bool]:
+    """Replace the owned working copy with a fresh copy of the built instance.
+
+    Returns the owned workdir and whether a previous copy was replaced. The
+    builder's handoff copy is consumed (removed) afterwards.
+    """
+    scenario_path = Path(scenario_dir_path)
+    workdir = (scenario_path / "work").resolve()
+    replaced = workdir.exists() or workdir.is_symlink()
+    staging_tmp = scenario_path / f"work.tmp-{uuid.uuid4().hex}"
+    shutil.copytree(instance.instance_dir, staging_tmp)
+    if replaced:
+        shutil.rmtree(workdir, ignore_errors=True)
+    os.replace(staging_tmp, workdir)
+    shutil.rmtree(instance.instance_dir, ignore_errors=True)
+    return workdir, replaced
 
 
 def run_instance(
@@ -318,7 +337,7 @@ def run_instance(
     except OSError, ValueError:
         config = {}
     try:
-        instance = _scrubbed_build(build, validated, seed, cache_dir, config)
+        instance = scrubbed_build(build, validated, seed, cache_dir, config)
     except GenerationFailure as exc:
         record_file = Path(getattr(exc, "workspace", cache_dir)) / "failure_record.json"
         print(
@@ -338,14 +357,7 @@ def run_instance(
                 file=sys.stderr,
             )
             return 5
-    workdir = (scenario_dir(root, scenario_id) / "work").resolve()
-    replaced = workdir.exists() or workdir.is_symlink()
-    staging_tmp = scenario_dir(root, scenario_id) / f"work.tmp-{uuid.uuid4().hex}"
-    shutil.copytree(instance.instance_dir, staging_tmp)
-    if replaced:
-        shutil.rmtree(workdir, ignore_errors=True)
-    os.replace(staging_tmp, workdir)
-    shutil.rmtree(instance.instance_dir, ignore_errors=True)
+    workdir, replaced = publish_working_copy(scenario_dir(root, scenario_id), instance)
     try:
         record = json.loads((workdir / "instance_record.json").read_text(encoding="utf-8"))
         if not isinstance(record, dict) or not isinstance(record.get("raw_tables"), list):

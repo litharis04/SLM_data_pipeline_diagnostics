@@ -6,11 +6,8 @@ from data_pipeline_diagnostics.cli import app
 
 COMMANDS = ["connect", "list", "open", "seed", "create", "delete"]
 
-# NB: every C01 stub is implemented now ("list" C03, "connect" C07, "open" C08,
-# "seed" C09, "delete" C10); only "create" still stubs to exit 5 (see below).
-VALID_STUBS: list[list[str]] = [
-    ["create", "--domain", "mydomain"],
-]
+# NB: all six commands are implemented (C03/C07/C08/C09/C10/C12); the C01 stub
+# phase is over and its valid-but-unimplemented test is retired.
 
 
 def _assert_no_workspace(tmp_path):
@@ -67,18 +64,6 @@ def test_invalid_input_exits_2(tmp_path, monkeypatch, capsys, argv):
     assert exc.value.code == 2
     out, err = capsys.readouterr()
     assert err.strip() != ""
-    assert "Traceback" not in err
-    assert "Traceback" not in out
-    _assert_no_workspace(tmp_path)
-
-
-@pytest.mark.parametrize("argv", VALID_STUBS)
-def test_valid_but_unimplemented_exits_5(tmp_path, monkeypatch, capsys, argv):
-    monkeypatch.chdir(tmp_path)
-    code = app.main(argv)
-    assert code == 5
-    out, err = capsys.readouterr()
-    assert "not yet implemented" in err
     assert "Traceback" not in err
     assert "Traceback" not in out
     _assert_no_workspace(tmp_path)

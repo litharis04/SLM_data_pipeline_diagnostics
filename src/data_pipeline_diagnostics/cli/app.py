@@ -1,8 +1,8 @@
-"""Console scaffold for the ``plgen`` entry point (C01, extended in C03).
+"""Console entry point for ``plgen`` (C01 scaffold, all commands implemented).
 
 Root dispatch, global flags, and the section 9 output/error skeleton.
-``list`` is implemented (C03); every other valid command still stubs to
-exit ``5``.
+Implemented: ``connect`` (C07), ``list`` (C03), ``open`` (C08), ``seed``
+(C09), ``delete`` (C10), ``create`` (C12).
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from data_pipeline_diagnostics.cli.cmd_delete import run_delete
 from data_pipeline_diagnostics.cli.cmd_list import run_list
 from data_pipeline_diagnostics.cli.cmd_open import run_open
 from data_pipeline_diagnostics.cli.cmd_seed import run_seed
+from data_pipeline_diagnostics.cli.create import run_create
 
 DEFAULT_WORKSPACE = "./pipeline_workspace"
 _MAX_DATA_SEED = 2**63 - 1
@@ -143,6 +144,8 @@ def dispatch(parsed: argparse.Namespace, workspace: Path) -> int:
         return run_seed(workspace, parsed)
     if parsed.command == "delete":
         return run_delete(workspace, parsed)
+    if parsed.command == "create":
+        return run_create(workspace, parsed)
     command = getattr(parsed, "command", None)
     print(f"plgen {command}: not yet implemented", file=sys.stderr)
     return 5
