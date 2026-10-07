@@ -14,6 +14,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
+from data_pipeline_diagnostics.cli.features import SIZE_PRESET_CEILINGS, classify_raw_size
 from data_pipeline_diagnostics.cli.workspace import (
     catalog_path,
     ensure_workspace,
@@ -23,10 +24,8 @@ from data_pipeline_diagnostics.cli.workspace import (
 )
 from data_pipeline_diagnostics.scenario import parse_scenario_json
 
-# Raw-layer size preset ceilings (§4.2), shared with C04 preflight and the
-# realized-size checks of C08/C09/C12. Bounds are inclusive upper bounds on
-# M_raw, the maximum realized row count over raw tables.
-RAW_SIZE_CEILINGS = {"small": 1_000, "medium": 10_000, "large": 100_000}
+# Alias kept for backward compatibility; canonical table lives in features.py.
+RAW_SIZE_CEILINGS = SIZE_PRESET_CEILINGS
 
 STATE_PREPARED = "prepared"
 STATE_UNPREPARED = "unprepared"
@@ -35,17 +34,6 @@ SIZE_ABSENT = "-"
 SIZE_UNKNOWN = "unknown"
 
 HEADER = "scenario_id domain seed state size description"
-
-
-def classify_raw_size(max_rows: int) -> str:
-    """Map realized ``M_raw`` onto its §4.2 size category."""
-    if max_rows <= RAW_SIZE_CEILINGS["small"]:
-        return "small"
-    if max_rows <= RAW_SIZE_CEILINGS["medium"]:
-        return "medium"
-    if max_rows <= RAW_SIZE_CEILINGS["large"]:
-        return "large"
-    return "outside-presets"
 
 
 @dataclass(frozen=True)
