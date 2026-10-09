@@ -17,6 +17,7 @@ import io
 import json
 import os
 import re
+import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -144,6 +145,15 @@ def classify_exit(code: int, run_dir: Path, stderr: str) -> tuple[str, dict | No
     return "infra", final
 
 
+def failure_lines(stderr: str) -> list[str]:
+    """Sanitized failure lines (stage chatter excluded) for the report and console."""
+    return [
+        line
+        for line in stderr.splitlines()
+        if line.startswith("plgen create:") and "attempt " not in line
+    ]
+
+
 def evaluate_request(root: Path, provider: str, model: str, request: dict) -> dict:
     buffer = io.StringIO()
     started = time.perf_counter()
@@ -154,6 +164,13 @@ def evaluate_request(root: Path, provider: str, model: str, request: dict) -> di
     run_dir = root / "authoring" / scenario_id
     attempts, usage, reported = summarize_attempts(run_dir)
     outcome, final = classify_exit(code, run_dir, buffer.getvalue())
+    errors = failure_lines(buffer.getvalue())
+    print(
+        f"[live] {provider}/{request['key']}: {outcome} "
+        f"(exit {code}, {attempts} attempts, {elapsed:.0f}s)"
+        + (f" :: {errors[-1]}" if errors else ""),
+        file=sys.stderr,
+    )
     entry_path = root / "scenarios" / scenario_id / "entry.json"
     accepted: dict | None = None
     if code == 0 and entry_path.is_file():
@@ -175,6 +192,7 @@ def evaluate_request(root: Path, provider: str, model: str, request: dict) -> di
         "usage": usage,
         "usage_reported": reported,
         "final": final,
+        "error": errors[-1] if errors else None,
         "accepted": accepted,
     }
 
