@@ -1,0 +1,137 @@
+{
+  "date": "2026-10-09",
+  "models": {
+    "gemini": "gemini-3.8-flash",
+    "openrouter": "openrouter/free"
+  },
+  "notes": [
+    "Five attempts is a budget, not a guaranteed success rate.",
+    "API unavailability (connect failures, rate limits, timeouts) is recorded as unavailable/infra/provider outcomes, separate from authoring quality.",
+    "No corpus-wide generation, no paid fallback, no model/provider switching, no retried 429s; the example corpus was not touched."
+  ],
+  "results": [
+    {
+      "accepted": {
+        "model_identity": "cohere/north-mini-code:free",
+        "realized": {
+          "category": "small",
+          "max_raw_rows": 458
+        },
+        "scenario_hash": "7ceb7f2187da6c7edf1011a75845f999aa9f869618944bed5961d2afc8a29ada"
+      },
+      "attempts_used": 1,
+      "elapsed_s": 115.4,
+      "exit": 0,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "accepted",
+      "provider": "openrouter",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 26426,
+        "output_tokens": 19828,
+        "reasoning_tokens": 19530
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": {
+        "model_identity": "dots-studio/dots-3-note-preview:free",
+        "realized": {
+          "category": "small",
+          "max_raw_rows": 157
+        },
+        "scenario_hash": "77afad4275acaa6d87e03162afded7f2c029bbd10fbedb5ef779234924ca40ac"
+      },
+      "attempts_used": 4,
+      "elapsed_s": 869.6,
+      "exit": 0,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "accepted",
+      "provider": "openrouter",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 119981,
+        "output_tokens": 65619,
+        "reasoning_tokens": 59209
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 2,
+      "elapsed_s": 964.7,
+      "exit": 3,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "provider",
+      "provider": "openrouter",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 55212,
+        "output_tokens": 65366,
+        "reasoning_tokens": 64269
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 74.5,
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 61.4,
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 7.7,
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    }
+  ],
+  "suite": "tests/cli/test_c16_live.py (PLGEN_LIVE=1)"
+}
