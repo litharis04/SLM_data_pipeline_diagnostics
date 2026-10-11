@@ -1,0 +1,147 @@
+{
+  "date": "2026-10-10",
+  "models": {
+    "gemini": "gemini-3.8-flash",
+    "openrouter": "openrouter/free"
+  },
+  "notes": [
+    "Five attempts is a budget, not a guaranteed success rate.",
+    "API unavailability (connect failures, rate limits, timeouts) is recorded as unavailable/infra/provider outcomes, separate from authoring quality.",
+    "No corpus-wide generation, no paid fallback, no model/provider switching, no retried 429s; the example corpus was not touched."
+  ],
+  "results": [
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 234.9,
+      "error": "plgen create: provider failure: openrouter request failed request timed out after 180s",
+      "exit": 3,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "provider",
+      "provider": "openrouter",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": {
+        "model_identity": "dots-studio/dots-3-note-preview:free",
+        "realized": {
+          "category": "small",
+          "max_raw_rows": 618
+        },
+        "scenario_hash": "54162fd02515ec0aeab0624f8993ea5473a483ebba2dc953c49b29e0ed47dff0"
+      },
+      "attempts_used": 5,
+      "elapsed_s": 790.5,
+      "error": null,
+      "exit": 0,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "accepted",
+      "provider": "openrouter",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 152201,
+        "output_tokens": 36992,
+        "reasoning_tokens": 28133
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 5,
+      "elapsed_s": 808.8,
+      "error": "plgen create: failed after 5 attempts: [E126] output_models[0].metrics: metric column 'cost' not in source",
+      "exit": 4,
+      "final": {
+        "code": "E126",
+        "message": "metric column 'cost' not in source",
+        "path": "output_models[0].metrics"
+      },
+      "model": "openrouter/free",
+      "outcome": "exhausted",
+      "provider": "openrouter",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 164200,
+        "output_tokens": 53862,
+        "reasoning_tokens": 45459
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 4.9,
+      "error": "plgen create: provider failure: gemini request failed [http 503] (503) This model is currently experiencing high demand. Spikes in demand are usually temporary. Please try again later.",
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 180.3,
+      "error": "plgen create: provider failure: gemini request failed request timed out after 180s",
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": {
+        "model_identity": "gemini-3.8-flash",
+        "realized": {
+          "category": "small",
+          "max_raw_rows": 443
+        },
+        "scenario_hash": "90c246cb6362054c09e57646ba90cee8069efca5af1df36da4b5af958f7dd3e2"
+      },
+      "attempts_used": 1,
+      "elapsed_s": 110.8,
+      "error": null,
+      "exit": 0,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "accepted",
+      "provider": "gemini",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 29388,
+        "output_tokens": 3260,
+        "reasoning_tokens": 7787
+      },
+      "usage_reported": true
+    }
+  ],
+  "suite": "tests/cli/test_c16_live.py (PLGEN_LIVE=1)"
+}
