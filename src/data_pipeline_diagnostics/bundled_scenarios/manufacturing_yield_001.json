@@ -1,0 +1,470 @@
+{
+  "description": "Manufacturing yield pipeline: per-run efficiency over a join, dimensional output with grain-equal dimensions.",
+  "domain": "manufacturing",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "run_id",
+          "target": "run_id"
+        },
+        {
+          "side": "left",
+          "source": "good_units",
+          "target": "good_units"
+        },
+        {
+          "side": "left",
+          "source": "total_units",
+          "target": "total_units"
+        },
+        {
+          "side": "left",
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "side": "right",
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "run_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "line_id",
+            "right": "line_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_runs",
+      "name": "j_runs_lines",
+      "operation": "join",
+      "right": "stg_lines"
+    },
+    {
+      "columns": [
+        {
+          "source": "run_id",
+          "target": "run_id"
+        },
+        {
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "source": "line_name",
+          "target": "line_name"
+        },
+        {
+          "source": "good_units",
+          "target": "good_units"
+        },
+        {
+          "source": "total_units",
+          "target": "total_units"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "good_units",
+              "kind": "column"
+            },
+            "operator": "divide",
+            "right": {
+              "column": "total_units",
+              "kind": "column"
+            }
+          },
+          "name": "efficiency",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "run_id"
+      ],
+      "name": "t_yield",
+      "operation": "transform",
+      "source": "j_runs_lines"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "run_id",
+          "target": "run_id"
+        },
+        {
+          "side": "left",
+          "source": "efficiency",
+          "target": "efficiency"
+        },
+        {
+          "side": "left",
+          "source": "line_name",
+          "target": "line_name"
+        },
+        {
+          "side": "right",
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "run_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "shift_id",
+            "right": "shift_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_yield",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_shifts"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [
+        "line_name",
+        "shift_id"
+      ],
+      "filters": [],
+      "grain": [
+        "line_name",
+        "shift_id"
+      ],
+      "group_by": [
+        {
+          "source": "line_name",
+          "target": "line_name"
+        },
+        {
+          "source": "shift_id",
+          "target": "shift_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "efficiency",
+          "function": "avg",
+          "name": "avg_eff"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_runs"
+        }
+      ],
+      "name": "o_eff_by_line_shift",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "LN-"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "line_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_lines",
+      "primary_key": [
+        "line_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "day",
+              "night"
+            ]
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 12,
+            "min": 1
+          },
+          "name": "crew_size",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_shifts",
+      "primary_key": [
+        "shift_id"
+      ],
+      "rows": {
+        "max": 2,
+        "min": 2
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RN-"
+          },
+          "name": "run_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_line_runs",
+            "target_side": "left"
+          },
+          "name": "line_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_shift_runs",
+            "target_side": "right"
+          },
+          "name": "shift_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 500,
+            "min": 0
+          },
+          "name": "good_units",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 500,
+            "min": 1
+          },
+          "name": "total_units",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "boolean"
+          },
+          "name": "rework",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "boolean",
+          "unique": false
+        }
+      ],
+      "name": "raw_runs",
+      "primary_key": [
+        "run_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_lines"
+      },
+      "name": "rel_line_runs",
+      "right": {
+        "columns": [
+          "line_id"
+        ],
+        "table": "raw_runs"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_runs"
+      },
+      "name": "rel_shift_runs",
+      "right": {
+        "columns": [
+          "shift_id"
+        ],
+        "table": "raw_shifts"
+      }
+    }
+  ],
+  "scenario_id": "manufacturing_yield_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "line_name",
+          "target": "line_name"
+        }
+      ],
+      "grain": [
+        "line_id"
+      ],
+      "name": "stg_lines",
+      "row_operations": [],
+      "source": "raw_lines"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "operations": [],
+          "source": "crew_size",
+          "target": "crew_size"
+        }
+      ],
+      "grain": [
+        "shift_id"
+      ],
+      "name": "stg_shifts",
+      "row_operations": [],
+      "source": "raw_shifts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "run_id",
+          "target": "run_id"
+        },
+        {
+          "operations": [],
+          "source": "line_id",
+          "target": "line_id"
+        },
+        {
+          "operations": [],
+          "source": "shift_id",
+          "target": "shift_id"
+        },
+        {
+          "operations": [],
+          "source": "good_units",
+          "target": "good_units"
+        },
+        {
+          "operations": [],
+          "source": "total_units",
+          "target": "total_units"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "rework",
+          "target": "rework_score"
+        }
+      ],
+      "grain": [
+        "run_id"
+      ],
+      "name": "stg_runs",
+      "row_operations": [],
+      "source": "raw_runs"
+    }
+  ],
+  "tests": [
+    {
+      "column": "efficiency",
+      "min": 0.0,
+      "model": "t_yield",
+      "name": "efficiency_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

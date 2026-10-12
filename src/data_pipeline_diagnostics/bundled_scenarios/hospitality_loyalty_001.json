@@ -1,0 +1,355 @@
+{
+  "description": "Hospitality loyalty pipeline: maximum-capacity member keys, many-to-many redemptions, trimmed names.",
+  "domain": "hospitality",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "redemption_id",
+          "target": "redemption_id"
+        },
+        {
+          "side": "left",
+          "source": "reward_id",
+          "target": "reward_id"
+        },
+        {
+          "side": "right",
+          "source": "member_id",
+          "target": "member_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "redemption_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "member_id",
+            "right": "member_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_redemptions",
+      "name": "j_red_members",
+      "operation": "join",
+      "right": "stg_members"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "redemption_id",
+          "target": "redemption_id"
+        },
+        {
+          "side": "right",
+          "source": "reward_name",
+          "target": "reward_name"
+        },
+        {
+          "side": "right",
+          "source": "points",
+          "target": "points"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "redemption_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "reward_id",
+            "right": "reward_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_red_members",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_rewards"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "reward_name"
+      ],
+      "group_by": [
+        {
+          "source": "reward_name",
+          "target": "reward_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "points",
+          "function": "sum",
+          "name": "total_points"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_redemptions"
+        }
+      ],
+      "name": "o_points_by_reward",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 18,
+            "kind": "formatted_id",
+            "prefix": "MB-"
+          },
+          "name": "member_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_members",
+      "primary_key": [
+        "member_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RW-"
+          },
+          "name": "reward_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "reward_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1000,
+            "min": 10
+          },
+          "name": "points",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_rewards",
+      "primary_key": [
+        "reward_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RD-"
+          },
+          "name": "redemption_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_redemptions",
+            "target_side": "left"
+          },
+          "name": "member_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_redemptions",
+            "target_side": "right"
+          },
+          "name": "reward_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_redemptions",
+      "primary_key": [
+        "redemption_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "bridge": {
+        "left_columns": [
+          "member_id"
+        ],
+        "right_columns": [
+          "reward_id"
+        ],
+        "table": "raw_redemptions"
+      },
+      "cardinality": "many_to_many",
+      "left": {
+        "columns": [
+          "member_id"
+        ],
+        "table": "raw_members"
+      },
+      "name": "rel_redemptions",
+      "right": {
+        "columns": [
+          "reward_id"
+        ],
+        "table": "raw_rewards"
+      }
+    }
+  ],
+  "scenario_id": "hospitality_loyalty_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "trim"
+            }
+          ],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "member_id"
+      ],
+      "name": "stg_members",
+      "row_operations": [],
+      "source": "raw_members"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reward_id",
+          "target": "reward_id"
+        },
+        {
+          "operations": [],
+          "source": "reward_name",
+          "target": "reward_name"
+        },
+        {
+          "operations": [],
+          "source": "points",
+          "target": "points"
+        }
+      ],
+      "grain": [
+        "reward_id"
+      ],
+      "name": "stg_rewards",
+      "row_operations": [],
+      "source": "raw_rewards"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "redemption_id",
+          "target": "redemption_id"
+        },
+        {
+          "operations": [],
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "operations": [],
+          "source": "reward_id",
+          "target": "reward_id"
+        }
+      ],
+      "grain": [
+        "redemption_id"
+      ],
+      "name": "stg_redemptions",
+      "row_operations": [],
+      "source": "raw_redemptions"
+    }
+  ],
+  "tests": [
+    {
+      "column": "points",
+      "min": 0,
+      "model": "stg_rewards",
+      "name": "points_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

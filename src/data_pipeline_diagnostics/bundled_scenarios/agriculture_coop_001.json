@@ -1,0 +1,396 @@
+{
+  "description": "Agriculture seed pipeline: keyless variety master, case-normalized names and origins.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "planting_id",
+          "target": "planting_id"
+        },
+        {
+          "side": "left",
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "side": "right",
+          "source": "variety_code",
+          "target": "variety_code"
+        },
+        {
+          "side": "right",
+          "source": "supplier",
+          "target": "supplier"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "planting_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "seed_id",
+            "right": "seed_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_plantings",
+      "name": "j_plant_seeds",
+      "operation": "join",
+      "right": "stg_seeds"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "planting_id",
+          "target": "planting_id"
+        },
+        {
+          "side": "left",
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "side": "right",
+          "source": "variety_name",
+          "target": "variety_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "planting_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "variety_code",
+            "right": "variety_code"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_plant_seeds",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_varieties"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "variety_name"
+      ],
+      "group_by": [
+        {
+          "source": "variety_name",
+          "target": "variety_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "area_ha",
+          "function": "sum",
+          "name": "total_area"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_plantings"
+        }
+      ],
+      "name": "o_area_by_variety",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "V1",
+              "V2",
+              "V3",
+              "V4",
+              "V5"
+            ]
+          },
+          "name": "variety_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "variety_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_varieties",
+      "primary_key": [],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "SD-"
+          },
+          "name": "seed_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_variety_seeds",
+            "target_side": "right"
+          },
+          "name": "variety_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "imported",
+              "local"
+            ]
+          },
+          "name": "origin",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "supplier",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_seeds",
+      "primary_key": [
+        "seed_id"
+      ],
+      "rows": {
+        "max": 50,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "planting_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_seed_plantings",
+            "target_side": "left"
+          },
+          "name": "seed_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 200.0,
+            "min": 1.0
+          },
+          "name": "area_ha",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_plantings",
+      "primary_key": [
+        "planting_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "variety_code"
+        ],
+        "table": "raw_seeds"
+      },
+      "name": "rel_variety_seeds",
+      "right": {
+        "columns": [
+          "variety_code"
+        ],
+        "table": "raw_varieties"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "seed_id"
+        ],
+        "table": "raw_seeds"
+      },
+      "name": "rel_seed_plantings",
+      "right": {
+        "columns": [
+          "seed_id"
+        ],
+        "table": "raw_plantings"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_coop_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "variety_code",
+          "target": "variety_code"
+        },
+        {
+          "operations": [
+            {
+              "op": "lower"
+            }
+          ],
+          "source": "variety_name",
+          "target": "variety_name"
+        }
+      ],
+      "grain": [
+        "variety_code"
+      ],
+      "name": "stg_varieties",
+      "row_operations": [],
+      "source": "raw_varieties"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "seed_id",
+          "target": "seed_id"
+        },
+        {
+          "operations": [],
+          "source": "variety_code",
+          "target": "variety_code"
+        },
+        {
+          "operations": [
+            {
+              "op": "upper"
+            }
+          ],
+          "source": "origin",
+          "target": "origin"
+        },
+        {
+          "operations": [],
+          "source": "supplier",
+          "target": "supplier"
+        }
+      ],
+      "grain": [
+        "seed_id"
+      ],
+      "name": "stg_seeds",
+      "row_operations": [],
+      "source": "raw_seeds"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "planting_id",
+          "target": "planting_id"
+        },
+        {
+          "operations": [],
+          "source": "seed_id",
+          "target": "seed_id"
+        },
+        {
+          "operations": [],
+          "source": "area_ha",
+          "target": "area_ha"
+        }
+      ],
+      "grain": [
+        "planting_id"
+      ],
+      "name": "stg_plantings",
+      "row_operations": [],
+      "source": "raw_plantings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "origin",
+      "model": "stg_seeds",
+      "name": "origin_values",
+      "type": "accepted_values",
+      "values": [
+        "IMPORTED",
+        "LOCAL"
+      ]
+    }
+  ]
+}

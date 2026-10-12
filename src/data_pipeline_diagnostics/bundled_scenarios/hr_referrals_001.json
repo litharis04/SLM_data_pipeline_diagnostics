@@ -1,0 +1,445 @@
+{
+  "description": "HR referrals pipeline: hired-only aggregates, raw status contract, German candidate emails.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "hire_id",
+          "target": "hire_id"
+        },
+        {
+          "side": "left",
+          "source": "salary",
+          "target": "salary"
+        },
+        {
+          "side": "right",
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "side": "right",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "bonus",
+          "target": "bonus"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "hire_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "referral_id",
+            "right": "referral_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_hires",
+      "name": "j_hires_referrals",
+      "operation": "join",
+      "right": "stg_referrals"
+    },
+    {
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "status",
+            "kind": "column"
+          },
+          "operator": "eq",
+          "right": {
+            "kind": "literal",
+            "value": "hired"
+          }
+        }
+      ],
+      "grain": [
+        "emp_id"
+      ],
+      "group_by": [
+        {
+          "source": "emp_id",
+          "target": "emp_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "bonus",
+          "function": "sum",
+          "name": "total_bonus"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_hires"
+        }
+      ],
+      "name": "a_emp_stats",
+      "operation": "aggregate",
+      "source": "j_hires_referrals"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "side": "left",
+          "source": "total_bonus",
+          "target": "total_bonus"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "emp_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "emp_id",
+            "right": "emp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_emp_stats",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_employees"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "full_name"
+      ],
+      "group_by": [
+        {
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "total_bonus",
+          "function": "sum",
+          "name": "paid_bonus"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_emps"
+        }
+      ],
+      "name": "o_bonus_by_employee",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EM-"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_employees",
+      "primary_key": [
+        "emp_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "RF-"
+          },
+          "name": "referral_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_emp_referrals",
+            "target_side": "left"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email",
+            "locale": "de_DE"
+          },
+          "name": "candidate_email",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "hired",
+              "pending"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 5000.0,
+            "min": 100.0
+          },
+          "name": "bonus",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_referrals",
+      "primary_key": [
+        "referral_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "HR-"
+          },
+          "name": "hire_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_referral_hires",
+            "target_side": "left"
+          },
+          "name": "referral_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 200000.0,
+            "min": 30000.0
+          },
+          "name": "salary",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_hires",
+      "primary_key": [
+        "hire_id"
+      ],
+      "rows": {
+        "max": 200,
+        "min": 60
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_employees"
+      },
+      "name": "rel_emp_referrals",
+      "right": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_referrals"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "referral_id"
+        ],
+        "table": "raw_referrals"
+      },
+      "name": "rel_referral_hires",
+      "right": {
+        "columns": [
+          "referral_id"
+        ],
+        "table": "raw_hires"
+      }
+    }
+  ],
+  "scenario_id": "hr_referrals_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "emp_id"
+      ],
+      "name": "stg_employees",
+      "row_operations": [],
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "referral_id",
+          "target": "referral_id"
+        },
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "candidate_email",
+          "target": "candidate_email"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "bonus",
+          "target": "bonus"
+        }
+      ],
+      "grain": [
+        "referral_id"
+      ],
+      "name": "stg_referrals",
+      "row_operations": [],
+      "source": "raw_referrals"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hire_id",
+          "target": "hire_id"
+        },
+        {
+          "operations": [],
+          "source": "referral_id",
+          "target": "referral_id"
+        },
+        {
+          "operations": [],
+          "source": "salary",
+          "target": "salary"
+        }
+      ],
+      "grain": [
+        "hire_id"
+      ],
+      "name": "stg_hires",
+      "row_operations": [],
+      "source": "raw_hires"
+    }
+  ],
+  "tests": [
+    {
+      "column": "status",
+      "model": "raw_referrals",
+      "name": "status_values_raw",
+      "type": "accepted_values",
+      "values": [
+        "hired",
+        "pending"
+      ]
+    }
+  ]
+}

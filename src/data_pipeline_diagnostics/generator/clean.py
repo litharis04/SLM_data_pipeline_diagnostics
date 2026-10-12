@@ -105,6 +105,14 @@ def _dbt_env() -> dict[str, str]:
 
 def run_clean_build(*, dbt_dir: str | Path) -> CleanBuildResult:
     """Run the fixed clean build and validate its outcome."""
+    if shutil.which("dbt") is None:
+        raise GenerationFailure(
+            table="*",
+            column=None,
+            reason="dbt-executable-not-found",
+            detail="dbt executable not found on PATH; install the runtime "
+            "dependencies (dbt-core and dbt-duckdb) and retry",
+        )
     project_dir = Path(dbt_dir)
     command = DBT_BUILD_COMMAND
     log_path = project_dir / "logs" / "dbt.log"

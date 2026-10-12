@@ -1,0 +1,435 @@
+{
+  "description": "Hospitality rates pipeline: null-mapped room classes, unified float capacities and boolean smoking flags.",
+  "domain": "hospitality",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "booking_id",
+          "target": "booking_id"
+        },
+        {
+          "side": "left",
+          "source": "guests",
+          "target": "guests"
+        },
+        {
+          "side": "right",
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "side": "right",
+          "source": "class",
+          "target": "class"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "booking_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "type_id",
+            "right": "type_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_bookings",
+      "name": "j_book_types",
+      "operation": "join",
+      "right": "stg_types"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "booking_id",
+          "target": "booking_id"
+        },
+        {
+          "side": "left",
+          "source": "guests",
+          "target": "guests"
+        },
+        {
+          "side": "right",
+          "source": "hotel_name",
+          "target": "hotel_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "booking_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hotel_id",
+            "right": "hotel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_book_types",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_hotels"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "hotel_name"
+      ],
+      "group_by": [
+        {
+          "source": "hotel_name",
+          "target": "hotel_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "guests",
+          "function": "sum",
+          "name": "total_guests"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_bookings"
+        }
+      ],
+      "name": "o_guests_by_hotel",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HT-"
+          },
+          "name": "hotel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "hotel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "manager",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hotels",
+      "primary_key": [
+        "hotel_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RT-"
+          },
+          "name": "type_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hotel_types",
+            "target_side": "left"
+          },
+          "name": "hotel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "double",
+              "single",
+              "suite"
+            ]
+          },
+          "name": "class",
+          "null_probability": 0.1,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 6,
+            "min": 1
+          },
+          "name": "capacity",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_types",
+      "primary_key": [
+        "type_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "BK-"
+          },
+          "name": "booking_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_type_bookings",
+            "target_side": "left"
+          },
+          "name": "type_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 6,
+            "min": 1
+          },
+          "name": "guests",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1,
+            "min": 0
+          },
+          "name": "smoking",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_bookings",
+      "primary_key": [
+        "booking_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "hotel_id"
+        ],
+        "table": "raw_hotels"
+      },
+      "name": "rel_hotel_types",
+      "right": {
+        "columns": [
+          "hotel_id"
+        ],
+        "table": "raw_types"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "type_id"
+        ],
+        "table": "raw_types"
+      },
+      "name": "rel_type_bookings",
+      "right": {
+        "columns": [
+          "type_id"
+        ],
+        "table": "raw_bookings"
+      }
+    }
+  ],
+  "scenario_id": "hospitality_rates_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "operations": [],
+          "source": "hotel_name",
+          "target": "hotel_name"
+        },
+        {
+          "operations": [],
+          "source": "manager",
+          "target": "manager"
+        }
+      ],
+      "grain": [
+        "hotel_id"
+      ],
+      "name": "stg_hotels",
+      "row_operations": [],
+      "source": "raw_hotels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "type_id",
+          "target": "type_id"
+        },
+        {
+          "operations": [],
+          "source": "hotel_id",
+          "target": "hotel_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "double": "D"
+              },
+              "on_unmapped": "null",
+              "op": "map_values"
+            }
+          ],
+          "source": "class",
+          "target": "class"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "capacity",
+          "target": "cap"
+        }
+      ],
+      "grain": [
+        "type_id"
+      ],
+      "name": "stg_types",
+      "row_operations": [],
+      "source": "raw_types"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "booking_id",
+          "target": "booking_id"
+        },
+        {
+          "operations": [],
+          "source": "type_id",
+          "target": "type_id"
+        },
+        {
+          "operations": [],
+          "source": "guests",
+          "target": "guests"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "smoking",
+          "target": "flag"
+        }
+      ],
+      "grain": [
+        "booking_id"
+      ],
+      "name": "stg_bookings",
+      "row_operations": [],
+      "source": "raw_bookings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "guests",
+      "min": 0,
+      "model": "stg_bookings",
+      "name": "guests_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

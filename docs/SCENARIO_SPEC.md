@@ -40,12 +40,10 @@ This document does not define:
 - how an LLM or human chooses a useful domain or composes a diverse scenario;
 - the runtime algorithm, probability distribution, or random-stream allocation of a mini-generator;
 - SQL, YAML, Parquet, DuckDB, or dbt rendering details;
-- generated project layout;
-- fault definitions or fault injection;
-- diagnostic tools, oracle behavior, trajectories, training, or evaluation; or
+- generated project layout; or
 - arbitrary user-provided Python, SQL, Jinja, regular expressions, or templating code.
 
-Those responsibilities belong to `SCENARIO_AUTHORING.md`, `GENERATOR_SPEC.md`, and the downstream specifications identified in `PIPELINE_SPEC.md`.
+Authoring and runtime responsibilities belong to `SCENARIO_AUTHORING.md` and `GENERATOR_SPEC.md`; their cross-component boundaries are defined in `PIPELINE_SPEC.md`.
 
 ## 3. Contract principles
 
@@ -301,7 +299,7 @@ Cross-object references MUST be stored by stable names, never by array index or 
 
 Pydantic MUST enforce the version literal and collection bounds. It MUST NOT resolve names, determine connectivity, or validate the DAG while constructing `Scenario`.
 
-The root model MUST NOT contain compiler settings, output paths, environment names, DuckDB paths, dbt profiles, seeds, fault metadata, expected fault labels, or diagnostic configuration.
+The root model MUST NOT contain compiler settings, output paths, environment names, DuckDB paths, dbt profiles, or seeds.
 
 ## 7. Raw-data models
 
@@ -853,7 +851,7 @@ Every assertion has `name: Identifier`, a target `model: Identifier`, and option
 | `row_count` | optional non-negative integer `min`, optional non-negative integer `max` | At least one bound; `min <= max` when both exist. |
 | `column_range` | `column`, optional `min`, optional `max`, `inclusive: bool = true` | At least one bound. |
 
-All assertion references and contextual value types are semantic checks. All healthy assertions are blocking during clean control; warning severity is not part of the version-1 contract. A downstream fault variant may intentionally cause one or more of these assertions to fail.
+All assertion references and contextual value types are semantic checks. All healthy assertions are blocking during clean control; warning severity is not part of the version-1 contract.
 
 Neither explicit nor derived assertions inspect realized data during scenario validation. They
 are runtime postconditions compiled into the clean pipeline and evaluated by clean control.
@@ -1043,7 +1041,7 @@ postconditions.
 
 When a concrete `(ValidatedScenario, data_seed)` instance is first needed, the clean control
 defined in `PIPELINE_SPEC.md` checks these postconditions once and caches the successful baseline.
-Failure aborts the current downstream dataset build and exposes a specification, validation,
+Failure aborts the current pipeline-instance build and exposes a specification, validation,
 generation, compilation, or runtime-integration defect. The system MUST NOT silently reject the
 scenario, substitute another seed, or weaken an assertion.
 

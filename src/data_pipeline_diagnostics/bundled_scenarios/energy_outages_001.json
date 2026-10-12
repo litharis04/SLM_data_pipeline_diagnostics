@@ -1,0 +1,439 @@
+{
+  "description": "Energy outages pipeline: pending storm and equipment outages, ranged total-minute output metric.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "outage_id",
+          "target": "outage_id"
+        },
+        {
+          "side": "left",
+          "source": "cause",
+          "target": "cause"
+        },
+        {
+          "side": "left",
+          "source": "minutes",
+          "target": "minutes"
+        },
+        {
+          "side": "right",
+          "source": "voltage",
+          "target": "voltage"
+        },
+        {
+          "side": "right",
+          "source": "sub_id",
+          "target": "sub_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "outage_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "feeder_id",
+            "right": "feeder_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_outages",
+      "name": "j_out_feed",
+      "operation": "join",
+      "right": "stg_feeders"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "outage_id",
+          "target": "outage_id"
+        },
+        {
+          "side": "left",
+          "source": "cause",
+          "target": "cause"
+        },
+        {
+          "side": "left",
+          "source": "minutes",
+          "target": "minutes"
+        },
+        {
+          "side": "right",
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "outage_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "sub_id",
+            "right": "sub_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_out_feed",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_substations"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "cause"
+      ],
+      "group_by": [
+        {
+          "source": "cause",
+          "target": "cause"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "minutes",
+          "function": "sum",
+          "name": "total_min"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_outages"
+        }
+      ],
+      "name": "o_min_by_cause",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "SB-"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "sub_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_substations",
+      "primary_key": [
+        "sub_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FD-"
+          },
+          "name": "feeder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sub_feeders",
+            "target_side": "left"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 35,
+            "min": 10
+          },
+          "name": "voltage",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_feeders",
+      "primary_key": [
+        "feeder_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "OT-"
+          },
+          "name": "outage_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_feeder_outages",
+            "target_side": "left"
+          },
+          "name": "feeder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "equipment",
+              "human",
+              "storm"
+            ]
+          },
+          "name": "cause",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 1440,
+            "min": 5
+          },
+          "name": "minutes",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "restored_at",
+          "null_probability": 0.4,
+          "nullable": true,
+          "type": "timestamp",
+          "unique": false
+        }
+      ],
+      "name": "raw_outages",
+      "primary_key": [
+        "outage_id"
+      ],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_substations"
+      },
+      "name": "rel_sub_feeders",
+      "right": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_feeders"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "feeder_id"
+        ],
+        "table": "raw_feeders"
+      },
+      "name": "rel_feeder_outages",
+      "right": {
+        "columns": [
+          "feeder_id"
+        ],
+        "table": "raw_outages"
+      }
+    }
+  ],
+  "scenario_id": "energy_outages_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "grain": [
+        "sub_id"
+      ],
+      "name": "stg_substations",
+      "row_operations": [],
+      "source": "raw_substations"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "feeder_id",
+          "target": "feeder_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "voltage",
+          "target": "voltage"
+        }
+      ],
+      "grain": [
+        "feeder_id"
+      ],
+      "name": "stg_feeders",
+      "row_operations": [],
+      "source": "raw_feeders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "outage_id",
+          "target": "outage_id"
+        },
+        {
+          "operations": [],
+          "source": "feeder_id",
+          "target": "feeder_id"
+        },
+        {
+          "operations": [],
+          "source": "cause",
+          "target": "cause"
+        },
+        {
+          "operations": [],
+          "source": "minutes",
+          "target": "minutes"
+        },
+        {
+          "operations": [],
+          "source": "restored_at",
+          "target": "restored_at"
+        }
+      ],
+      "grain": [
+        "outage_id"
+      ],
+      "name": "stg_outages",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "in",
+                "negated": false,
+                "options": [
+                  "equipment",
+                  "storm"
+                ],
+                "value": {
+                  "column": "cause",
+                  "kind": "column"
+                }
+              },
+              {
+                "kind": "is_null",
+                "value": {
+                  "column": "restored_at",
+                  "kind": "column"
+                }
+              }
+            ],
+            "kind": "all"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_outages"
+    }
+  ],
+  "tests": [
+    {
+      "column": "total_min",
+      "min": 0.0,
+      "model": "o_min_by_cause",
+      "name": "total_min_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

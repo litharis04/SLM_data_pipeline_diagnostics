@@ -1,0 +1,444 @@
+{
+  "description": "Medium-scale admissions pipeline (scaled variant for CLI offline scale checks): composite raw PK, mixed INNER/LEFT JOINs, an intermediate filter, and a business deduplication model.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "app_id",
+          "target": "app_id"
+        },
+        {
+          "side": "left",
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "left",
+          "source": "submitted",
+          "target": "submitted"
+        },
+        {
+          "side": "right",
+          "source": "reviewer_name",
+          "target": "reviewer_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "app_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "reviewer_id",
+            "right": "reviewer_id"
+          }
+        ],
+        "type": "left"
+      },
+      "left": "stg_applications",
+      "name": "j_apps_reviewers",
+      "operation": "join",
+      "right": "stg_reviewers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "app_id",
+          "target": "app_id"
+        },
+        {
+          "side": "left",
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "side": "left",
+          "source": "reviewer_name",
+          "target": "reviewer_name"
+        },
+        {
+          "side": "right",
+          "source": "degree",
+          "target": "degree"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "kind": "comparison",
+          "operator": "gt",
+          "left": {
+            "kind": "column",
+            "column": "score"
+          },
+          "right": {
+            "kind": "literal",
+            "value": 50.0
+          }
+        }
+      ],
+      "grain": [
+        "app_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "program_id",
+            "right": "program_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_apps_reviewers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "d_programs"
+    },
+    {
+      "operation": "deduplicate",
+      "name": "d_programs",
+      "source": "stg_programs",
+      "keys": [
+        "program_id"
+      ],
+      "order_by": [
+        {
+          "column": "degree",
+          "direction": "desc"
+        }
+      ],
+      "grain": [
+        "program_id"
+      ]
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "degree"
+      ],
+      "group_by": [
+        {
+          "source": "degree",
+          "target": "degree"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "score",
+          "function": "avg",
+          "name": "avg_score"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_apps"
+        }
+      ],
+      "name": "o_score_by_degree",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "RV-",
+            "start": 500
+          },
+          "name": "reviewer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "reviewer_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_reviewers",
+      "primary_key": [
+        "reviewer_id"
+      ],
+      "rows": {
+        "min": 12,
+        "max": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "ba",
+              "ma",
+              "phd"
+            ]
+          },
+          "name": "degree",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_programs",
+      "primary_key": [
+        "program_id"
+      ],
+      "rows": {
+        "min": 200,
+        "max": 200
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id"
+          },
+          "name": "app_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_reviewer_apps",
+            "target_side": "right"
+          },
+          "name": "reviewer_id",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_program_apps",
+            "target_side": "right"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-08-31",
+            "min": "2024-01-01"
+          },
+          "name": "submitted",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "name": "app_seq",
+          "type": "integer",
+          "nullable": false,
+          "null_probability": 0.0,
+          "unique": false,
+          "generator": {
+            "kind": "integer_range",
+            "min": 1,
+            "max": 50
+          }
+        }
+      ],
+      "name": "raw_applications",
+      "primary_key": [
+        "program_id",
+        "app_seq"
+      ],
+      "rows": {
+        "min": 3000,
+        "max": 6000
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "reviewer_id"
+        ],
+        "table": "raw_applications"
+      },
+      "name": "rel_reviewer_apps",
+      "right": {
+        "columns": [
+          "reviewer_id"
+        ],
+        "table": "raw_reviewers"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_applications"
+      },
+      "name": "rel_program_apps",
+      "right": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_programs"
+      }
+    }
+  ],
+  "scenario_id": "scale_medium_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reviewer_id",
+          "target": "reviewer_id"
+        },
+        {
+          "operations": [],
+          "source": "reviewer_name",
+          "target": "reviewer_name"
+        }
+      ],
+      "grain": [
+        "reviewer_id"
+      ],
+      "name": "stg_reviewers",
+      "row_operations": [],
+      "source": "raw_reviewers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "degree",
+          "target": "degree"
+        }
+      ],
+      "grain": [
+        "program_id"
+      ],
+      "name": "stg_programs",
+      "row_operations": [],
+      "source": "raw_programs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "app_id",
+          "target": "app_id"
+        },
+        {
+          "operations": [],
+          "source": "reviewer_id",
+          "target": "reviewer_id"
+        },
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        },
+        {
+          "operations": [],
+          "source": "submitted",
+          "target": "submitted"
+        },
+        {
+          "source": "app_seq",
+          "target": "app_seq"
+        }
+      ],
+      "grain": [
+        "app_id"
+      ],
+      "name": "stg_applications",
+      "row_operations": [],
+      "source": "raw_applications"
+    }
+  ],
+  "tests": [
+    {
+      "column": "degree",
+      "model": "stg_programs",
+      "name": "degree_values",
+      "type": "accepted_values",
+      "values": [
+        "ba",
+        "ma",
+        "phd"
+      ]
+    }
+  ]
+}

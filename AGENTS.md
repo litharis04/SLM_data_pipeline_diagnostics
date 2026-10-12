@@ -1,171 +1,61 @@
 ## 1. Project purpose
 
-This project builds a synthetic data pipeline fault-diagnosis environment and trains a small language model (SLM) to perform constrained tool-based diagnosis. The SLM is trained to follow a diagnostic policy for known fault families using a limited set of tools. It is not expected to discover arbitrary unknown failures.
+This project generates reproducible local data pipelines for learning and experimentation.
+A declarative scenario describes synthetic tables, relationships, transformations, joins, and
+analytical outputs. The generator produces Parquet data, a DuckDB database, a runnable dbt
+project with blocking tests, and an instance record.
 
-## 2. System architecture overview
+The scenario language, example corpus, and materializer are implemented. The next deliverable
+is a CLI for authoring scenarios from a user's domain and pipeline requirements through an
+external LLM API, materializing them, and rebuilding existing scenarios with another `data_seed`.
 
-The project consists of five main subsystems.
+## 2. Architecture and boundaries
 
-### 2.1. Data pipeline subsystem
+```text
+user request -> optional external LLM -> scenario JSON
+scenario JSON -> strict parsing -> semantic validation -> ValidatedScenario
+  -> seeded raw data / Parquet -> DuckDB
+  -> dbt staging -> intermediate -> output tables -> dbt tests
+  -> instance record + verified cache + isolated working copy
+```
 
-This is the synthetic data pipeline used to produce normal and faulty pipeline runs.
+The LLM authors declarative scenarios; the compiler derives raw data and SQL from the validated
+contract. Materialization is deterministic for fixed scenario content, seed, and compatible
+implementation/runtime versions. Preparing an existing scenario does not require an LLM.
 
-High-level flow:
-raw data generation
-  -> load into DuckDB
-  -> dbt staging models
-  -> dbt intermediate models
-  -> dbt output models
-  -> dbt tests
+## 3. Sources of truth and repository map
 
-Pipeline layers:
-- raw layer: generated Parquet files loaded into DuckDB.
-- staging layer: initial cleaning, typing, normalization.
-- intermediate layer: joins and basic business transformations.
-- output layer: final analytical models, including aggregations.
+- `docs/PIPELINE_SPEC.md`: architecture, instance lifecycle, caching, and failure semantics.
+- `docs/SCENARIO_SPEC.md`: scenario language and validation contract.
+- `docs/SCENARIO_AUTHORING.md`: example-corpus authoring and coverage rules.
+- `docs/GENERATOR_SPEC.md`: raw generation, SQL/dbt rendering, execution, and records.
+- `docs/CLI_SPEC.md`: CLI commands, API connections, user requirements, and authoring lifecycle.
+- `src/data_pipeline_diagnostics/`: implemented scenario contract and pipeline generator.
+- `scenarios/`: accepted examples and their coverage plan; `tasks/`: implementation instructions.
+- `tests/`: pytest checks; `artifacts/`: schemas, build evidence, reports, and generated instances.
+- `STATE.md`: implementation status and history, not a specification.
 
-Detailed pipeline structure, data profiles, and variability rules are described in `docs/PIPELINE_SPEC.md`.
+## 4. Working rules
 
-### 2.2. Fault subsystem
+- Core compiler operations accept `ValidatedScenario`; validate authored JSON before compilation.
+- Use named seed streams for synthetic data. Keep LLM authoring separate from deterministic
+  materialization and preserve the authored scenario needed to reproduce an instance.
+- Keep API keys out of version control, logs, and generated artifacts. Tests run offline and
+  mock external LLM calls.
+- Preserve immutable cache entries and bump the relevant implementation version for
+  output-affecting changes.
+- Do not weaken validators or blocking tests to admit a generated scenario or failed build.
+- Change public APIs or data contracts only when required by the task, updating docs and tests.
+- Prefer small, testable vertical slices and run all quality gates relevant to the change.
+- Update `STATE.md` when a task materially changes project state.
+- Report implementation/specification disagreements; follow the task specification when it
+  explicitly updates the affected contract, otherwise follow the existing specification.
 
-The fault subsystem is responsible for deterministic fault injection.
+## 5. Task execution
 
-It can:
-- reset the pipeline to a healthy state;
-- inject a fault using a seed;
-- run the pipeline with the injected fault;
-- produce a reproducible failure or test anomaly.
+1. Read the complete task, referenced specifications, and relevant existing implementation.
+2. Make the requested changes directly in the repository and run the required validation.
+3. Re-read the task and verify every checklist item against the actual repository state.
+4. Update required state/documentation and report completion only when all items are met.
 
-Faults may affect:
-- raw data values;
-- raw data structure;
-- loading behavior;
-- staging logic;
-- output logic;
-
-Fault applicability is evaluated against `ValidatedScenario` before assignment. The fault
-specifications define applicability targets and data-seed sensitivity for each fault subtype or
-context. Applicability deficits extend the scenario coverage plan and reopen scenario authoring.
-
-Important rule: The fault generator may know the hidden fault label. The diagnostic model and tool outputs must not receive that hidden label directly.
-
-Detailed fault types and injection mechanics are described in `docs/FAULT_CATALOG.md` and `docs/FAULT_INJECTION.md`.
-
-### 2.3. Diagnostic environment
-
-The diagnostic environment exposes observations from faulty pipeline runs to the diagnosing model.
-It provides:
-- dbt run and test failure information;
-- extracted log snippets;
-- diagnostic tools;
-- read-only inspection of pipeline state.
-
-The diagnosing model does not directly fix the pipeline. It only observes the pipeline state and produces a diagnosis.
-Diagnostic tools must be:
-- deterministic for a fixed seed and fault state;
-- read-only;
-- limited in scope;
-- unable to reveal hidden ground-truth labels.
-
-Detailed tool contracts are described in `docs/DIAGNOSTIC_TOOLS.md`.
-
-### 2.4. Supervision generation subsystem
-
-This subsystem generates gold trajectories for SFT. It uses oracle solvers.
-An oracle solver:
-- receives a symptom or failed-test context;
-- calls allowed diagnostic tools;
-- observes tool outputs;
-- chooses the next diagnostic step;
-- produces a final diagnosis.
-
-Oracle solvers are used as teachers for the SLM. They are not the runtime product agent.
-Important rules:
-- Oracle solvers must use only allowed diagnostic tools.
-- Oracle solvers must not read hidden fault labels during the diagnostic trajectory.
-- Hidden fault metadata may be used outside the trajectory to validate the oracle's final diagnosis and generated supervision.
-- Oracle solvers must stay within the configured tool-call budget.
-
-Detailed oracle rules are described in `docs/ORACLE_SPEC.md`.
-
-### 2.5. ML subsystem
-
-The ML subsystem uses generated trajectories to train and evaluate a small language model. Training may run in the cloud because local hardware is limited.
-It includes:
-- SFT dataset building;
-- train/val/test splitting;
-- model training;
-- evaluation;
-- baseline comparison.
-
-SFT allocation is balanced first by fault family, subtype, injection site or layer, and observed
-symptom class, then by scenario context and `data_seed`. Seed variants are selected according to
-whether they materially vary diagnostic evidence. All trajectories derived from one
-`scenario_id` remain in the same dataset partition. Dataset size is selected through learning
-curves over nested balanced subsets and a fixed held-out scenario partition.
-
-Detailed training and evaluation rules are described in `docs/TRAINING.md` and `docs/EVALUATION.md`.
-
-### 2.6. End-to-end data flow
-
-healthy pipeline
-  -> fault injection
-  -> faulty pipeline run
-  -> failed dbt model or dbt test
-  -> extracted symptom / log snippet
-  -> diagnostic environment
-      -> oracle trajectory
-          -> final diagnosis
-          -> gold trajectory / SFT dataset
-      -> SLM trajectory
-          -> final diagnosis
-          -> evaluation record
-
-
-## 3. Non-negotiable rules
-
-- Keep behavior deterministic where possible.
-- Use seeds for all synthetic data and fault variants.
-- Do not commit secrets.
-- Do not run long cloud training jobs inside unit tests.
-- Do not change public tool names without updating docs and tests.
-- Do not introduce new fault families, diagnostic tools, or public data contracts unless required by the current task or specification.
-- Keep fault generation separate from diagnosis: diagnostic code must not access fault-injection configuration or oracle-only metadata.
-- Prefer small, testable vertical slices.
-- Before marking a task complete, run all quality gates relevant to the changed code.
-- Update `STATE.md` when a task materially changes the implemented project state.
-- When implementation, tests, and documentation disagree, do not guess. Report the inconsistency and follow the task specification unless it explicitly updates the relevant project specification.
-
-
-## 4. Repository map
-
-- `STATE.md` - concise record of the current implementation state; not a specification.
-- `tasks/` - task definitions.
-- `docs/` - detailed specifications.
-- `scenarios/` - authored scenario corpus and its coverage plan.
-- `data/` - generated raw data.
-- `dbt/` - dbt project.
-- `artifacts/` - logs, trajectories, evaluation outputs.
-- `training/` - SFT dataset preparation and cloud training scripts.
-- `tests/` - pytest tests.
-
-## 5. Task Execution
-
-Implementation tasks are instructions to modify the repository, not requests
-for proposed code.
-
-For tasks defined by a Markdown task file:
-
-1. Read the complete task before making changes.
-2. Inspect the referenced specifications and existing implementation.
-3. Perform the requested changes directly in the repository.
-4. Run the validation required by the task.
-5. Re-read the original task file before finishing.
-6. Verify every checklist item against the actual repository state.
-7. Update project state/documentation required by the task.
-8. Report only after the task is complete.
-
-Do not substitute code shown in chat for repository changes.
-Do not mark or report a task complete if any checklist item remains unmet.
-
-If required checks do not exist yet, explicitly state what is missing.
+Report any missing checks or unmet requirements explicitly; do not mark incomplete work complete.

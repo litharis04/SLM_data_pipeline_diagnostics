@@ -1,0 +1,680 @@
+{
+  "description": "Healthcare protocols pipeline: nested award arithmetic with a full data-quality contract suite.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "source": "protocol_id",
+          "target": "protocol_id"
+        },
+        {
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "source": "dose",
+          "target": "dose"
+        },
+        {
+          "source": "booster",
+          "target": "booster"
+        },
+        {
+          "source": "cycles",
+          "target": "cycles"
+        },
+        {
+          "source": "tx_code",
+          "target": "tx_code"
+        },
+        {
+          "source": "verify_code",
+          "target": "verify_code"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "kind": "binary",
+              "left": {
+                "column": "dose",
+                "kind": "column"
+              },
+              "operator": "add",
+              "right": {
+                "column": "booster",
+                "kind": "column"
+              }
+            },
+            "operator": "multiply",
+            "right": {
+              "column": "cycles",
+              "kind": "column"
+            }
+          },
+          "name": "adjusted",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "name": "t_enrollments",
+      "operation": "transform",
+      "source": "stg_enrollments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "right",
+          "source": "protocol_id",
+          "target": "protocol_id"
+        },
+        {
+          "side": "left",
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "side": "left",
+          "source": "adjusted",
+          "target": "adjusted"
+        },
+        {
+          "side": "left",
+          "source": "tx_code",
+          "target": "tx_code"
+        },
+        {
+          "side": "left",
+          "source": "verify_code",
+          "target": "verify_code"
+        },
+        {
+          "side": "right",
+          "source": "dosage",
+          "target": "dosage"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "protocol_id",
+            "right": "protocol_id"
+          },
+          {
+            "left": "arm_no",
+            "right": "arm_no"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_enrollments",
+      "name": "j_enr_arms",
+      "operation": "join",
+      "right": "stg_arms"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "adjusted",
+          "target": "adjusted"
+        },
+        {
+          "side": "right",
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "protocol_id",
+            "right": "protocol_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_enr_arms",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_protocols"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "title"
+      ],
+      "group_by": [
+        {
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "adjusted",
+          "function": "avg",
+          "name": "avg_adjusted"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_enrollments"
+        }
+      ],
+      "name": "o_adjusted_by_title",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PR-"
+          },
+          "name": "protocol_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "sponsor",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_protocols",
+      "primary_key": [
+        "protocol_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_protocol_arms",
+            "target_side": "left"
+          },
+          "name": "protocol_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 3,
+            "min": 1
+          },
+          "name": "arm_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 10.0
+          },
+          "name": "dosage",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_arms",
+      "primary_key": [
+        "protocol_id",
+        "arm_no"
+      ],
+      "rows": {
+        "max": 32,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EN-"
+          },
+          "name": "enroll_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_arm_enrollments",
+            "target_side": "right"
+          },
+          "name": "protocol_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_arm_enrollments",
+            "target_side": "right"
+          },
+          "name": "arm_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 1.0
+          },
+          "name": "dose",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 20.0,
+            "min": 0.0
+          },
+          "name": "booster",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 3.0,
+            "min": 1.0
+          },
+          "name": "cycles",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "notes",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "contact",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "tx_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "verify_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_enrollments",
+      "primary_key": [
+        "enroll_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "protocol_id"
+        ],
+        "table": "raw_protocols"
+      },
+      "name": "rel_protocol_arms",
+      "right": {
+        "columns": [
+          "protocol_id"
+        ],
+        "table": "raw_arms"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "protocol_id",
+          "arm_no"
+        ],
+        "table": "raw_enrollments"
+      },
+      "name": "rel_arm_enrollments",
+      "right": {
+        "columns": [
+          "protocol_id",
+          "arm_no"
+        ],
+        "table": "raw_arms"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_protocols_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "protocol_id",
+          "target": "protocol_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        },
+        {
+          "operations": [],
+          "source": "sponsor",
+          "target": "sponsor"
+        }
+      ],
+      "grain": [
+        "protocol_id"
+      ],
+      "name": "stg_protocols",
+      "row_operations": [],
+      "source": "raw_protocols"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "protocol_id",
+          "target": "protocol_id"
+        },
+        {
+          "operations": [],
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "operations": [],
+          "source": "dosage",
+          "target": "dosage"
+        }
+      ],
+      "grain": [
+        "arm_no",
+        "protocol_id"
+      ],
+      "name": "stg_arms",
+      "row_operations": [],
+      "source": "raw_arms"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "operations": [],
+          "source": "protocol_id",
+          "target": "protocol_id"
+        },
+        {
+          "operations": [],
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "operations": [],
+          "source": "dose",
+          "target": "dose"
+        },
+        {
+          "operations": [],
+          "source": "booster",
+          "target": "booster"
+        },
+        {
+          "operations": [],
+          "source": "cycles",
+          "target": "cycles"
+        },
+        {
+          "operations": [],
+          "source": "notes",
+          "target": "notes"
+        },
+        {
+          "operations": [],
+          "source": "contact",
+          "target": "contact"
+        },
+        {
+          "operations": [],
+          "source": "tx_code",
+          "target": "tx_code"
+        },
+        {
+          "operations": [],
+          "source": "verify_code",
+          "target": "verify_code"
+        }
+      ],
+      "grain": [
+        "enroll_id"
+      ],
+      "name": "stg_enrollments",
+      "row_operations": [],
+      "source": "raw_enrollments"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "notes",
+        "contact"
+      ],
+      "model": "stg_enrollments",
+      "name": "contact_present",
+      "type": "not_null"
+    },
+    {
+      "columns": [
+        "tx_code",
+        "verify_code"
+      ],
+      "model": "j_enr_arms",
+      "name": "audit_unique",
+      "type": "unique"
+    },
+    {
+      "columns": [
+        "arm_no",
+        "protocol_id"
+      ],
+      "model": "j_enr_arms",
+      "name": "arm_link",
+      "to_columns": [
+        "arm_no",
+        "protocol_id"
+      ],
+      "to_model": "raw_arms",
+      "type": "relationships"
+    },
+    {
+      "max": 100000,
+      "min": 1,
+      "model": "o_adjusted_by_title",
+      "name": "title_bounded",
+      "type": "row_count"
+    },
+    {
+      "column": "adjusted",
+      "max": 100000.0,
+      "model": "j_enr_arms",
+      "name": "adjusted_capped",
+      "type": "column_range"
+    },
+    {
+      "column": "arm_no",
+      "model": "stg_arms",
+      "name": "arm_values",
+      "type": "accepted_values",
+      "values": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "min": 1,
+      "model": "stg_protocols",
+      "name": "protocols_present",
+      "type": "row_count"
+    },
+    {
+      "max": 100000,
+      "model": "j_enr_arms",
+      "name": "enrollments_bounded",
+      "type": "row_count"
+    },
+    {
+      "column": "dosage",
+      "max": 10000.0,
+      "min": 0.0,
+      "model": "stg_arms",
+      "name": "dosage_bounds",
+      "type": "column_range"
+    },
+    {
+      "column": "arm_no",
+      "inclusive": false,
+      "min": 0,
+      "model": "stg_arms",
+      "name": "arm_positive",
+      "type": "column_range"
+    },
+    {
+      "column": "arm_no",
+      "model": "raw_arms",
+      "name": "arm_codes_raw",
+      "type": "accepted_values",
+      "values": [
+        1,
+        2,
+        3
+      ]
+    }
+  ]
+}

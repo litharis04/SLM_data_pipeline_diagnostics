@@ -1,0 +1,138 @@
+{
+  "date": "2026-10-09",
+  "models": {
+    "gemini": "gemini-3.8-flash",
+    "openrouter": "openrouter/free"
+  },
+  "notes": [
+    "Five attempts is a budget, not a guaranteed success rate.",
+    "API unavailability (connect failures, rate limits, timeouts) is recorded as unavailable/infra/provider outcomes, separate from authoring quality.",
+    "No corpus-wide generation, no paid fallback, no model/provider switching, no retried 429s; the example corpus was not touched."
+  ],
+  "results": [
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 570.9,
+      "error": "plgen create: provider failure: openrouter request failed request timed out after 180s",
+      "exit": 3,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "provider",
+      "provider": "openrouter",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 0.2,
+      "error": "plgen create: provider failure: openrouter request failed network failure: <urlopen error [Errno 8] nodename nor servname provided, or not known>",
+      "exit": 3,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "provider",
+      "provider": "openrouter",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 0.1,
+      "error": "plgen create: provider failure: openrouter request failed network failure: <urlopen error [Errno 8] nodename nor servname provided, or not known>",
+      "exit": 3,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "provider",
+      "provider": "openrouter",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 0.0,
+      "exit": 3,
+      "final": {
+        "code": "connect-failed",
+        "message": "see stderr",
+        "path": "config"
+      },
+      "model": "gemini-3.8-flash",
+      "outcome": "unavailable",
+      "provider": "gemini",
+      "request": "plain",
+      "scenario_id": null,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 0.0,
+      "exit": 3,
+      "final": {
+        "code": "connect-failed",
+        "message": "see stderr",
+        "path": "config"
+      },
+      "model": "gemini-3.8-flash",
+      "outcome": "unavailable",
+      "provider": "gemini",
+      "request": "composite",
+      "scenario_id": null,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 0.0,
+      "exit": 3,
+      "final": {
+        "code": "connect-failed",
+        "message": "see stderr",
+        "path": "config"
+      },
+      "model": "gemini-3.8-flash",
+      "outcome": "unavailable",
+      "provider": "gemini",
+      "request": "combined",
+      "scenario_id": null,
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    }
+  ],
+  "suite": "tests/cli/test_c16_live.py (PLGEN_LIVE=1)"
+}

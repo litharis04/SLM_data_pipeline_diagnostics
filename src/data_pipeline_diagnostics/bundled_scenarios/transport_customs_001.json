@@ -1,0 +1,437 @@
+{
+  "description": "Transport customs pipeline: dashless container IDs, compact arrival codes and ISO clearance parsing.",
+  "domain": "transport",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "side": "left",
+          "source": "arrival",
+          "target": "arrival"
+        },
+        {
+          "side": "left",
+          "source": "container",
+          "target": "container"
+        },
+        {
+          "side": "right",
+          "source": "country",
+          "target": "country"
+        },
+        {
+          "side": "left",
+          "source": "vessel_id",
+          "target": "vessel_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "call_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "port_id",
+            "right": "port_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_calls",
+      "name": "j_calls_ports",
+      "operation": "join",
+      "right": "stg_ports"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "side": "left",
+          "source": "arrival",
+          "target": "arrival"
+        },
+        {
+          "side": "left",
+          "source": "country",
+          "target": "country"
+        },
+        {
+          "side": "right",
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "call_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "vessel_id",
+            "right": "vessel_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_calls_ports",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_vessels"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "country"
+      ],
+      "group_by": [
+        {
+          "source": "country",
+          "target": "country"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "arrival",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_calls"
+        }
+      ],
+      "name": "o_latest_by_country",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PT-"
+          },
+          "name": "port_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "DE",
+              "NL"
+            ]
+          },
+          "name": "country",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_ports",
+      "primary_key": [
+        "port_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "VS-"
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "vessel_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_vessels",
+      "primary_key": [
+        "vessel_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CC-"
+          },
+          "name": "call_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_port_calls",
+            "target_side": "left"
+          },
+          "name": "port_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_vessel_calls",
+            "target_side": "right"
+          },
+          "name": "vessel_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "20240301",
+              "20240302",
+              "20240303"
+            ]
+          },
+          "name": "arrival_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "2024-03-01T08:00:00",
+              "2024-03-02T08:00:00"
+            ]
+          },
+          "name": "cleared_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "MSKU-1",
+              "TCLU-2"
+            ]
+          },
+          "name": "container",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_calls",
+      "primary_key": [
+        "call_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "port_id"
+        ],
+        "table": "raw_ports"
+      },
+      "name": "rel_port_calls",
+      "right": {
+        "columns": [
+          "port_id"
+        ],
+        "table": "raw_calls"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "vessel_id"
+        ],
+        "table": "raw_calls"
+      },
+      "name": "rel_vessel_calls",
+      "right": {
+        "columns": [
+          "vessel_id"
+        ],
+        "table": "raw_vessels"
+      }
+    }
+  ],
+  "scenario_id": "transport_customs_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "port_id",
+          "target": "port_id"
+        },
+        {
+          "operations": [],
+          "source": "country",
+          "target": "country"
+        }
+      ],
+      "grain": [
+        "port_id"
+      ],
+      "name": "stg_ports",
+      "row_operations": [],
+      "source": "raw_ports"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "operations": [],
+          "source": "vessel_name",
+          "target": "vessel_name"
+        }
+      ],
+      "grain": [
+        "vessel_id"
+      ],
+      "name": "stg_vessels",
+      "row_operations": [],
+      "source": "raw_vessels"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "call_id",
+          "target": "call_id"
+        },
+        {
+          "operations": [],
+          "source": "port_id",
+          "target": "port_id"
+        },
+        {
+          "operations": [],
+          "source": "vessel_id",
+          "target": "vessel_id"
+        },
+        {
+          "operations": [
+            {
+              "format": "%Y%m%d",
+              "op": "cast",
+              "type": "date"
+            }
+          ],
+          "source": "arrival_str",
+          "target": "arrival"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "timestamp"
+            }
+          ],
+          "source": "cleared_str",
+          "target": "cleared"
+        },
+        {
+          "operations": [
+            {
+              "new": "",
+              "old": "-",
+              "op": "replace"
+            }
+          ],
+          "source": "container",
+          "target": "container"
+        }
+      ],
+      "grain": [
+        "call_id"
+      ],
+      "name": "stg_calls",
+      "row_operations": [],
+      "source": "raw_calls"
+    }
+  ],
+  "tests": [
+    {
+      "column": "country",
+      "model": "stg_ports",
+      "name": "country_values",
+      "type": "accepted_values",
+      "values": [
+        "DE",
+        "NL"
+      ]
+    }
+  ]
+}

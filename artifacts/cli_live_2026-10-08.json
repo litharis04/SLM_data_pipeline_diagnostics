@@ -1,0 +1,123 @@
+{
+  "date": "2026-10-08",
+  "models": {
+    "gemini": "gemini-3.8-flash",
+    "openrouter": "openrouter/free"
+  },
+  "notes": [
+    "Five attempts is a budget, not a guaranteed success rate.",
+    "API unavailability (connect failures, rate limits, timeouts) is recorded as unavailable/infra/provider outcomes, separate from authoring quality.",
+    "No corpus-wide generation, no paid fallback, no model/provider switching, no retried 429s; the example corpus was not touched."
+  ],
+  "results": [
+    {
+      "accepted": null,
+      "attempts_used": 2,
+      "elapsed_s": 191.6,
+      "exit": 5,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "infra",
+      "provider": "openrouter",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 61355,
+        "output_tokens": 14261,
+        "reasoning_tokens": 7099
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 3,
+      "elapsed_s": 323.6,
+      "exit": 5,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "infra",
+      "provider": "openrouter",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 86683,
+        "output_tokens": 26167,
+        "reasoning_tokens": 23006
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 1,
+      "elapsed_s": 1206.8,
+      "exit": 3,
+      "final": null,
+      "model": "openrouter/free",
+      "outcome": "provider",
+      "provider": "openrouter",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 29873,
+        "output_tokens": 26590,
+        "reasoning_tokens": 22704
+      },
+      "usage_reported": true
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 4.0,
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "plain",
+      "scenario_id": "live_plain_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 6.0,
+      "exit": 3,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "provider",
+      "provider": "gemini",
+      "request": "composite",
+      "scenario_id": "live_composite_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    },
+    {
+      "accepted": null,
+      "attempts_used": 0,
+      "elapsed_s": 45.4,
+      "exit": 5,
+      "final": null,
+      "model": "gemini-3.8-flash",
+      "outcome": "infra",
+      "provider": "gemini",
+      "request": "combined",
+      "scenario_id": "live_combined_001",
+      "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "reasoning_tokens": 0
+      },
+      "usage_reported": false
+    }
+  ],
+  "suite": "tests/cli/test_c16_live.py (PLGEN_LIVE=1)"
+}

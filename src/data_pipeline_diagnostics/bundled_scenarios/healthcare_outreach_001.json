@@ -1,0 +1,472 @@
+{
+  "description": "Healthcare outreach pipeline: contact fallback over a join, priority costs and mobile coverage conditionals.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "outreach_id",
+          "target": "outreach_id"
+        },
+        {
+          "side": "left",
+          "source": "campaign_id",
+          "target": "campaign_id"
+        },
+        {
+          "side": "left",
+          "source": "cost",
+          "target": "cost"
+        },
+        {
+          "side": "right",
+          "source": "mobile",
+          "target": "mobile"
+        },
+        {
+          "side": "right",
+          "source": "email",
+          "target": "email"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "outreach_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "patient_id",
+            "right": "patient_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_outreaches",
+      "name": "j_out_patients",
+      "operation": "join",
+      "right": "stg_patients"
+    },
+    {
+      "columns": [
+        {
+          "source": "outreach_id",
+          "target": "outreach_id"
+        },
+        {
+          "source": "campaign_id",
+          "target": "campaign_id"
+        },
+        {
+          "source": "cost",
+          "target": "cost"
+        },
+        {
+          "source": "mobile",
+          "target": "mobile"
+        },
+        {
+          "source": "email",
+          "target": "email"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "coalesce",
+            "values": [
+              {
+                "column": "mobile",
+                "kind": "column"
+              },
+              {
+                "column": "email",
+                "kind": "column"
+              }
+            ]
+          },
+          "name": "contact",
+          "type": "string"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "outreach_id"
+      ],
+      "name": "t_contacts",
+      "operation": "transform",
+      "source": "j_out_patients"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "outreach_id",
+          "target": "outreach_id"
+        },
+        {
+          "side": "left",
+          "source": "cost",
+          "target": "cost"
+        },
+        {
+          "side": "left",
+          "source": "mobile",
+          "target": "mobile"
+        },
+        {
+          "side": "right",
+          "source": "campaign_name",
+          "target": "campaign_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "outreach_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "campaign_id",
+            "right": "campaign_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_contacts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_campaigns"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "campaign_name"
+      ],
+      "group_by": [
+        {
+          "source": "campaign_name",
+          "target": "campaign_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "cost",
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "cost",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 100.0
+            }
+          },
+          "function": "conditional_sum",
+          "name": "priority_cost"
+        },
+        {
+          "column": "mobile",
+          "function": "count",
+          "name": "reached"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_outreaches"
+        }
+      ],
+      "name": "o_cost_by_campaign",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PT-"
+          },
+          "name": "patient_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "phone_number",
+            "locale": "de_DE"
+          },
+          "name": "mobile",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "email",
+            "locale": "de_DE"
+          },
+          "name": "email",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_patients",
+      "primary_key": [
+        "patient_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CP-"
+          },
+          "name": "campaign_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "campaign_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_campaigns",
+      "primary_key": [
+        "campaign_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "OR-"
+          },
+          "name": "outreach_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_patient_outreaches",
+            "target_side": "left"
+          },
+          "name": "patient_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_campaign_outreaches",
+            "target_side": "right"
+          },
+          "name": "campaign_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 5.0
+          },
+          "name": "cost",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_outreaches",
+      "primary_key": [
+        "outreach_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "patient_id"
+        ],
+        "table": "raw_patients"
+      },
+      "name": "rel_patient_outreaches",
+      "right": {
+        "columns": [
+          "patient_id"
+        ],
+        "table": "raw_outreaches"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "campaign_id"
+        ],
+        "table": "raw_outreaches"
+      },
+      "name": "rel_campaign_outreaches",
+      "right": {
+        "columns": [
+          "campaign_id"
+        ],
+        "table": "raw_campaigns"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_outreach_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [],
+          "source": "mobile",
+          "target": "mobile"
+        },
+        {
+          "operations": [],
+          "source": "email",
+          "target": "email"
+        }
+      ],
+      "grain": [
+        "patient_id"
+      ],
+      "name": "stg_patients",
+      "row_operations": [],
+      "source": "raw_patients"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "campaign_id",
+          "target": "campaign_id"
+        },
+        {
+          "operations": [],
+          "source": "campaign_name",
+          "target": "campaign_name"
+        }
+      ],
+      "grain": [
+        "campaign_id"
+      ],
+      "name": "stg_campaigns",
+      "row_operations": [],
+      "source": "raw_campaigns"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "outreach_id",
+          "target": "outreach_id"
+        },
+        {
+          "operations": [],
+          "source": "patient_id",
+          "target": "patient_id"
+        },
+        {
+          "operations": [],
+          "source": "campaign_id",
+          "target": "campaign_id"
+        },
+        {
+          "operations": [],
+          "source": "cost",
+          "target": "cost"
+        }
+      ],
+      "grain": [
+        "outreach_id"
+      ],
+      "name": "stg_outreaches",
+      "row_operations": [],
+      "source": "raw_outreaches"
+    }
+  ],
+  "tests": [
+    {
+      "column": "cost",
+      "min": 0.0,
+      "model": "stg_outreaches",
+      "name": "cost_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

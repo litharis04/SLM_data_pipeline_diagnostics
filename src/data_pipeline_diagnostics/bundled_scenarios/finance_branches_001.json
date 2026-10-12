@@ -1,0 +1,422 @@
+{
+  "description": "Finance branches pipeline: positive-amount aggregates, German street and phone contacts.",
+  "domain": "finance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "txn_id",
+          "target": "txn_id"
+        },
+        {
+          "side": "left",
+          "source": "amount",
+          "target": "amount"
+        },
+        {
+          "side": "right",
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "side": "right",
+          "source": "owner",
+          "target": "owner"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "txn_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "account_id",
+            "right": "account_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_transactions",
+      "name": "j_txn_accounts",
+      "operation": "join",
+      "right": "stg_accounts"
+    },
+    {
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "amount",
+            "kind": "column"
+          },
+          "operator": "gt",
+          "right": {
+            "kind": "literal",
+            "value": 0.0
+          }
+        }
+      ],
+      "grain": [
+        "branch_id"
+      ],
+      "group_by": [
+        {
+          "source": "branch_id",
+          "target": "branch_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "amount",
+          "function": "sum",
+          "name": "volume"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_txns"
+        }
+      ],
+      "name": "a_branch_stats",
+      "operation": "aggregate",
+      "source": "j_txn_accounts"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "side": "left",
+          "source": "volume",
+          "target": "volume"
+        },
+        {
+          "side": "right",
+          "source": "street",
+          "target": "street"
+        },
+        {
+          "side": "right",
+          "source": "phone",
+          "target": "phone"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "branch_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "branch_id",
+            "right": "branch_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_branch_stats",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_branches"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "street"
+      ],
+      "group_by": [
+        {
+          "source": "street",
+          "target": "street"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "volume",
+          "function": "sum",
+          "name": "branch_volume"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_branches"
+        }
+      ],
+      "name": "o_volume_by_street",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "BR-"
+          },
+          "name": "branch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "street_address",
+            "locale": "de_DE"
+          },
+          "name": "street",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "phone_number",
+            "locale": "de_DE"
+          },
+          "name": "phone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_branches",
+      "primary_key": [
+        "branch_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "AC-"
+          },
+          "name": "account_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_branch_accounts",
+            "target_side": "left"
+          },
+          "name": "branch_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "owner",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_accounts",
+      "primary_key": [
+        "account_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "TX-"
+          },
+          "name": "txn_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_account_txns",
+            "target_side": "left"
+          },
+          "name": "account_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100000.0,
+            "min": 0.0
+          },
+          "name": "amount",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_transactions",
+      "primary_key": [
+        "txn_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "branch_id"
+        ],
+        "table": "raw_branches"
+      },
+      "name": "rel_branch_accounts",
+      "right": {
+        "columns": [
+          "branch_id"
+        ],
+        "table": "raw_accounts"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "account_id"
+        ],
+        "table": "raw_accounts"
+      },
+      "name": "rel_account_txns",
+      "right": {
+        "columns": [
+          "account_id"
+        ],
+        "table": "raw_transactions"
+      }
+    }
+  ],
+  "scenario_id": "finance_branches_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "operations": [],
+          "source": "street",
+          "target": "street"
+        },
+        {
+          "operations": [],
+          "source": "phone",
+          "target": "phone"
+        }
+      ],
+      "grain": [
+        "branch_id"
+      ],
+      "name": "stg_branches",
+      "row_operations": [],
+      "source": "raw_branches"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "account_id",
+          "target": "account_id"
+        },
+        {
+          "operations": [],
+          "source": "branch_id",
+          "target": "branch_id"
+        },
+        {
+          "operations": [],
+          "source": "owner",
+          "target": "owner"
+        }
+      ],
+      "grain": [
+        "account_id"
+      ],
+      "name": "stg_accounts",
+      "row_operations": [],
+      "source": "raw_accounts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "txn_id",
+          "target": "txn_id"
+        },
+        {
+          "operations": [],
+          "source": "account_id",
+          "target": "account_id"
+        },
+        {
+          "operations": [],
+          "source": "amount",
+          "target": "amount"
+        }
+      ],
+      "grain": [
+        "txn_id"
+      ],
+      "name": "stg_transactions",
+      "row_operations": [],
+      "source": "raw_transactions"
+    }
+  ],
+  "tests": [
+    {
+      "column": "amount",
+      "min": 0.0,
+      "model": "stg_transactions",
+      "name": "amount_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

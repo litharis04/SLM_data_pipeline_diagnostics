@@ -5,7 +5,7 @@ Status: draft.
 ## 1. Purpose
 
 This document defines the complete workflow for authoring the scenario corpus. An author is an
-LLM agent or a human working directly with the implemented scenario contract. The author writes
+LLM or a human working directly with the implemented scenario contract. The author writes
 `scenario.json` files directly, corrects them against the two existing validation stages, and
 maintains an explicit coverage plan until every quota is met.
 
@@ -165,11 +165,7 @@ run begins. This is a correction of a defective predicate, not permission to rem
 but feasible case or reduce its quota.
 
 An independent audit MAY append a requirement omitted from the mandatory inventory, using the
-applicable standard target. After the fault catalog defines scenario-level applicability, its
-applicability audit MUST append any predicates and targets needed to represent each required
-combination of fault subtype, injection-site or layer class, and materially distinct scenario
-context. These rows use stable `I-FAULT-` IDs and count distinct validated scenarios in which the
-stated fault context is applicable. Their targets are owned by the fault specification.
+applicable standard target.
 
 Appended rows go after existing rows. Their addition creates new deficits and restarts the same
 authoring cycle; it does not invalidate scenarios that remain valid.
@@ -206,7 +202,7 @@ boundary rows use `F-`; the 16 primary domain-family rows use `D-`:
 “Every variant” means every discriminator or enum member exposed by the current public contract.
 It does not require arbitrary sampling of equivalent literal values. Numeric and collection
 boundaries deserve separate predicates only where they affect validation, generator capacity,
-data behavior, grain, or later fault applicability.
+data behavior, or grain.
 
 The 16 domain families MUST be selected before generation, be recognizably different problem
 settings, and support plausible multi-table analytical pipelines. A change of domain, identifier,
@@ -254,9 +250,8 @@ The plan MUST NOT enumerate the full Cartesian product. A combination belongs in
 when the interaction changes at least one of:
 
 - compilation semantics;
-- lineage or grain reasoning;
-- generated data behavior; or
-- applicability of a plausible future fault.
+- lineage or grain reasoning; or
+- generated data behavior.
 
 Each selected interaction predicate must name the combination precisely enough that the author
 and an independent auditor reach the same result. Superficial combinations whose components do
@@ -362,17 +357,16 @@ lexicographically sorted `scenarios/*.json` list and treats every requirement de
 
 The auditor MUST:
 
-1. compare the requirements plan with section 5, the current scenario contract, and any active
-   fault-applicability requirements, checking that all mandatory individual axes, interaction
-   families, DAG motifs, and exactly 16 domain-family rows were expanded into unambiguous
-   predicates with their applicable targets;
+1. compare the requirements plan with section 5 and the current scenario contract, checking that
+   all mandatory individual axes, interaction families, DAG motifs, and exactly 16 domain-family
+   rows were expanded into unambiguous predicates with their applicable targets;
 2. enumerate every `scenarios/*.json` file, verify that their count equals the prompt value, and
    verify that every filename equals its `scenario_id`;
 3. rerun strict Pydantic validation and semantic validation for every file;
 4. independently evaluate every requirement predicate for every `ValidatedScenario`, including
    verifying that every scenario belongs to exactly one selected `D-` family;
 5. replace each file's claims with the complete recomputed set and recompute all `actual` values;
-6. append any omitted mandatory requirement with its standard or fault-specified target and
+6. append any omitted mandatory requirement with its standard target and
    calculate its existing actual coverage; and
 7. report invalid files, filename mismatches, ambiguous or defective predicates, incorrect
    claims, corrected counts, and all remaining deficits.
@@ -397,19 +391,3 @@ The corpus is complete only when the independent audit leaves:
 - exact `actual` values derived from those claims; and
 - no requirement below its target; and
 - exactly the number of scenarios stated in the audit prompt.
-
-## 9. Fault-applicability extension
-
-Once fault applicability is specified, the applicability audit evaluates every
-`ValidatedScenario` and identifies all eligible injection sites without modifying scenario JSON.
-For each underrepresented fault subtype and context, it appends a precise scenario predicate to
-`COVERAGE.md` with the target defined by the fault specification.
-
-The next authoring session treats those deficits like the existing interaction requirements,
-authors additional scenarios, validates and records them through sections 6–7, and then submits
-the expanded corpus to the independent audit in section 8. This cycle repeats whenever the fault
-catalog or its applicability rules add an uncovered context.
-
-Coverage targets ensure that suitable scenario contexts exist. Fault assignments, concrete
-pipeline instances, `data_seed` variants, oracle trajectories, and SFT sampling weights belong to
-their downstream subsystems and are not scenario coverage claims.

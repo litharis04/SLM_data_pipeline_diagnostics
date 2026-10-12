@@ -1,0 +1,419 @@
+{
+  "description": "Energy dispatch pipeline: deduplicate-then-filter readings, staging aggregates, right-only feeder projection.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "filters": [],
+      "grain": [
+        "feeder_id"
+      ],
+      "group_by": [
+        {
+          "source": "feeder_id",
+          "target": "feeder_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "value",
+          "function": "sum",
+          "name": "total"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_readings"
+        }
+      ],
+      "name": "a_feeder_stats",
+      "operation": "aggregate",
+      "source": "stg_readings"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "feeder_id",
+          "target": "feeder_id"
+        },
+        {
+          "side": "left",
+          "source": "total",
+          "target": "total"
+        },
+        {
+          "side": "right",
+          "source": "sub_id",
+          "target": "sub_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "feeder_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "feeder_id",
+            "right": "feeder_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_feeder_stats",
+      "name": "j_stats_feeders",
+      "operation": "join",
+      "right": "stg_feeders"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "feeder_id",
+          "target": "feeder_id"
+        },
+        {
+          "side": "right",
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "feeder_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "sub_id",
+            "right": "sub_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_stats_feeders",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_substations"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "sub_name"
+      ],
+      "group_by": [
+        {
+          "source": "sub_name",
+          "target": "sub_name"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_feeders"
+        }
+      ],
+      "name": "o_feeders_by_sub",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "SB-"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "sub_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "dispatcher",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_substations",
+      "primary_key": [
+        "sub_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FD-"
+          },
+          "name": "feeder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_sub_feeders",
+            "target_side": "left"
+          },
+          "name": "sub_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_feeders",
+      "primary_key": [
+        "feeder_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RD-"
+          },
+          "name": "reading_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_feeder_readings",
+            "target_side": "left"
+          },
+          "name": "feeder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "ts",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 0.0
+          },
+          "name": "value",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_readings",
+      "primary_key": [
+        "reading_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_substations"
+      },
+      "name": "rel_sub_feeders",
+      "right": {
+        "columns": [
+          "sub_id"
+        ],
+        "table": "raw_feeders"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "feeder_id"
+        ],
+        "table": "raw_feeders"
+      },
+      "name": "rel_feeder_readings",
+      "right": {
+        "columns": [
+          "feeder_id"
+        ],
+        "table": "raw_readings"
+      }
+    }
+  ],
+  "scenario_id": "energy_dispatch_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_name",
+          "target": "sub_name"
+        },
+        {
+          "operations": [],
+          "source": "dispatcher",
+          "target": "dispatcher"
+        }
+      ],
+      "grain": [
+        "sub_id"
+      ],
+      "name": "stg_substations",
+      "row_operations": [],
+      "source": "raw_substations"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "feeder_id",
+          "target": "feeder_id"
+        },
+        {
+          "operations": [],
+          "source": "sub_id",
+          "target": "sub_id"
+        }
+      ],
+      "grain": [
+        "feeder_id"
+      ],
+      "name": "stg_feeders",
+      "row_operations": [],
+      "source": "raw_feeders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "operations": [],
+          "source": "feeder_id",
+          "target": "feeder_id"
+        },
+        {
+          "operations": [],
+          "source": "ts",
+          "target": "ts"
+        },
+        {
+          "operations": [],
+          "source": "value",
+          "target": "value"
+        }
+      ],
+      "grain": [
+        "reading_id"
+      ],
+      "name": "stg_readings",
+      "row_operations": [
+        {
+          "keys": [
+            "reading_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "ts",
+              "direction": "asc"
+            }
+          ]
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "value",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0.0
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_readings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "value",
+      "min": 0.0,
+      "model": "stg_readings",
+      "name": "value_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

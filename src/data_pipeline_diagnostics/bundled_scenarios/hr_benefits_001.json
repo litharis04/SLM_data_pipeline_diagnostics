@@ -1,0 +1,400 @@
+{
+  "description": "HR benefits pipeline: kept tier codes, boolean enrollment flags and dependent labels.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "dep_label",
+          "target": "dep_label"
+        },
+        {
+          "side": "left",
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "emp_id",
+            "right": "emp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_enrollments",
+      "name": "j_enr_emps",
+      "operation": "join",
+      "right": "stg_employees"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "dep_label",
+          "target": "dep_label"
+        },
+        {
+          "side": "right",
+          "source": "tier",
+          "target": "tier"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "plan_id",
+            "right": "plan_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_enr_emps",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_plans"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "tier"
+      ],
+      "group_by": [
+        {
+          "source": "tier",
+          "target": "tier"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_enrollments"
+        }
+      ],
+      "name": "o_enrollments_by_tier",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EM-"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_employees",
+      "primary_key": [
+        "emp_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PL-"
+          },
+          "name": "plan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "basic",
+              "plus"
+            ]
+          },
+          "name": "tier",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_plans",
+      "primary_key": [
+        "plan_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EN-"
+          },
+          "name": "enroll_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_emp_enrollments",
+            "target_side": "left"
+          },
+          "name": "emp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_plan_enrollments",
+            "target_side": "right"
+          },
+          "name": "plan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "N",
+              "Y"
+            ]
+          },
+          "name": "enrolled_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 0
+          },
+          "name": "dependents",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_enrollments",
+      "primary_key": [
+        "enroll_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_employees"
+      },
+      "name": "rel_emp_enrollments",
+      "right": {
+        "columns": [
+          "emp_id"
+        ],
+        "table": "raw_enrollments"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "plan_id"
+        ],
+        "table": "raw_enrollments"
+      },
+      "name": "rel_plan_enrollments",
+      "right": {
+        "columns": [
+          "plan_id"
+        ],
+        "table": "raw_plans"
+      }
+    }
+  ],
+  "scenario_id": "hr_benefits_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "emp_id"
+      ],
+      "name": "stg_employees",
+      "row_operations": [],
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "basic": "B"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "tier",
+          "target": "tier"
+        }
+      ],
+      "grain": [
+        "plan_id"
+      ],
+      "name": "stg_plans",
+      "row_operations": [],
+      "source": "raw_plans"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "operations": [],
+          "source": "emp_id",
+          "target": "emp_id"
+        },
+        {
+          "operations": [],
+          "source": "plan_id",
+          "target": "plan_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "boolean"
+            }
+          ],
+          "source": "enrolled_str",
+          "target": "enrolled"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "string"
+            }
+          ],
+          "source": "dependents",
+          "target": "dep_label"
+        }
+      ],
+      "grain": [
+        "enroll_id"
+      ],
+      "name": "stg_enrollments",
+      "row_operations": [],
+      "source": "raw_enrollments"
+    }
+  ],
+  "tests": [
+    {
+      "column": "tier",
+      "model": "stg_plans",
+      "name": "tier_values",
+      "type": "accepted_values",
+      "values": [
+        "B",
+        "plus"
+      ]
+    }
+  ]
+}

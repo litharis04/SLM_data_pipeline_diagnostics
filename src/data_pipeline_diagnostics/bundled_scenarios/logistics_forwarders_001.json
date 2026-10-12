@@ -1,0 +1,354 @@
+{
+  "description": "Logistics forwarders pipeline: prefixless forwarder IDs with legacy numbering, heavy-container output gate.",
+  "domain": "logistics",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "container_id",
+          "target": "container_id"
+        },
+        {
+          "side": "left",
+          "source": "weight",
+          "target": "weight"
+        },
+        {
+          "side": "right",
+          "source": "forwarder_id",
+          "target": "forwarder_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "container_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "shipment_id",
+            "right": "shipment_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_containers",
+      "name": "j_con_shipments",
+      "operation": "join",
+      "right": "stg_shipments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "container_id",
+          "target": "container_id"
+        },
+        {
+          "side": "left",
+          "source": "weight",
+          "target": "weight"
+        },
+        {
+          "side": "right",
+          "source": "forwarder_name",
+          "target": "forwarder_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "container_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "forwarder_id",
+            "right": "forwarder_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_con_shipments",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_forwarders"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "weight",
+            "kind": "column"
+          },
+          "operator": "gte",
+          "right": {
+            "kind": "literal",
+            "value": 1000.0
+          }
+        }
+      ],
+      "grain": [
+        "forwarder_name"
+      ],
+      "group_by": [
+        {
+          "source": "forwarder_name",
+          "target": "forwarder_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "weight",
+          "function": "sum",
+          "name": "total_weight"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_containers"
+        }
+      ],
+      "name": "o_weight_by_forwarder",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id"
+          },
+          "name": "forwarder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "forwarder_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_forwarders",
+      "primary_key": [
+        "forwarder_id"
+      ],
+      "rows": {
+        "max": 12,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "SH-",
+            "start": 200
+          },
+          "name": "shipment_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_forwarder_shipments",
+            "target_side": "left"
+          },
+          "name": "forwarder_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_shipments",
+      "primary_key": [
+        "shipment_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "CT-"
+          },
+          "name": "container_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_shipment_containers",
+            "target_side": "left"
+          },
+          "name": "shipment_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 30000.0,
+            "min": 100.0
+          },
+          "name": "weight",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_containers",
+      "primary_key": [
+        "container_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "forwarder_id"
+        ],
+        "table": "raw_forwarders"
+      },
+      "name": "rel_forwarder_shipments",
+      "right": {
+        "columns": [
+          "forwarder_id"
+        ],
+        "table": "raw_shipments"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "shipment_id"
+        ],
+        "table": "raw_shipments"
+      },
+      "name": "rel_shipment_containers",
+      "right": {
+        "columns": [
+          "shipment_id"
+        ],
+        "table": "raw_containers"
+      }
+    }
+  ],
+  "scenario_id": "logistics_forwarders_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "forwarder_id",
+          "target": "forwarder_id"
+        },
+        {
+          "operations": [],
+          "source": "forwarder_name",
+          "target": "forwarder_name"
+        }
+      ],
+      "grain": [
+        "forwarder_id"
+      ],
+      "name": "stg_forwarders",
+      "row_operations": [],
+      "source": "raw_forwarders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "shipment_id",
+          "target": "shipment_id"
+        },
+        {
+          "operations": [],
+          "source": "forwarder_id",
+          "target": "forwarder_id"
+        }
+      ],
+      "grain": [
+        "shipment_id"
+      ],
+      "name": "stg_shipments",
+      "row_operations": [],
+      "source": "raw_shipments"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "container_id",
+          "target": "container_id"
+        },
+        {
+          "operations": [],
+          "source": "shipment_id",
+          "target": "shipment_id"
+        },
+        {
+          "operations": [],
+          "source": "weight",
+          "target": "weight"
+        }
+      ],
+      "grain": [
+        "container_id"
+      ],
+      "name": "stg_containers",
+      "row_operations": [],
+      "source": "raw_containers"
+    }
+  ],
+  "tests": [
+    {
+      "column": "weight",
+      "min": 0.0,
+      "model": "stg_containers",
+      "name": "weight_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

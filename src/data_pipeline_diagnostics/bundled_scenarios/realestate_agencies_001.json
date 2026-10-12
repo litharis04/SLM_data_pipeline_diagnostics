@@ -1,0 +1,396 @@
+{
+  "description": "Real-estate agencies pipeline: premium listing gate at output, German street and phone contacts.",
+  "domain": "real_estate",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "viewing_id",
+          "target": "viewing_id"
+        },
+        {
+          "side": "right",
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "side": "right",
+          "source": "price",
+          "target": "price"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "viewing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "listing_id",
+            "right": "listing_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_viewings",
+      "name": "j_view_listings",
+      "operation": "join",
+      "right": "stg_listings"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "viewing_id",
+          "target": "viewing_id"
+        },
+        {
+          "side": "left",
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "side": "left",
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "side": "right",
+          "source": "street",
+          "target": "street"
+        },
+        {
+          "side": "right",
+          "source": "phone",
+          "target": "phone"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "viewing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "agency_id",
+            "right": "agency_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_view_listings",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_agencies"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [
+        {
+          "kind": "comparison",
+          "left": {
+            "column": "price",
+            "kind": "column"
+          },
+          "operator": "gte",
+          "right": {
+            "kind": "literal",
+            "value": 100000.0
+          }
+        }
+      ],
+      "grain": [
+        "agency_id"
+      ],
+      "group_by": [
+        {
+          "source": "agency_id",
+          "target": "agency_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "price",
+          "function": "avg",
+          "name": "avg_price"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_viewings"
+        }
+      ],
+      "name": "o_price_by_agency",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "AG-"
+          },
+          "name": "agency_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "street_address",
+            "locale": "de_DE"
+          },
+          "name": "street",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "phone_number",
+            "locale": "de_DE"
+          },
+          "name": "phone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_agencies",
+      "primary_key": [
+        "agency_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "LS-"
+          },
+          "name": "listing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_agency_listings",
+            "target_side": "left"
+          },
+          "name": "agency_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 3000000.0,
+            "min": 50000.0
+          },
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_listings",
+      "primary_key": [
+        "listing_id"
+      ],
+      "rows": {
+        "max": 90,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "VW-"
+          },
+          "name": "viewing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_listing_viewings",
+            "target_side": "left"
+          },
+          "name": "listing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "visitor",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_viewings",
+      "primary_key": [
+        "viewing_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "agency_id"
+        ],
+        "table": "raw_agencies"
+      },
+      "name": "rel_agency_listings",
+      "right": {
+        "columns": [
+          "agency_id"
+        ],
+        "table": "raw_listings"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "listing_id"
+        ],
+        "table": "raw_listings"
+      },
+      "name": "rel_listing_viewings",
+      "right": {
+        "columns": [
+          "listing_id"
+        ],
+        "table": "raw_viewings"
+      }
+    }
+  ],
+  "scenario_id": "realestate_agencies_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "operations": [],
+          "source": "street",
+          "target": "street"
+        },
+        {
+          "operations": [],
+          "source": "phone",
+          "target": "phone"
+        }
+      ],
+      "grain": [
+        "agency_id"
+      ],
+      "name": "stg_agencies",
+      "row_operations": [],
+      "source": "raw_agencies"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "operations": [],
+          "source": "agency_id",
+          "target": "agency_id"
+        },
+        {
+          "operations": [],
+          "source": "price",
+          "target": "price"
+        }
+      ],
+      "grain": [
+        "listing_id"
+      ],
+      "name": "stg_listings",
+      "row_operations": [],
+      "source": "raw_listings"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "viewing_id",
+          "target": "viewing_id"
+        },
+        {
+          "operations": [],
+          "source": "listing_id",
+          "target": "listing_id"
+        },
+        {
+          "operations": [],
+          "source": "visitor",
+          "target": "visitor"
+        }
+      ],
+      "grain": [
+        "viewing_id"
+      ],
+      "name": "stg_viewings",
+      "row_operations": [],
+      "source": "raw_viewings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "price",
+      "min": 0.0,
+      "model": "stg_listings",
+      "name": "price_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

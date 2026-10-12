@@ -1,0 +1,496 @@
+{
+  "description": "Education libraries pipeline: prefixless loan IDs, German contact phones, bounded intermediate row contract.",
+  "domain": "education",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "side": "left",
+          "source": "overdue_days",
+          "target": "overdue_days"
+        },
+        {
+          "side": "left",
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "side": "right",
+          "source": "library_id",
+          "target": "library_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "loan_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "book_id",
+            "right": "book_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_loans",
+      "name": "j_loans_books",
+      "operation": "join",
+      "right": "stg_books"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "side": "left",
+          "source": "overdue_days",
+          "target": "overdue_days"
+        },
+        {
+          "side": "left",
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "side": "right",
+          "source": "library_id",
+          "target": "library_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "loan_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "library_id",
+            "right": "library_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_loans_books",
+      "name": "j_full_libs",
+      "operation": "join",
+      "right": "stg_libraries"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "side": "left",
+          "source": "overdue_days",
+          "target": "overdue_days"
+        },
+        {
+          "side": "left",
+          "source": "library_id",
+          "target": "library_id"
+        },
+        {
+          "side": "right",
+          "source": "member_name",
+          "target": "member_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "loan_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "member_id",
+            "right": "member_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_full_libs",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_members"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "library_id"
+      ],
+      "group_by": [
+        {
+          "source": "library_id",
+          "target": "library_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "overdue_days",
+          "function": "avg",
+          "name": "avg_overdue"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_loans"
+        }
+      ],
+      "name": "o_overdue_by_library",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "LB-"
+          },
+          "name": "library_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "phone_number",
+            "locale": "de_DE"
+          },
+          "name": "phone",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_libraries",
+      "primary_key": [
+        "library_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "MB-"
+          },
+          "name": "member_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "member_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_members",
+      "primary_key": [
+        "member_id"
+      ],
+      "rows": {
+        "max": 40,
+        "min": 40
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "BK-"
+          },
+          "name": "book_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_library_books",
+            "target_side": "left"
+          },
+          "name": "library_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 16,
+            "min_length": 6
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_books",
+      "primary_key": [
+        "book_id"
+      ],
+      "rows": {
+        "max": 72,
+        "min": 24
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id"
+          },
+          "name": "loan_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_book_loans",
+            "target_side": "left"
+          },
+          "name": "book_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_member_loans",
+            "target_side": "right"
+          },
+          "name": "member_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 90,
+            "min": 0
+          },
+          "name": "overdue_days",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_loans",
+      "primary_key": [
+        "loan_id"
+      ],
+      "rows": {
+        "max": 600,
+        "min": 200
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "library_id"
+        ],
+        "table": "raw_libraries"
+      },
+      "name": "rel_library_books",
+      "right": {
+        "columns": [
+          "library_id"
+        ],
+        "table": "raw_books"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "book_id"
+        ],
+        "table": "raw_books"
+      },
+      "name": "rel_book_loans",
+      "right": {
+        "columns": [
+          "book_id"
+        ],
+        "table": "raw_loans"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "member_id"
+        ],
+        "table": "raw_loans"
+      },
+      "name": "rel_member_loans",
+      "right": {
+        "columns": [
+          "member_id"
+        ],
+        "table": "raw_members"
+      }
+    }
+  ],
+  "scenario_id": "education_libraries_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "library_id",
+          "target": "library_id"
+        },
+        {
+          "operations": [],
+          "source": "phone",
+          "target": "phone"
+        }
+      ],
+      "grain": [
+        "library_id"
+      ],
+      "name": "stg_libraries",
+      "row_operations": [],
+      "source": "raw_libraries"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "operations": [],
+          "source": "member_name",
+          "target": "member_name"
+        }
+      ],
+      "grain": [
+        "member_id"
+      ],
+      "name": "stg_members",
+      "row_operations": [],
+      "source": "raw_members"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "book_id",
+          "target": "book_id"
+        },
+        {
+          "operations": [],
+          "source": "library_id",
+          "target": "library_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "grain": [
+        "book_id"
+      ],
+      "name": "stg_books",
+      "row_operations": [],
+      "source": "raw_books"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "loan_id",
+          "target": "loan_id"
+        },
+        {
+          "operations": [],
+          "source": "book_id",
+          "target": "book_id"
+        },
+        {
+          "operations": [],
+          "source": "member_id",
+          "target": "member_id"
+        },
+        {
+          "operations": [],
+          "source": "overdue_days",
+          "target": "overdue_days"
+        }
+      ],
+      "grain": [
+        "loan_id"
+      ],
+      "name": "stg_loans",
+      "row_operations": [],
+      "source": "raw_loans"
+    }
+  ],
+  "tests": [
+    {
+      "max": 100000,
+      "model": "j_full_libs",
+      "name": "libs_bounded",
+      "type": "row_count"
+    }
+  ]
+}

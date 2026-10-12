@@ -1,0 +1,458 @@
+{
+  "description": "Sports camps pipeline: unified float ages with opposed staging row-operation orders.",
+  "domain": "sports",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "session_id",
+          "target": "session_id"
+        },
+        {
+          "side": "left",
+          "source": "date",
+          "target": "date"
+        },
+        {
+          "side": "left",
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "side": "right",
+          "source": "camp_id",
+          "target": "camp_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "session_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "athlete_id",
+            "right": "athlete_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_sessions",
+      "name": "j_sess_athletes",
+      "operation": "join",
+      "right": "stg_athletes"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "session_id",
+          "target": "session_id"
+        },
+        {
+          "side": "left",
+          "source": "date",
+          "target": "date"
+        },
+        {
+          "side": "right",
+          "source": "camp_name",
+          "target": "camp_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "session_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "camp_id",
+            "right": "camp_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_sess_athletes",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_camps"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "camp_name"
+      ],
+      "group_by": [
+        {
+          "source": "camp_name",
+          "target": "camp_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "date",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_sessions"
+        }
+      ],
+      "name": "o_latest_by_camp",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "CP-"
+          },
+          "name": "camp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "camp_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_camps",
+      "primary_key": [
+        "camp_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "AT-"
+          },
+          "name": "athlete_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_camp_athletes",
+            "target_side": "left"
+          },
+          "name": "camp_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 18,
+            "min": 6
+          },
+          "name": "age",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        }
+      ],
+      "name": "raw_athletes",
+      "primary_key": [
+        "athlete_id"
+      ],
+      "rows": {
+        "max": 60,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SN-"
+          },
+          "name": "session_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_athlete_sessions",
+            "target_side": "left"
+          },
+          "name": "athlete_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 0.0
+          },
+          "name": "score",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_sessions",
+      "primary_key": [
+        "session_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "camp_id"
+        ],
+        "table": "raw_camps"
+      },
+      "name": "rel_camp_athletes",
+      "right": {
+        "columns": [
+          "camp_id"
+        ],
+        "table": "raw_athletes"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "athlete_id"
+        ],
+        "table": "raw_athletes"
+      },
+      "name": "rel_athlete_sessions",
+      "right": {
+        "columns": [
+          "athlete_id"
+        ],
+        "table": "raw_sessions"
+      }
+    }
+  ],
+  "scenario_id": "sports_camps_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "camp_id",
+          "target": "camp_id"
+        },
+        {
+          "operations": [],
+          "source": "camp_name",
+          "target": "camp_name"
+        }
+      ],
+      "grain": [
+        "camp_id"
+      ],
+      "name": "stg_camps",
+      "row_operations": [],
+      "source": "raw_camps"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "operations": [],
+          "source": "camp_id",
+          "target": "camp_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "age",
+          "target": "age_years"
+        }
+      ],
+      "grain": [
+        "athlete_id"
+      ],
+      "name": "stg_athletes",
+      "row_operations": [
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "age_years",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0.0
+            }
+          },
+          "op": "filter"
+        },
+        {
+          "keys": [
+            "athlete_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "full_name",
+              "direction": "asc"
+            }
+          ]
+        }
+      ],
+      "source": "raw_athletes"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "session_id",
+          "target": "session_id"
+        },
+        {
+          "operations": [],
+          "source": "athlete_id",
+          "target": "athlete_id"
+        },
+        {
+          "operations": [],
+          "source": "date",
+          "target": "date"
+        },
+        {
+          "operations": [],
+          "source": "score",
+          "target": "score"
+        }
+      ],
+      "grain": [
+        "session_id"
+      ],
+      "name": "stg_sessions",
+      "row_operations": [
+        {
+          "keys": [
+            "session_id"
+          ],
+          "op": "deduplicate",
+          "order_by": [
+            {
+              "column": "date",
+              "direction": "desc"
+            }
+          ]
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "score",
+              "kind": "column"
+            },
+            "operator": "gt",
+            "right": {
+              "kind": "literal",
+              "value": 0.0
+            }
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_sessions"
+    }
+  ],
+  "tests": [
+    {
+      "column": "score",
+      "min": 0.0,
+      "model": "stg_sessions",
+      "name": "score_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

@@ -1,0 +1,467 @@
+{
+  "description": "Healthcare trials pipeline: composite arm linkage asserted at intermediate level, completion-gated counts and peak ages.",
+  "domain": "healthcare",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "right",
+          "source": "trial_id",
+          "target": "trial_id"
+        },
+        {
+          "side": "left",
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "side": "left",
+          "source": "age",
+          "target": "age"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "dosage",
+          "target": "dosage"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "trial_id",
+            "right": "trial_id"
+          },
+          {
+            "left": "arm_no",
+            "right": "arm_no"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_enrollments",
+      "name": "j_enr_arms",
+      "operation": "join",
+      "right": "stg_arms"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "side": "left",
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "side": "left",
+          "source": "age",
+          "target": "age"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "enroll_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "trial_id",
+            "right": "trial_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_enr_arms",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_trials"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "arm_no"
+      ],
+      "group_by": [
+        {
+          "source": "arm_no",
+          "target": "arm_no"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "age",
+          "function": "max",
+          "name": "peak_age"
+        },
+        {
+          "condition": {
+            "kind": "comparison",
+            "left": {
+              "column": "status",
+              "kind": "column"
+            },
+            "operator": "eq",
+            "right": {
+              "kind": "literal",
+              "value": "done"
+            }
+          },
+          "function": "conditional_count",
+          "name": "completed"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_enrollments"
+        }
+      ],
+      "name": "o_completed_by_arm",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TR-"
+          },
+          "name": "trial_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 6
+          },
+          "name": "title",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_trials",
+      "primary_key": [
+        "trial_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_trial_arms",
+            "target_side": "left"
+          },
+          "name": "trial_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 4,
+            "min": 1
+          },
+          "name": "arm_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 10.0
+          },
+          "name": "dosage",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_arms",
+      "primary_key": [
+        "trial_id",
+        "arm_no"
+      ],
+      "rows": {
+        "max": 32,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "EN-"
+          },
+          "name": "enroll_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_arm_enrollments",
+            "target_side": "right"
+          },
+          "name": "trial_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_arm_enrollments",
+            "target_side": "right"
+          },
+          "name": "arm_no",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 90,
+            "min": 18
+          },
+          "name": "age",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "done",
+              "ongoing"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "investigator",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_enrollments",
+      "primary_key": [
+        "enroll_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "trial_id"
+        ],
+        "table": "raw_trials"
+      },
+      "name": "rel_trial_arms",
+      "right": {
+        "columns": [
+          "trial_id"
+        ],
+        "table": "raw_arms"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "trial_id",
+          "arm_no"
+        ],
+        "table": "raw_enrollments"
+      },
+      "name": "rel_arm_enrollments",
+      "right": {
+        "columns": [
+          "trial_id",
+          "arm_no"
+        ],
+        "table": "raw_arms"
+      }
+    }
+  ],
+  "scenario_id": "healthcare_trials_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "trial_id",
+          "target": "trial_id"
+        },
+        {
+          "operations": [],
+          "source": "title",
+          "target": "title"
+        }
+      ],
+      "grain": [
+        "trial_id"
+      ],
+      "name": "stg_trials",
+      "row_operations": [],
+      "source": "raw_trials"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "trial_id",
+          "target": "trial_id"
+        },
+        {
+          "operations": [],
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "operations": [],
+          "source": "dosage",
+          "target": "dosage"
+        }
+      ],
+      "grain": [
+        "arm_no",
+        "trial_id"
+      ],
+      "name": "stg_arms",
+      "row_operations": [],
+      "source": "raw_arms"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "enroll_id",
+          "target": "enroll_id"
+        },
+        {
+          "operations": [],
+          "source": "trial_id",
+          "target": "trial_id"
+        },
+        {
+          "operations": [],
+          "source": "arm_no",
+          "target": "arm_no"
+        },
+        {
+          "operations": [],
+          "source": "age",
+          "target": "age"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "operations": [],
+          "source": "investigator",
+          "target": "investigator"
+        }
+      ],
+      "grain": [
+        "enroll_id"
+      ],
+      "name": "stg_enrollments",
+      "row_operations": [],
+      "source": "raw_enrollments"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "arm_no",
+        "trial_id"
+      ],
+      "model": "j_enr_arms",
+      "name": "arm_link",
+      "to_columns": [
+        "arm_no",
+        "trial_id"
+      ],
+      "to_model": "raw_arms",
+      "type": "relationships"
+    }
+  ]
+}

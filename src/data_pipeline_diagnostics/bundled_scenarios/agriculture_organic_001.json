@@ -1,0 +1,429 @@
+{
+  "description": "Organic agriculture pipeline: inspected lots only, lot-level ledger with public cultivar label.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lot_id",
+          "target": "lot_id"
+        },
+        {
+          "side": "left",
+          "source": "variety",
+          "target": "variety"
+        },
+        {
+          "side": "left",
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "side": "left",
+          "source": "buyer_id",
+          "target": "buyer_id"
+        },
+        {
+          "side": "right",
+          "source": "farm_name",
+          "target": "farm_name"
+        },
+        {
+          "side": "left",
+          "source": "inspector",
+          "target": "inspector"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [
+        {
+          "kind": "is_null",
+          "negated": true,
+          "value": {
+            "column": "inspector",
+            "kind": "column"
+          }
+        }
+      ],
+      "grain": [
+        "lot_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "farm_id",
+            "right": "farm_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_lots",
+      "name": "j_lots_farms",
+      "operation": "join",
+      "right": "stg_farms"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "lot_id",
+          "target": "lot_id"
+        },
+        {
+          "side": "left",
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "side": "right",
+          "source": "company",
+          "target": "company"
+        },
+        {
+          "side": "left",
+          "source": "variety",
+          "target": "variety"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "lot_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "buyer_id",
+            "right": "buyer_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_lots_farms",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_buyers"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "lot_id"
+      ],
+      "group_by": [
+        {
+          "source": "lot_id",
+          "target": "lot_id"
+        },
+        {
+          "source": "variety",
+          "target": "cultivar"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "area_ha",
+          "function": "sum",
+          "name": "total_area"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_lots"
+        }
+      ],
+      "name": "o_area_by_lot",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FM-"
+          },
+          "name": "farm_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "farm_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_farms",
+      "primary_key": [
+        "farm_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "BY-"
+          },
+          "name": "buyer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "company_name",
+            "locale": "de_DE"
+          },
+          "name": "company",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_buyers",
+      "primary_key": [
+        "buyer_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "LT-"
+          },
+          "name": "lot_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_farm_lots",
+            "target_side": "left"
+          },
+          "name": "farm_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_buyer_lots",
+            "target_side": "right"
+          },
+          "name": "buyer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "corn",
+              "wheat"
+            ]
+          },
+          "name": "variety",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 100.0,
+            "min": 1.0
+          },
+          "name": "area_ha",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "inspector",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_lots",
+      "primary_key": [
+        "lot_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "farm_id"
+        ],
+        "table": "raw_farms"
+      },
+      "name": "rel_farm_lots",
+      "right": {
+        "columns": [
+          "farm_id"
+        ],
+        "table": "raw_lots"
+      }
+    },
+    {
+      "cardinality": "many_to_one",
+      "left": {
+        "columns": [
+          "buyer_id"
+        ],
+        "table": "raw_lots"
+      },
+      "name": "rel_buyer_lots",
+      "right": {
+        "columns": [
+          "buyer_id"
+        ],
+        "table": "raw_buyers"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_organic_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "farm_id",
+          "target": "farm_id"
+        },
+        {
+          "operations": [],
+          "source": "farm_name",
+          "target": "farm_name"
+        }
+      ],
+      "grain": [
+        "farm_id"
+      ],
+      "name": "stg_farms",
+      "row_operations": [],
+      "source": "raw_farms"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "buyer_id",
+          "target": "buyer_id"
+        },
+        {
+          "operations": [],
+          "source": "company",
+          "target": "company"
+        }
+      ],
+      "grain": [
+        "buyer_id"
+      ],
+      "name": "stg_buyers",
+      "row_operations": [],
+      "source": "raw_buyers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "lot_id",
+          "target": "lot_id"
+        },
+        {
+          "operations": [],
+          "source": "farm_id",
+          "target": "farm_id"
+        },
+        {
+          "operations": [],
+          "source": "buyer_id",
+          "target": "buyer_id"
+        },
+        {
+          "operations": [],
+          "source": "variety",
+          "target": "variety"
+        },
+        {
+          "operations": [],
+          "source": "area_ha",
+          "target": "area_ha"
+        },
+        {
+          "operations": [],
+          "source": "inspector",
+          "target": "inspector"
+        }
+      ],
+      "grain": [
+        "lot_id"
+      ],
+      "name": "stg_lots",
+      "row_operations": [],
+      "source": "raw_lots"
+    }
+  ],
+  "tests": [
+    {
+      "column": "variety",
+      "model": "stg_lots",
+      "name": "variety_values",
+      "type": "accepted_values",
+      "values": [
+        "corn",
+        "wheat"
+      ]
+    }
+  ]
+}

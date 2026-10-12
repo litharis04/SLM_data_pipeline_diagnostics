@@ -1,0 +1,471 @@
+{
+  "description": "Media advertising pipeline: coded genres with strict rating codebook, unique transmission audit codes.",
+  "domain": "media",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "left",
+          "source": "tx_code",
+          "target": "tx_code"
+        },
+        {
+          "side": "left",
+          "source": "verify_code",
+          "target": "verify_code"
+        },
+        {
+          "side": "right",
+          "source": "station_id",
+          "target": "station_id"
+        },
+        {
+          "side": "right",
+          "source": "genre",
+          "target": "genre"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "airing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "program_id",
+            "right": "program_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_airings",
+      "name": "j_air_programs",
+      "operation": "join",
+      "right": "stg_programs"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "side": "left",
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "side": "right",
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "airing_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "station_id",
+            "right": "station_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_air_programs",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_stations"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "band"
+      ],
+      "group_by": [
+        {
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "duration_min",
+          "function": "avg",
+          "name": "avg_duration"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_airings"
+        }
+      ],
+      "name": "o_duration_by_band",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "ST-"
+          },
+          "name": "station_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "am",
+              "fm"
+            ]
+          },
+          "name": "band",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_stations",
+      "primary_key": [
+        "station_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "PG-"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_station_programs",
+            "target_side": "left"
+          },
+          "name": "station_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "comedy",
+              "documentary",
+              "drama"
+            ]
+          },
+          "name": "genre",
+          "null_probability": 0.1,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "G",
+              "PG",
+              "R"
+            ]
+          },
+          "name": "rating",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_programs",
+      "primary_key": [
+        "program_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "AR-"
+          },
+          "name": "airing_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_program_airings",
+            "target_side": "left"
+          },
+          "name": "program_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "aired_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 120,
+            "min": 5
+          },
+          "name": "duration_min",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "tx_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 20,
+            "min_length": 20
+          },
+          "name": "verify_code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_airings",
+      "primary_key": [
+        "airing_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "station_id"
+        ],
+        "table": "raw_stations"
+      },
+      "name": "rel_station_programs",
+      "right": {
+        "columns": [
+          "station_id"
+        ],
+        "table": "raw_programs"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_programs"
+      },
+      "name": "rel_program_airings",
+      "right": {
+        "columns": [
+          "program_id"
+        ],
+        "table": "raw_airings"
+      }
+    }
+  ],
+  "scenario_id": "media_advertising_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "station_id",
+          "target": "station_id"
+        },
+        {
+          "operations": [],
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "grain": [
+        "station_id"
+      ],
+      "name": "stg_stations",
+      "row_operations": [],
+      "source": "raw_stations"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "station_id",
+          "target": "station_id"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "documentary": "DOC",
+                "drama": "DRM"
+              },
+              "on_unmapped": "null",
+              "op": "map_values"
+            }
+          ],
+          "source": "genre",
+          "target": "genre"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "G": "general",
+                "PG": "guidance",
+                "R": "restricted"
+              },
+              "on_unmapped": "error",
+              "op": "map_values"
+            }
+          ],
+          "source": "rating",
+          "target": "rating"
+        }
+      ],
+      "grain": [
+        "program_id"
+      ],
+      "name": "stg_programs",
+      "row_operations": [],
+      "source": "raw_programs"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "airing_id",
+          "target": "airing_id"
+        },
+        {
+          "operations": [],
+          "source": "program_id",
+          "target": "program_id"
+        },
+        {
+          "operations": [],
+          "source": "aired_at",
+          "target": "aired_at"
+        },
+        {
+          "operations": [],
+          "source": "duration_min",
+          "target": "duration_min"
+        },
+        {
+          "operations": [],
+          "source": "tx_code",
+          "target": "tx_code"
+        },
+        {
+          "operations": [],
+          "source": "verify_code",
+          "target": "verify_code"
+        }
+      ],
+      "grain": [
+        "airing_id"
+      ],
+      "name": "stg_airings",
+      "row_operations": [],
+      "source": "raw_airings"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "tx_code",
+        "verify_code"
+      ],
+      "model": "j_air_programs",
+      "name": "audit_unique",
+      "type": "unique"
+    }
+  ]
+}

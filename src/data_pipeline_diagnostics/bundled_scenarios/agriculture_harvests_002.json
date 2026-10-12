@@ -1,0 +1,573 @@
+{
+  "description": "Agriculture harvests pipeline: display names with fallback, nested price derivation, sound positive lots only.",
+  "domain": "agriculture",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ernte_id",
+          "target": "ernte_id"
+        },
+        {
+          "side": "left",
+          "source": "spitzname",
+          "target": "spitzname"
+        },
+        {
+          "side": "left",
+          "source": "bezeichnung",
+          "target": "bezeichnung"
+        },
+        {
+          "side": "left",
+          "source": "menge",
+          "target": "menge"
+        },
+        {
+          "side": "left",
+          "source": "preis",
+          "target": "preis"
+        },
+        {
+          "side": "left",
+          "source": "satz",
+          "target": "satz"
+        },
+        {
+          "side": "left",
+          "source": "status",
+          "target": "status"
+        },
+        {
+          "side": "right",
+          "source": "kultur",
+          "target": "kultur"
+        },
+        {
+          "side": "right",
+          "source": "hof_id",
+          "target": "hof_id"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "coalesce",
+            "values": [
+              {
+                "column": "spitzname",
+                "kind": "column"
+              },
+              {
+                "column": "bezeichnung",
+                "kind": "column"
+              }
+            ]
+          },
+          "name": "anzeige",
+          "type": "string"
+        },
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "kind": "binary",
+              "left": {
+                "column": "menge",
+                "kind": "column"
+              },
+              "operator": "multiply",
+              "right": {
+                "column": "satz",
+                "kind": "column"
+              }
+            },
+            "operator": "add",
+            "right": {
+              "column": "preis",
+              "kind": "column"
+            }
+          },
+          "name": "endpreis",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "ernte_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "feld_id",
+            "right": "feld_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_ernten",
+      "name": "j_ernte_felder",
+      "operation": "join",
+      "right": "stg_felder"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "ernte_id",
+          "target": "ernte_id"
+        },
+        {
+          "side": "left",
+          "source": "anzeige",
+          "target": "anzeige"
+        },
+        {
+          "side": "left",
+          "source": "menge",
+          "target": "menge"
+        },
+        {
+          "side": "left",
+          "source": "kultur",
+          "target": "kultur"
+        },
+        {
+          "side": "left",
+          "source": "endpreis",
+          "target": "endpreis"
+        },
+        {
+          "side": "right",
+          "source": "ort",
+          "target": "ort"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "ernte_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "hof_id",
+            "right": "hof_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_ernte_felder",
+      "name": "m_full",
+      "operation": "join",
+      "right": "stg_hoefe"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "kultur"
+      ],
+      "group_by": [
+        {
+          "source": "kultur",
+          "target": "kultur"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "menge",
+          "function": "sum",
+          "name": "menge_gesamt"
+        },
+        {
+          "function": "count_rows",
+          "name": "n"
+        }
+      ],
+      "name": "o_menge_by_kultur",
+      "source": "m_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HO-"
+          },
+          "name": "hof_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "ort",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_hoefe",
+      "primary_key": [
+        "hof_id"
+      ],
+      "rows": {
+        "max": 10,
+        "min": 10
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "FE-"
+          },
+          "name": "feld_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_hof_felder",
+            "target_side": "left"
+          },
+          "name": "hof_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "Weizen",
+              "Roggen",
+              "Gerste",
+              "Hafer"
+            ]
+          },
+          "name": "kultur",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_felder",
+      "primary_key": [
+        "feld_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "ER-"
+          },
+          "name": "ernte_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_feld_ernten",
+            "target_side": "left"
+          },
+          "name": "feld_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 4
+          },
+          "name": "spitzname",
+          "null_probability": 0.3,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 16,
+            "min_length": 6
+          },
+          "name": "bezeichnung",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 10000.0,
+            "min": 100.0
+          },
+          "name": "menge",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 10.0
+          },
+          "name": "preis",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 2.0,
+            "min": 0.1
+          },
+          "name": "satz",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "verkauft",
+              "lager",
+              "verloren"
+            ]
+          },
+          "name": "status",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_ernten",
+      "primary_key": [
+        "ernte_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "hof_id"
+        ],
+        "table": "raw_hoefe"
+      },
+      "name": "rel_hof_felder",
+      "right": {
+        "columns": [
+          "hof_id"
+        ],
+        "table": "raw_felder"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "feld_id"
+        ],
+        "table": "raw_felder"
+      },
+      "name": "rel_feld_ernten",
+      "right": {
+        "columns": [
+          "feld_id"
+        ],
+        "table": "raw_ernten"
+      }
+    }
+  ],
+  "scenario_id": "agriculture_harvests_002",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "hof_id",
+          "target": "hof_id"
+        },
+        {
+          "operations": [],
+          "source": "ort",
+          "target": "ort"
+        }
+      ],
+      "grain": [
+        "hof_id"
+      ],
+      "name": "stg_hoefe",
+      "row_operations": [],
+      "source": "raw_hoefe"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "feld_id",
+          "target": "feld_id"
+        },
+        {
+          "operations": [],
+          "source": "hof_id",
+          "target": "hof_id"
+        },
+        {
+          "operations": [],
+          "source": "kultur",
+          "target": "kultur"
+        }
+      ],
+      "grain": [
+        "feld_id"
+      ],
+      "name": "stg_felder",
+      "row_operations": [],
+      "source": "raw_felder"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "ernte_id",
+          "target": "ernte_id"
+        },
+        {
+          "operations": [],
+          "source": "feld_id",
+          "target": "feld_id"
+        },
+        {
+          "operations": [],
+          "source": "spitzname",
+          "target": "spitzname"
+        },
+        {
+          "operations": [],
+          "source": "bezeichnung",
+          "target": "bezeichnung"
+        },
+        {
+          "operations": [],
+          "source": "menge",
+          "target": "menge"
+        },
+        {
+          "operations": [],
+          "source": "preis",
+          "target": "preis"
+        },
+        {
+          "operations": [],
+          "source": "satz",
+          "target": "satz"
+        },
+        {
+          "operations": [],
+          "source": "status",
+          "target": "status"
+        }
+      ],
+      "grain": [
+        "ernte_id"
+      ],
+      "name": "stg_ernten",
+      "row_operations": [
+        {
+          "condition": {
+            "conditions": [
+              {
+                "kind": "comparison",
+                "left": {
+                  "column": "menge",
+                  "kind": "column"
+                },
+                "operator": "gt",
+                "right": {
+                  "kind": "literal",
+                  "value": 0.0
+                }
+              },
+              {
+                "condition": {
+                  "kind": "comparison",
+                  "left": {
+                    "column": "status",
+                    "kind": "column"
+                  },
+                  "operator": "eq",
+                  "right": {
+                    "kind": "literal",
+                    "value": "verloren"
+                  }
+                },
+                "kind": "not"
+              }
+            ],
+            "kind": "all"
+          },
+          "op": "filter"
+        }
+      ],
+      "source": "raw_ernten"
+    }
+  ],
+  "tests": [
+    {
+      "column": "menge",
+      "min": 0.0,
+      "model": "m_full",
+      "name": "menge_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

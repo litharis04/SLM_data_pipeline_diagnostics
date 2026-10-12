@@ -1,0 +1,447 @@
+{
+  "description": "Finance FX pipeline: quoted tenors and rates parsed in staging, placeholder memos nulled.",
+  "domain": "finance",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "deal_id",
+          "target": "deal_id"
+        },
+        {
+          "side": "left",
+          "source": "term",
+          "target": "term"
+        },
+        {
+          "side": "left",
+          "source": "rate",
+          "target": "rate"
+        },
+        {
+          "side": "right",
+          "source": "desk_id",
+          "target": "desk_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "deal_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "trader_id",
+            "right": "trader_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_deals",
+      "name": "j_deals_traders",
+      "operation": "join",
+      "right": "stg_traders"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "deal_id",
+          "target": "deal_id"
+        },
+        {
+          "side": "left",
+          "source": "term",
+          "target": "term"
+        },
+        {
+          "side": "left",
+          "source": "rate",
+          "target": "rate"
+        },
+        {
+          "side": "right",
+          "source": "desk_name",
+          "target": "desk_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "deal_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "desk_id",
+            "right": "desk_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_deals_traders",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_desks"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "term"
+      ],
+      "group_by": [
+        {
+          "source": "term",
+          "target": "term"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "rate",
+          "function": "avg",
+          "name": "avg_rate"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_deals"
+        }
+      ],
+      "name": "o_rate_by_term",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DK-"
+          },
+          "name": "desk_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 12,
+            "min_length": 5
+          },
+          "name": "desk_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_desks",
+      "primary_key": [
+        "desk_id"
+      ],
+      "rows": {
+        "max": 6,
+        "min": 6
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "TR-"
+          },
+          "name": "trader_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_desk_traders",
+            "target_side": "left"
+          },
+          "name": "desk_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_traders",
+      "primary_key": [
+        "trader_id"
+      ],
+      "rows": {
+        "max": 36,
+        "min": 12
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "FX-"
+          },
+          "name": "deal_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_trader_deals",
+            "target_side": "left"
+          },
+          "name": "trader_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "EURUSD",
+              "USDJPY"
+            ]
+          },
+          "name": "pair",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "12",
+              "3",
+              "6"
+            ]
+          },
+          "name": "term_months",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "1.05",
+              "1.10",
+              "150.2"
+            ]
+          },
+          "name": "rate_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 25,
+            "min_length": 5
+          },
+          "name": "memo",
+          "null_probability": 0.2,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_deals",
+      "primary_key": [
+        "deal_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "desk_id"
+        ],
+        "table": "raw_desks"
+      },
+      "name": "rel_desk_traders",
+      "right": {
+        "columns": [
+          "desk_id"
+        ],
+        "table": "raw_traders"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "trader_id"
+        ],
+        "table": "raw_traders"
+      },
+      "name": "rel_trader_deals",
+      "right": {
+        "columns": [
+          "trader_id"
+        ],
+        "table": "raw_deals"
+      }
+    }
+  ],
+  "scenario_id": "finance_fx_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "desk_id",
+          "target": "desk_id"
+        },
+        {
+          "operations": [],
+          "source": "desk_name",
+          "target": "desk_name"
+        }
+      ],
+      "grain": [
+        "desk_id"
+      ],
+      "name": "stg_desks",
+      "row_operations": [],
+      "source": "raw_desks"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "trader_id",
+          "target": "trader_id"
+        },
+        {
+          "operations": [],
+          "source": "desk_id",
+          "target": "desk_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "trader_id"
+      ],
+      "name": "stg_traders",
+      "row_operations": [],
+      "source": "raw_traders"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "deal_id",
+          "target": "deal_id"
+        },
+        {
+          "operations": [],
+          "source": "trader_id",
+          "target": "trader_id"
+        },
+        {
+          "operations": [],
+          "source": "pair",
+          "target": "pair"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "term_months",
+          "target": "term"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            }
+          ],
+          "source": "rate_str",
+          "target": "rate"
+        },
+        {
+          "operations": [
+            {
+              "op": "null_if",
+              "values": [
+                "n/a"
+              ]
+            }
+          ],
+          "source": "memo",
+          "target": "memo"
+        }
+      ],
+      "grain": [
+        "deal_id"
+      ],
+      "name": "stg_deals",
+      "row_operations": [],
+      "source": "raw_deals"
+    }
+  ],
+  "tests": [
+    {
+      "column": "pair",
+      "model": "stg_deals",
+      "name": "pair_values",
+      "type": "accepted_values",
+      "values": [
+        "EURUSD",
+        "USDJPY"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,475 @@
+{
+  "description": "HR attrition pipeline: deduplicated employee snapshots joined to departments and reviews, legacy level codes parsed.",
+  "domain": "human_resources",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "employee_id",
+          "target": "employee_id"
+        },
+        {
+          "side": "left",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "side": "left",
+          "source": "hire_date",
+          "target": "hire_date"
+        },
+        {
+          "side": "right",
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "employee_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "dept_id",
+            "right": "dept_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "d_employees",
+      "name": "j_emp_depts",
+      "operation": "join",
+      "right": "stg_departments"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "employee_id",
+          "target": "employee_id"
+        },
+        {
+          "side": "left",
+          "source": "level",
+          "target": "level"
+        },
+        {
+          "side": "left",
+          "source": "dept_name",
+          "target": "dept_name"
+        },
+        {
+          "side": "right",
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "side": "right",
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "side": "right",
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "review_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "employee_id",
+            "right": "employee_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_emp_depts",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_reviews"
+    },
+    {
+      "grain": [
+        "employee_id"
+      ],
+      "keys": [
+        "employee_id"
+      ],
+      "name": "d_employees",
+      "operation": "deduplicate",
+      "order_by": [
+        {
+          "column": "hire_date",
+          "direction": "asc"
+        }
+      ],
+      "source": "stg_employees"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "dept_name"
+      ],
+      "group_by": [
+        {
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "rating",
+          "function": "avg",
+          "name": "avg_rating"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_reviews"
+        }
+      ],
+      "name": "o_rating_by_dept",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 2,
+            "kind": "formatted_id",
+            "prefix": "DP-"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "engineering",
+              "sales",
+              "support"
+            ]
+          },
+          "name": "dept_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_departments",
+      "primary_key": [
+        "dept_id"
+      ],
+      "rows": {
+        "max": 5,
+        "min": 5
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "EMP-"
+          },
+          "name": "employee_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_dept_emps",
+            "target_side": "left"
+          },
+          "name": "dept_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "1",
+              "2",
+              "3",
+              "4",
+              "5"
+            ]
+          },
+          "name": "level_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-01-01",
+            "min": "2015-01-01"
+          },
+          "name": "hire_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_employees",
+      "primary_key": [
+        "employee_id"
+      ],
+      "rows": {
+        "max": 100,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RVW-"
+          },
+          "name": "review_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_emp_reviews",
+            "target_side": "left"
+          },
+          "name": "employee_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 5,
+            "min": 1
+          },
+          "name": "rating",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "high",
+              "low",
+              "mid"
+            ]
+          },
+          "name": "band",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_reviews",
+      "primary_key": [
+        "review_id"
+      ],
+      "rows": {
+        "max": 400,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "dept_id"
+        ],
+        "table": "raw_departments"
+      },
+      "name": "rel_dept_emps",
+      "right": {
+        "columns": [
+          "dept_id"
+        ],
+        "table": "raw_employees"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "employee_id"
+        ],
+        "table": "raw_employees"
+      },
+      "name": "rel_emp_reviews",
+      "right": {
+        "columns": [
+          "employee_id"
+        ],
+        "table": "raw_reviews"
+      }
+    }
+  ],
+  "scenario_id": "hr_attrition_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "dept_id",
+          "target": "dept_id"
+        },
+        {
+          "operations": [],
+          "source": "dept_name",
+          "target": "dept_name"
+        }
+      ],
+      "grain": [
+        "dept_id"
+      ],
+      "name": "stg_departments",
+      "row_operations": [],
+      "source": "raw_departments"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "employee_id",
+          "target": "employee_id"
+        },
+        {
+          "operations": [],
+          "source": "dept_id",
+          "target": "dept_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "level_str",
+          "target": "level"
+        },
+        {
+          "operations": [],
+          "source": "hire_date",
+          "target": "hire_date"
+        }
+      ],
+      "grain": [
+        "employee_id"
+      ],
+      "name": "stg_employees",
+      "row_operations": [],
+      "source": "raw_employees"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "review_id",
+          "target": "review_id"
+        },
+        {
+          "operations": [],
+          "source": "employee_id",
+          "target": "employee_id"
+        },
+        {
+          "operations": [],
+          "source": "rating",
+          "target": "rating"
+        },
+        {
+          "operations": [
+            {
+              "mapping": {
+                "low": "L1",
+                "mid": "M1"
+              },
+              "on_unmapped": "keep",
+              "op": "map_values"
+            }
+          ],
+          "source": "band",
+          "target": "band"
+        }
+      ],
+      "grain": [
+        "review_id"
+      ],
+      "name": "stg_reviews",
+      "row_operations": [],
+      "source": "raw_reviews"
+    }
+  ],
+  "tests": [
+    {
+      "column": "dept_name",
+      "model": "stg_departments",
+      "name": "dept_values",
+      "type": "accepted_values",
+      "values": [
+        "engineering",
+        "sales",
+        "support"
+      ]
+    }
+  ]
+}

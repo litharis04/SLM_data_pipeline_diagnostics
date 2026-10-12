@@ -1,0 +1,428 @@
+{
+  "description": "Energy metering pipeline: legacy string readings cast to float with null-fill, tiered tariffs.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "side": "left",
+          "source": "read_date",
+          "target": "read_date"
+        },
+        {
+          "side": "right",
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "side": "right",
+          "source": "installed_date",
+          "target": "installed_date"
+        },
+        {
+          "side": "right",
+          "source": "household_id",
+          "target": "household_id"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "meter_id",
+            "right": "meter_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_readings",
+      "name": "j_read_meters",
+      "operation": "join",
+      "right": "stg_meters"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "side": "right",
+          "source": "tariff_level",
+          "target": "tariff_level"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "household_id",
+            "right": "household_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_read_meters",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_households"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "tariff_level"
+      ],
+      "group_by": [
+        {
+          "source": "tariff_level",
+          "target": "tariff_level"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "kwh",
+          "function": "avg",
+          "name": "avg_kwh"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_readings"
+        }
+      ],
+      "name": "o_kwh_by_tariff",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "HH-"
+          },
+          "name": "household_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 2,
+            "min": 1
+          },
+          "name": "tariff_level",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 30,
+            "min_length": 5
+          },
+          "name": "notes",
+          "null_probability": 0.0,
+          "nullable": true,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_households",
+      "primary_key": [
+        "household_id"
+      ],
+      "rows": {
+        "max": 15,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "MTR-"
+          },
+          "name": "meter_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_house_meters",
+            "target_side": "left"
+          },
+          "name": "household_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2023-12-31",
+            "min": "2020-01-01"
+          },
+          "name": "installed_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_meters",
+      "primary_key": [
+        "meter_id"
+      ],
+      "rows": {
+        "max": 45,
+        "min": 15
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RDG-"
+          },
+          "name": "reading_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_meter_readings",
+            "target_side": "left"
+          },
+          "name": "meter_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "integer_range",
+            "max": 500,
+            "min": 0
+          },
+          "name": "kwh_int",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "integer",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "template_string",
+            "template": "{kwh_int}"
+          },
+          "name": "reading_str",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "read_date",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_readings",
+      "primary_key": [
+        "reading_id"
+      ],
+      "rows": {
+        "max": 400,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "household_id"
+        ],
+        "table": "raw_households"
+      },
+      "name": "rel_house_meters",
+      "right": {
+        "columns": [
+          "household_id"
+        ],
+        "table": "raw_meters"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "meter_id"
+        ],
+        "table": "raw_meters"
+      },
+      "name": "rel_meter_readings",
+      "right": {
+        "columns": [
+          "meter_id"
+        ],
+        "table": "raw_readings"
+      }
+    }
+  ],
+  "scenario_id": "energy_meters_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "household_id",
+          "target": "household_id"
+        },
+        {
+          "operations": [],
+          "source": "tariff_level",
+          "target": "tariff_level"
+        },
+        {
+          "operations": [],
+          "source": "notes",
+          "target": "notes"
+        }
+      ],
+      "grain": [
+        "household_id"
+      ],
+      "name": "stg_households",
+      "row_operations": [],
+      "source": "raw_households"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "operations": [],
+          "source": "household_id",
+          "target": "household_id"
+        },
+        {
+          "operations": [],
+          "source": "installed_date",
+          "target": "installed_date"
+        }
+      ],
+      "grain": [
+        "meter_id"
+      ],
+      "name": "stg_meters",
+      "row_operations": [],
+      "source": "raw_meters"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "operations": [],
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "float"
+            },
+            {
+              "op": "coalesce",
+              "value": 0.0
+            }
+          ],
+          "source": "reading_str",
+          "target": "kwh"
+        },
+        {
+          "operations": [],
+          "source": "read_date",
+          "target": "read_date"
+        }
+      ],
+      "grain": [
+        "reading_id"
+      ],
+      "name": "stg_readings",
+      "row_operations": [],
+      "source": "raw_readings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "kwh",
+      "min": 0.0,
+      "model": "stg_readings",
+      "name": "kwh_nonnegative",
+      "type": "column_range"
+    }
+  ]
+}

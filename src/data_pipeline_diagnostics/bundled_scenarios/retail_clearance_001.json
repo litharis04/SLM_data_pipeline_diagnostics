@@ -1,0 +1,461 @@
+{
+  "description": "Retail clearance pipeline: uppercased tags, whole-percent markdowns, derived margins.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "source": "cost",
+          "target": "cost"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "binary",
+            "left": {
+              "column": "price",
+              "kind": "column"
+            },
+            "operator": "subtract",
+            "right": {
+              "column": "cost",
+              "kind": "column"
+            }
+          },
+          "name": "margin",
+          "type": "float"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "name": "t_sales",
+      "operation": "transform",
+      "source": "stg_sales"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "side": "left",
+          "source": "margin",
+          "target": "margin"
+        },
+        {
+          "side": "right",
+          "source": "outlet_id",
+          "target": "outlet_id"
+        },
+        {
+          "side": "right",
+          "source": "tag",
+          "target": "tag"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "product_id",
+            "right": "product_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "t_sales",
+      "name": "j_sales_products",
+      "operation": "join",
+      "right": "stg_products"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "side": "left",
+          "source": "margin",
+          "target": "margin"
+        },
+        {
+          "side": "left",
+          "source": "tag",
+          "target": "tag"
+        },
+        {
+          "side": "right",
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "sale_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "outlet_id",
+            "right": "outlet_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_sales_products",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_outlets"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "tag"
+      ],
+      "group_by": [
+        {
+          "source": "tag",
+          "target": "tag"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "margin",
+          "function": "avg",
+          "name": "avg_margin"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_sales"
+        }
+      ],
+      "name": "o_margin_by_tag",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "OT-"
+          },
+          "name": "outlet_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "city",
+            "locale": "de_DE"
+          },
+          "name": "city",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_outlets",
+      "primary_key": [
+        "outlet_id"
+      ],
+      "rows": {
+        "max": 8,
+        "min": 8
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PD-"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_outlet_products",
+            "target_side": "left"
+          },
+          "name": "outlet_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "c",
+              "x"
+            ]
+          },
+          "name": "tag",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 48,
+        "min": 16
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "SL-"
+          },
+          "name": "sale_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_product_sales",
+            "target_side": "left"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 500.0,
+            "min": 5.0
+          },
+          "name": "price",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 400.0,
+            "min": 1.0
+          },
+          "name": "cost",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 70.0,
+            "min": 5.0
+          },
+          "name": "markdown",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        }
+      ],
+      "name": "raw_sales",
+      "primary_key": [
+        "sale_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "outlet_id"
+        ],
+        "table": "raw_outlets"
+      },
+      "name": "rel_outlet_products",
+      "right": {
+        "columns": [
+          "outlet_id"
+        ],
+        "table": "raw_products"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_products"
+      },
+      "name": "rel_product_sales",
+      "right": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_sales"
+      }
+    }
+  ],
+  "scenario_id": "retail_clearance_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "outlet_id",
+          "target": "outlet_id"
+        },
+        {
+          "operations": [],
+          "source": "city",
+          "target": "city"
+        }
+      ],
+      "grain": [
+        "outlet_id"
+      ],
+      "name": "stg_outlets",
+      "row_operations": [],
+      "source": "raw_outlets"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "outlet_id",
+          "target": "outlet_id"
+        },
+        {
+          "operations": [
+            {
+              "op": "upper"
+            }
+          ],
+          "source": "tag",
+          "target": "tag"
+        }
+      ],
+      "grain": [
+        "product_id"
+      ],
+      "name": "stg_products",
+      "row_operations": [],
+      "source": "raw_products"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "sale_id",
+          "target": "sale_id"
+        },
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "price",
+          "target": "price"
+        },
+        {
+          "operations": [],
+          "source": "cost",
+          "target": "cost"
+        },
+        {
+          "operations": [
+            {
+              "op": "cast",
+              "type": "integer"
+            }
+          ],
+          "source": "markdown",
+          "target": "markdown_pct"
+        }
+      ],
+      "grain": [
+        "sale_id"
+      ],
+      "name": "stg_sales",
+      "row_operations": [],
+      "source": "raw_sales"
+    }
+  ],
+  "tests": [
+    {
+      "column": "tag",
+      "model": "stg_products",
+      "name": "tag_values",
+      "type": "accepted_values",
+      "values": [
+        "C",
+        "X"
+      ]
+    }
+  ]
+}

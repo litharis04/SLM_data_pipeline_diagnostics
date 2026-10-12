@@ -1,0 +1,437 @@
+{
+  "description": "Energy tariffs pipeline: one-to-one meter contracts, year and quarter derivation in the join.",
+  "domain": "energy",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "side": "left",
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "side": "right",
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "side": "right",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "left",
+          "source": "read_at",
+          "target": "read_at"
+        }
+      ],
+      "derived_columns": [
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "year",
+            "value": {
+              "column": "read_at",
+              "kind": "column"
+            }
+          },
+          "name": "yr",
+          "type": "integer"
+        },
+        {
+          "expression": {
+            "kind": "date_part",
+            "part": "quarter",
+            "value": {
+              "column": "read_at",
+              "kind": "column"
+            }
+          },
+          "name": "qtr",
+          "type": "integer"
+        }
+      ],
+      "filters": [],
+      "grain": [
+        "reading_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "meter_id",
+            "right": "meter_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_readings",
+      "name": "j_read_meters",
+      "operation": "join",
+      "right": "stg_meters"
+    },
+    {
+      "filters": [],
+      "grain": [
+        "contract_id",
+        "meter_id"
+      ],
+      "group_by": [
+        {
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "source": "meter_id",
+          "target": "meter_id"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "kwh",
+          "function": "sum",
+          "name": "total_kwh"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_readings"
+        }
+      ],
+      "name": "a_meter_stats",
+      "operation": "aggregate",
+      "source": "j_read_meters"
+    },
+    {
+      "columns": [
+        {
+          "side": "right",
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "side": "right",
+          "source": "tariff",
+          "target": "tariff"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "contract_id"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "contract_id",
+            "right": "contract_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "a_meter_stats",
+      "name": "j_stats_contracts",
+      "operation": "join",
+      "right": "stg_contracts"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "tariff"
+      ],
+      "group_by": [
+        {
+          "source": "tariff",
+          "target": "tariff"
+        }
+      ],
+      "metrics": [
+        {
+          "function": "count_rows",
+          "name": "n_contracts"
+        }
+      ],
+      "name": "o_contracts_by_tariff",
+      "source": "j_stats_contracts"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CT-"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "categorical",
+            "values": [
+              "green",
+              "standard"
+            ]
+          },
+          "name": "tariff",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_contracts",
+      "primary_key": [
+        "contract_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "MT-"
+          },
+          "name": "meter_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_contract_meters",
+            "target_side": "right"
+          },
+          "name": "contract_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": true
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "location",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_meters",
+      "primary_key": [
+        "meter_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 5,
+            "kind": "formatted_id",
+            "prefix": "RD-"
+          },
+          "name": "reading_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_meter_readings",
+            "target_side": "left"
+          },
+          "name": "meter_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "float_range",
+            "max": 1000.0,
+            "min": 0.0
+          },
+          "name": "kwh",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "float",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "timestamp_range",
+            "max": "2024-12-31T23:59:59+00:00",
+            "min": "2024-01-01T00:00:00+00:00"
+          },
+          "name": "read_at",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "timestamp",
+          "unique": false
+        }
+      ],
+      "name": "raw_readings",
+      "primary_key": [
+        "reading_id"
+      ],
+      "rows": {
+        "max": 500,
+        "min": 150
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "cardinality": "one_to_one",
+      "left": {
+        "columns": [
+          "contract_id"
+        ],
+        "table": "raw_meters"
+      },
+      "name": "rel_contract_meters",
+      "right": {
+        "columns": [
+          "contract_id"
+        ],
+        "table": "raw_contracts"
+      }
+    },
+    {
+      "cardinality": "one_to_many",
+      "left": {
+        "columns": [
+          "meter_id"
+        ],
+        "table": "raw_meters"
+      },
+      "name": "rel_meter_readings",
+      "right": {
+        "columns": [
+          "meter_id"
+        ],
+        "table": "raw_readings"
+      }
+    }
+  ],
+  "scenario_id": "energy_tariffs_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "tariff",
+          "target": "tariff"
+        }
+      ],
+      "grain": [
+        "contract_id"
+      ],
+      "name": "stg_contracts",
+      "row_operations": [],
+      "source": "raw_contracts"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "operations": [],
+          "source": "contract_id",
+          "target": "contract_id"
+        },
+        {
+          "operations": [],
+          "source": "location",
+          "target": "location"
+        }
+      ],
+      "grain": [
+        "meter_id"
+      ],
+      "name": "stg_meters",
+      "row_operations": [],
+      "source": "raw_meters"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "reading_id",
+          "target": "reading_id"
+        },
+        {
+          "operations": [],
+          "source": "meter_id",
+          "target": "meter_id"
+        },
+        {
+          "operations": [],
+          "source": "kwh",
+          "target": "kwh"
+        },
+        {
+          "operations": [],
+          "source": "read_at",
+          "target": "read_at"
+        }
+      ],
+      "grain": [
+        "reading_id"
+      ],
+      "name": "stg_readings",
+      "row_operations": [],
+      "source": "raw_readings"
+    }
+  ],
+  "tests": [
+    {
+      "column": "tariff",
+      "model": "stg_contracts",
+      "name": "tariff_values",
+      "type": "accepted_values",
+      "values": [
+        "green",
+        "standard"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,356 @@
+{
+  "description": "Retail gifting pipeline: many-to-many wishlist linkage through a keyless bridge with constrained confirmation codes.",
+  "domain": "retail",
+  "intermediate_models": [
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "code",
+          "target": "code"
+        },
+        {
+          "side": "left",
+          "source": "added",
+          "target": "added"
+        },
+        {
+          "side": "left",
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "side": "right",
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "code"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "customer_id",
+            "right": "customer_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "stg_wishlists",
+      "name": "j_wish_customers",
+      "operation": "join",
+      "right": "stg_customers"
+    },
+    {
+      "columns": [
+        {
+          "side": "left",
+          "source": "code",
+          "target": "code"
+        },
+        {
+          "side": "left",
+          "source": "added",
+          "target": "added"
+        },
+        {
+          "side": "right",
+          "source": "product_name",
+          "target": "product_name"
+        }
+      ],
+      "derived_columns": [],
+      "filters": [],
+      "grain": [
+        "code"
+      ],
+      "join": {
+        "on": [
+          {
+            "left": "product_id",
+            "right": "product_id"
+          }
+        ],
+        "type": "inner"
+      },
+      "left": "j_wish_customers",
+      "name": "j_full",
+      "operation": "join",
+      "right": "stg_products"
+    }
+  ],
+  "output_models": [
+    {
+      "dimensions": [],
+      "filters": [],
+      "grain": [
+        "product_name"
+      ],
+      "group_by": [
+        {
+          "source": "product_name",
+          "target": "product_name"
+        }
+      ],
+      "metrics": [
+        {
+          "column": "added",
+          "function": "max",
+          "name": "latest"
+        },
+        {
+          "function": "count_rows",
+          "name": "n_wishes"
+        }
+      ],
+      "name": "o_latest_by_product",
+      "source": "j_full"
+    }
+  ],
+  "raw_tables": [
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 3,
+            "kind": "formatted_id",
+            "prefix": "CU-"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "person_name",
+            "locale": "de_DE"
+          },
+          "name": "full_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_customers",
+      "primary_key": [
+        "customer_id"
+      ],
+      "rows": {
+        "max": 30,
+        "min": 30
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "digits": 4,
+            "kind": "formatted_id",
+            "prefix": "PD-"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "random_string",
+            "max_length": 14,
+            "min_length": 5
+          },
+          "name": "product_name",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        }
+      ],
+      "name": "raw_products",
+      "primary_key": [
+        "product_id"
+      ],
+      "rows": {
+        "max": 20,
+        "min": 20
+      }
+    },
+    {
+      "columns": [
+        {
+          "generator": {
+            "alphabet": "ABCDEFGHJKMNPQRSTUVWXYZ23456789",
+            "kind": "random_string",
+            "max_length": 6,
+            "min_length": 6
+          },
+          "name": "code",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_gifting",
+            "target_side": "left"
+          },
+          "name": "customer_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "foreign_key",
+            "relationship": "rel_gifting",
+            "target_side": "right"
+          },
+          "name": "product_id",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "string",
+          "unique": false
+        },
+        {
+          "generator": {
+            "kind": "date_range",
+            "max": "2024-12-31",
+            "min": "2024-01-01"
+          },
+          "name": "added",
+          "null_probability": 0.0,
+          "nullable": false,
+          "type": "date",
+          "unique": false
+        }
+      ],
+      "name": "raw_wishlists",
+      "primary_key": [],
+      "rows": {
+        "max": 300,
+        "min": 100
+      }
+    }
+  ],
+  "relationships": [
+    {
+      "bridge": {
+        "left_columns": [
+          "customer_id"
+        ],
+        "right_columns": [
+          "product_id"
+        ],
+        "table": "raw_wishlists"
+      },
+      "cardinality": "many_to_many",
+      "left": {
+        "columns": [
+          "customer_id"
+        ],
+        "table": "raw_customers"
+      },
+      "name": "rel_gifting",
+      "right": {
+        "columns": [
+          "product_id"
+        ],
+        "table": "raw_products"
+      }
+    }
+  ],
+  "scenario_id": "retail_gifting_001",
+  "schema_version": "1.0",
+  "staging_models": [
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [],
+          "source": "full_name",
+          "target": "full_name"
+        }
+      ],
+      "grain": [
+        "customer_id"
+      ],
+      "name": "stg_customers",
+      "row_operations": [],
+      "source": "raw_customers"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "product_name",
+          "target": "product_name"
+        }
+      ],
+      "grain": [
+        "product_id"
+      ],
+      "name": "stg_products",
+      "row_operations": [],
+      "source": "raw_products"
+    },
+    {
+      "columns": [
+        {
+          "operations": [],
+          "source": "code",
+          "target": "code"
+        },
+        {
+          "operations": [],
+          "source": "customer_id",
+          "target": "customer_id"
+        },
+        {
+          "operations": [],
+          "source": "product_id",
+          "target": "product_id"
+        },
+        {
+          "operations": [],
+          "source": "added",
+          "target": "added"
+        }
+      ],
+      "grain": [
+        "code"
+      ],
+      "name": "stg_wishlists",
+      "row_operations": [],
+      "source": "raw_wishlists"
+    }
+  ],
+  "tests": [
+    {
+      "columns": [
+        "added"
+      ],
+      "model": "stg_wishlists",
+      "name": "added_present",
+      "type": "not_null"
+    }
+  ]
+}

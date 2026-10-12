@@ -1,0 +1,164 @@
+{
+  "cases": {
+    "hospitality_loyalty_001": {
+      "category": "small",
+      "clean": "success",
+      "dbt": {
+        "models_ok": 6,
+        "models_total": 6,
+        "node_elapsed_s": 0.3,
+        "tests_ok": 25,
+        "tests_total": 25
+      },
+      "declared_max": 300,
+      "downstream_by_model": {
+        "j_full": 214,
+        "j_red_members": 214,
+        "o_points_by_reward": 10,
+        "stg_members": 30,
+        "stg_redemptions": 214,
+        "stg_rewards": 10
+      },
+      "downstream_max": 214,
+      "features": {
+        "composite_raw_pk": false,
+        "intermediate": [],
+        "join_types": [
+          "inner"
+        ],
+        "metrics": [
+          "count_rows",
+          "sum"
+        ],
+        "staging_ops": [
+          "trim"
+        ]
+      },
+      "peak_rss_mb": 166.9,
+      "realized_by_table": {
+        "raw_members": 30,
+        "raw_redemptions": 214,
+        "raw_rewards": 10
+      },
+      "realized_max": 214,
+      "scenario_id": "hospitality_loyalty_001",
+      "seed": 0,
+      "timings_s": {
+        "open": 3.3,
+        "validate": 0.0
+      }
+    },
+    "scale_large_001": {
+      "category": "large",
+      "clean": "success",
+      "dbt": {
+        "models_ok": 7,
+        "models_total": 7,
+        "node_elapsed_s": 0.4,
+        "tests_ok": 29,
+        "tests_total": 29
+      },
+      "declared_max": 90000,
+      "downstream_by_model": {
+        "d_harvests": 53711,
+        "j_full": 53711,
+        "j_harv_fields": 53711,
+        "o_yield_by_year": 5,
+        "stg_farms": 8,
+        "stg_fields": 20,
+        "stg_harvests": 53711
+      },
+      "downstream_max": 53711,
+      "features": {
+        "composite_raw_pk": false,
+        "intermediate": [
+          "deduplicate",
+          "derive"
+        ],
+        "join_types": [
+          "inner"
+        ],
+        "metrics": [
+          "count_rows",
+          "sum"
+        ],
+        "staging_ops": []
+      },
+      "peak_rss_mb": 166.9,
+      "realized_by_table": {
+        "raw_farms": 8,
+        "raw_fields": 20,
+        "raw_harvests": 53711
+      },
+      "realized_max": 53711,
+      "scenario_id": "scale_large_001",
+      "seed": 0,
+      "timings_s": {
+        "open": 24.2,
+        "validate": 0.0
+      }
+    },
+    "scale_medium_001": {
+      "category": "medium",
+      "clean": "success",
+      "dbt": {
+        "models_ok": 7,
+        "models_total": 7,
+        "node_elapsed_s": 0.3,
+        "tests_ok": 28,
+        "tests_total": 28
+      },
+      "declared_max": 6000,
+      "downstream_by_model": {
+        "d_programs": 200,
+        "j_apps_reviewers": 5968,
+        "j_full": 2948,
+        "o_score_by_degree": 3,
+        "stg_applications": 5968,
+        "stg_programs": 200,
+        "stg_reviewers": 12
+      },
+      "downstream_max": 5968,
+      "features": {
+        "composite_raw_pk": true,
+        "intermediate": [
+          "deduplicate",
+          "filter"
+        ],
+        "join_types": [
+          "inner",
+          "left"
+        ],
+        "metrics": [
+          "avg",
+          "count_rows"
+        ],
+        "staging_ops": []
+      },
+      "peak_rss_mb": 114.1,
+      "realized_by_table": {
+        "raw_applications": 5968,
+        "raw_programs": 200,
+        "raw_reviewers": 12
+      },
+      "realized_max": 5968,
+      "scenario_id": "scale_medium_001",
+      "seed": 0,
+      "timings_s": {
+        "open": 7.1,
+        "validate": 0.0
+      }
+    }
+  },
+  "date": "2026-10-08",
+  "env": {
+    "platform": "macOS-26.5.2-arm64-arm-64bit-Mach-O",
+    "python": "3.14.7",
+    "rss_unit_note": "ru_maxrss is bytes on macOS, kilobytes on Linux"
+  },
+  "notes": [
+    "Downstream row counts never gate acceptance: even the many-to-many topology prepares cleanly with its full fan-out intact (no truncation).",
+    "Across the corpus and these cases, realized downstream maxima track the raw maximum (FK-disciplined joins), so the \u00a74.2 expansion clause stays vacuous but harmless; acceptance ignores downstream counts either way."
+  ],
+  "suite": "tests/cli/test_c15_scale.py (PLGEN_SLOW=1)"
+}
